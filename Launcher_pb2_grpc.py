@@ -24,6 +24,11 @@ class LauncherServiceStub(object):
         request_serializer=Launcher__pb2.Empty.SerializeToString,
         response_deserializer=Launcher__pb2.BoolValue.FromString,
         )
+    self.SetLogName = channel.unary_unary(
+        '/launcherservice.LauncherService/SetLogName',
+        request_serializer=Launcher__pb2.String.SerializeToString,
+        response_deserializer=Launcher__pb2.BoolValue.FromString,
+        )
 
 
 class LauncherServiceServicer(object):
@@ -31,13 +36,20 @@ class LauncherServiceServicer(object):
   pass
 
   def StartScheduler(self, request, context):
-    """rpc StartBroker(Empty) returns (BoolValue) {};
-    """
+    # missing associated documentation comment in .proto file
+    pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
   def StartWorker(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def SetLogName(self, request, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -55,6 +67,11 @@ def add_LauncherServiceServicer_to_server(servicer, server):
       'StartWorker': grpc.unary_unary_rpc_method_handler(
           servicer.StartWorker,
           request_deserializer=Launcher__pb2.Empty.FromString,
+          response_serializer=Launcher__pb2.BoolValue.SerializeToString,
+      ),
+      'SetLogName': grpc.unary_unary_rpc_method_handler(
+          servicer.SetLogName,
+          request_deserializer=Launcher__pb2.String.FromString,
           response_serializer=Launcher__pb2.BoolValue.SerializeToString,
       ),
   }

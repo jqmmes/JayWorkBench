@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='launcherservice',
   syntax='proto3',
   serialized_options=_b('\n%pt.up.fc.dcc.hyrax.od_launcher.protocB\nODLauncher'),
-  serialized_pb=_b('\n\x0eLauncher.proto\x12\x0flauncherservice\"\x1a\n\tBoolValue\x12\r\n\x05value\x18\x01 \x01(\x08\"\x07\n\x05\x45mpty2\x9e\x01\n\x0fLauncherService\x12\x46\n\x0eStartScheduler\x12\x16.launcherservice.Empty\x1a\x1a.launcherservice.BoolValue\"\x00\x12\x43\n\x0bStartWorker\x12\x16.launcherservice.Empty\x1a\x1a.launcherservice.BoolValue\"\x00\x42\x33\n%pt.up.fc.dcc.hyrax.od_launcher.protocB\nODLauncherb\x06proto3')
+  serialized_pb=_b('\n\x0eLauncher.proto\x12\x0flauncherservice\"\x1a\n\tBoolValue\x12\r\n\x05value\x18\x01 \x01(\x08\"\x07\n\x05\x45mpty\"\x15\n\x06String\x12\x0b\n\x03str\x18\x01 \x01(\t2\xe3\x01\n\x0fLauncherService\x12\x46\n\x0eStartScheduler\x12\x16.launcherservice.Empty\x1a\x1a.launcherservice.BoolValue\"\x00\x12\x43\n\x0bStartWorker\x12\x16.launcherservice.Empty\x1a\x1a.launcherservice.BoolValue\"\x00\x12\x43\n\nSetLogName\x12\x17.launcherservice.String\x1a\x1a.launcherservice.BoolValue\"\x00\x42\x33\n%pt.up.fc.dcc.hyrax.od_launcher.protocB\nODLauncherb\x06proto3')
 )
 
 
@@ -79,8 +79,40 @@ _EMPTY = _descriptor.Descriptor(
   serialized_end=70,
 )
 
+
+_STRING = _descriptor.Descriptor(
+  name='String',
+  full_name='launcherservice.String',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='str', full_name='launcherservice.String.str', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=72,
+  serialized_end=93,
+)
+
 DESCRIPTOR.message_types_by_name['BoolValue'] = _BOOLVALUE
 DESCRIPTOR.message_types_by_name['Empty'] = _EMPTY
+DESCRIPTOR.message_types_by_name['String'] = _STRING
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 BoolValue = _reflection.GeneratedProtocolMessageType('BoolValue', (_message.Message,), dict(
@@ -97,6 +129,13 @@ Empty = _reflection.GeneratedProtocolMessageType('Empty', (_message.Message,), d
   ))
 _sym_db.RegisterMessage(Empty)
 
+String = _reflection.GeneratedProtocolMessageType('String', (_message.Message,), dict(
+  DESCRIPTOR = _STRING,
+  __module__ = 'Launcher_pb2'
+  # @@protoc_insertion_point(class_scope:launcherservice.String)
+  ))
+_sym_db.RegisterMessage(String)
+
 
 DESCRIPTOR._options = None
 
@@ -106,8 +145,8 @@ _LAUNCHERSERVICE = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=73,
-  serialized_end=231,
+  serialized_start=96,
+  serialized_end=323,
   methods=[
   _descriptor.MethodDescriptor(
     name='StartScheduler',
@@ -124,6 +163,15 @@ _LAUNCHERSERVICE = _descriptor.ServiceDescriptor(
     index=1,
     containing_service=None,
     input_type=_EMPTY,
+    output_type=_BOOLVALUE,
+    serialized_options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='SetLogName',
+    full_name='launcherservice.LauncherService.SetLogName',
+    index=2,
+    containing_service=None,
+    input_type=_STRING,
     output_type=_BOOLVALUE,
     serialized_options=None,
   ),

@@ -20,11 +20,13 @@ class remoteClient:
     launcherStubStatus = ChannelConnectivity.SHUTDOWN
     launcherStub = None
     ip = None
+    name = ""
     schedulers = None
     models = None
 
-    def __init__(self, ip):
+    def __init__(self, ip, adbName):
         self.ip = ip
+        self.name = adbName
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
@@ -92,9 +94,18 @@ class remoteClient:
         if (self.brokerStubReady()):
             return self.brokerStub.scheduleJob(job.getProto())
 
+    def setLogName(self, log_name):
+        if (self.launcherStubReady()):
+            name = Launcher_pb2.String()
+            name.str = log_name
+            print(self.launcherStub.SetLogName(name))
+
 class Job:
-    id = str(uuid.uuid4())
+    id = ""
     data = None
+
+    def __init__(self):
+        self.id = str(uuid.uuid4())
 
     def addBytes(self, bytes):
         self.data = bytes
