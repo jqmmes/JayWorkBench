@@ -6,38 +6,12 @@ import os
 import adb
 import configparser
 from sys import argv
-from dataclasses import dataclass
-
-#LOG_NAME='Log_03'
-#RATE = 1/5 # Events/Seconds --> Events per seconds
 
 ASSETS=os.listdir("assets")
 EXPERIMENTS = []
-RUNNING_WORKERS = 0
 PENDING_JOBS = 0
-'''
-def run():
-    devices = adb.listDevices()
-    for device in devices:
-        adb.rebootAndWait(device)
-        adb.stopAll()
-        adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True)
-    worker = grpcControls.remoteClient(adb.getDeviceIp(devices[0]), devices[0])
-    worker.connectLauncherService()
-    worker.setLogName(LOG_NAME)
-    worker.startWorker()
-    worker.startScheduler()
-    worker.connectBrokerService()
-    sleep(1)
-    print(worker.listSchedulers())
-    worker.setScheduler(worker.listSchedulers().scheduler[0])
-    worker.setModel(worker.listModels().models[0])
-    while True:
-        sleep(random.expovariate(RATE))
-        threading.Thread(target = runJob, args = (worker,)).start()
-    adb.stopAll()
-    adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % LOG_NAME, destination='logs/%s_%s.csv' % (devices[0], LOG_NAME))
-'''
+PENDING_WORKERS = 0
+START_TIME=0
 
 def runJob(worker):
     global PENDING_JOBS
@@ -56,53 +30,93 @@ def runJob(worker):
     print(worker.scheduleJob(job))
     PENDING_JOBS -= 1
 
-START_TIME=time()
+def startWorker(experiment, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+    global PENDING_JOBS, PENDING_WORKERS
+    if experiment.reboot:
+        adb.rebootAndWait(device)
+    adb.stopAll(device)
+    adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True)
+    worker = grpcControls.remoteClient(adb.getDeviceIp(device), device)
+    worker.connectLauncherService()
+    worker.setLogName(experiment.name)
+    worker.startWorker()
+    worker.startScheduler()
+    worker.connectBrokerService()
+    sleep(2)
+    for scheduler in worker.listSchedulers().scheduler:
+        if scheduler.name == experiment.scheduler:
+            if (worker.setScheduler(scheduler) is None):
+                print("Failed to setScheduler on %s" % device)
+                return
+            break
+    for model in worker.listModels().models:
+        if model.name == experiment.model:
+            if (worker.setModel(model) is None):
+                print("Failed to setScheduler on %s" % device)
+                return
+            break
+
+    boot_barrier.wait()
+
+    rate = float(experiment.request_rate)/float(experiment.request_time)
+
+    start_barrier.wait()
+    while (time()-START_TIME) < experiment.duration:
+        next_event_in = random.expovariate(rate)
+        if next_event_in > (experiment.duration-time()-START_TIME):
+            break
+        sleep(next_event_in)
+        threading.Thread(target = runJob, args = (worker,)).start()
+
+    complete_barrier.wait()
+
+    log_pull_barrier.wait()
+    adb.stopAll(worker.name)
+    worker.destroy()
+    adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%s.csv' % (experiment.name, worker.name), device=worker.name)
+
+    finish_barrier.wait()
+
+
+def cleanLogs(path):
+    if os.path.isdir(path):
+        for f in os.listdir(path):
+            os.remove("%s%s" % (path, f))
+    else:
+        os.makedirs(path, exist_ok=True)
+
 
 def runExperiment(experiment):
-    global START_TIME, RUNNING_WORKERS, PENDING_JOBS
+    global START_TIME, PENDING_JOBS
     random.seed(experiment.seed)
-    devices = random.shuffle(adb.listDevices())[:experiment.devices]
-    workers = []
-    for device in devices:
-        if experiment.reboot:
-            adb.rebootAndWait(device)
-        adb.stopAll(device)
-        adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True)
-        worker = grpcControls.remoteClient(adb.getDeviceIp(devices), devices)
-        worker.connectLauncherService()
-        worker.setLogName(experiment.name)
-        worker.startWorker()
-        worker.startScheduler()
-        worker.connectBrokerService()
-        sleep(2)
-        for scheduler in worker.listSchedulers():
-            if scheduler.name == experiment.scheduler:
-                worker.setScheduler(scheduler)
-                break
-        for model in worker.listModels():
-            if model.name == experiment.model:
-                worker.setModel(model)
-                break
-        workers.append(worker)
+    cleanLogs("logs/%s/" % experiment.name)
+
+    devices = adb.listDevices()
+    if (len(devices) < experiment.devices):
+        print("Not Enought Devices")
+        return
+    devices.sort()
+    random.shuffle(devices)
+    boot_barrier = threading.Barrier(experiment.devices + 1)
+    start_barrier = threading.Barrier(experiment.devices + 1)
+    complete_barrier = threading.Barrier(experiment.devices + 1)
+    log_pull_barrier = threading.Barrier(experiment.devices + 1)
+    finish_barrier = threading.Barrier(experiment.devices + 1)
+    for device in devices[:experiment.devices]:
+        threading.Thread(target = startWorker, args = (experiment, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
+
+    boot_barrier.wait()
+    sleep(10)
     START_TIME=time()
-    for worker in workers:
-        threading.Thread(target = generateJobs, args = (experiment.duration, (float(experiment.request_rate)/float(experiment.request_time)), worker)).start()
-    sleep(experiment.duration - (Time()-START_TIME))
-    while RUNNING_WORKERS > 0 and PENDING_JOBS > 0:
+    start_barrier.wait()
+
+    complete_barrier.wait()
+    while PENDING_JOBS > 0:
         sleep(5)
-    for worker in workers:
-        adb.stopAll(worker.name)
-        adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % LOG_NAME, destination='logs/%s/%s_%s.csv' % (experiment.name, worker.name, experiment.name))
+    sleep(10)
+    log_pull_barrier.wait()
+    finish_barrier.wait()
 
-def generateJobs(time_limit, rate, worker):
-    global RUNNING_WORKERS
-    RUNNING_WORKERS += 1
-    while (time()-START_TIME) < time_limit:
-        sleep(random.expovariate(rate))
-        threading.Thread(target = runJob, args = (worker,)).start()
-    RUNNING_WORKERS -= 1
-
-@dataclass
 class Experiment:
     name = ""
     scheduler = "SingleDevice [LOCAL]"
@@ -137,31 +151,88 @@ def readConfig(confName):
                 experiment.request_rate = int(config[section][option])
             elif option == "generationrateseconds":
                 experiment.request_time = int(config[section][option])
-                if (experiment.request_time == 0) experiment.request_time = 1
+                if (experiment.request_time == 0): experiment.request_time = 1
             elif option == "duration":
                 experiment.duration = int(config[section][option])
             elif option == "turnoncloud":
                 experiment.cloud = config[section][option] == "True"
-            elif option = "seed":
+            elif option == "seed":
                 experiment.seed = config[section][option]
         EXPERIMENTS.append(experiment)
 
+def help():
+    print('''        ================================================ HELP ================================================
+        Run:        python3 test.py conf.cfg
+
+        Config Parameters:
+                    # Comment. Use python configparser syntax
+                    [Experiment Name]
+                    # Config Options
+                    Strategy                = Scheduler to use [STR]
+                    Model                   = Tensorflow model to use [STR]
+                    Devices                 = Number of Devices [INT]
+                    RebootDevices           = True|False [BOOL]
+                    GenerationRateRequests  = Number of requests (Poisson Distribution) [INT]
+                    GenerationRateSeconds   = Per ammount of time (Poisson Distribution) [INT]
+                    Duration                = experiment duration [INT]
+                    TurnOnCloud             = True|False [BOOL]
+                    Seed                    = Seed to use [STR]
+
+        Models:
+                    ssd_mobilenet_v1_fpn_coco
+                    ssd_mobilenet_v1_coco
+                    ssd_mobilenet_v2_coco
+                    ssdlite_mobilenet_v2_coco
+                    ssd_resnet_50_fpn_coco
+
+        Strategies:
+                    SingleDeviceScheduler [LOCAL]
+                    SingleDeviceScheduler [REMOTE]
+                    SingleDeviceScheduler [CLOUD]
+
+                    MultiDeviceScheduler [RoundRobin] [LOCAL]
+                    MultiDeviceScheduler [RoundRobin] [REMOTE]
+                    MultiDeviceScheduler [RoundRobin] [CLOUD]
+                    MultiDeviceScheduler [RoundRobin] [LOCAL, CLOUD]
+                    MultiDeviceScheduler [RoundRobin] [LOCAL, REMOTE]
+                    MultiDeviceScheduler [RoundRobin] [CLOUD, REMOTE]
+                    MultiDeviceScheduler [RoundRobin] [LOCAL, CLOUD, REMOTE]
+
+                    MultiDeviceScheduler [Random] [LOCAL]
+                    MultiDeviceScheduler [Random] [REMOTE]
+                    MultiDeviceScheduler [Random] [CLOUD]
+                    MultiDeviceScheduler [Random] [LOCAL, CLOUD]
+                    MultiDeviceScheduler [Random] [LOCAL, REMOTE]
+                    MultiDeviceScheduler [Random] [CLOUD, REMOTE]
+                    MultiDeviceScheduler [Random] [LOCAL, CLOUD, REMOTE]
+
+                    SmartScheduler
+
+                    EstimatedTimeScheduler
+        ================================================ HELP ================================================''')
+
 def main():
     if (len(argv) < 2):
-        print("Please provide config file")
+        print("\tPlease provide config file!")
+        help()
         return
+    if argv[1].lower() == "help":
+        help()
     readConfig(argv[1])
     for e in EXPERIMENTS:
-        print(e.name)
-        print(e.scheduler)
-        print(e.model)
-        print(e.devices)
-        print(e.reboot)
-        print(e.request_rate)
-        print(e.request_time)
-        print(e.duration)
-        print(e.cloud)
-        print(e.seed)
+        print("Experiment: " + e.name)
+        print("========== CONFIG ==========")
+        print("Scheduler: ", e.scheduler)
+        print("TF Model: ", e.model)
+        print("Devices: ", str(e.devices))
+        print("Reboot: ", e.reboot)
+        print("Rate: ", str(e.request_rate))
+        print("Rate Time: ", str(e.request_time) + "s")
+        print("Duration: ", str(e.duration) + "s")
+        print("Cloud: ", e.cloud)
+        print("Seed: ", e.seed)
+        print("=============================")
+        runExperiment(e)
 
 if __name__ == '__main__':
     main()

@@ -14,7 +14,13 @@ def adb(cmd, device=None):
     selected_device = []
     if(device != None):
         selected_device = ['-s', device]
-    result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE)
+    debug = "adb"
+    for i in selected_device:
+        debug += " " + i
+    for i in cmd:
+        debug += " " + i
+    print(debug)
+    result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=None)
     return result.stdout.decode('UTF-8')
 
 def gcloud(cmd):
@@ -37,15 +43,15 @@ def startService(service, package=PACKAGE, device=None, wait=False):
             sleep(0.5)
         sleep(4)
 
-def stopService(service, package=PACKAGE):
-    print(adb(['shell', 'am', 'stopservice', "%s/%s" % (package, service)]))
+def stopService(service, package=PACKAGE, device=None):
+    adb(['shell', 'am', 'stopservice', "%s/%s" % (package, service)], device)
 
-def stopAll():
-    stopService(LAUNCHER_SERVICE, LAUNCHER_PACKAGE)
-    forceStopApplication(PACKAGE)
-    stopService("%s%s" % (PACKAGE, WORKER), LAUNCHER_PACKAGE)
-    stopService("%s%s" % (PACKAGE, SCHEDULER), LAUNCHER_PACKAGE)
-    stopService("%s%s" % (PACKAGE, BROKER), LAUNCHER_PACKAGE)
+def stopAll(device=None):
+    stopService(LAUNCHER_SERVICE, LAUNCHER_PACKAGE, device)
+    forceStopApplication(PACKAGE, device=device)
+    stopService("%s%s" % (PACKAGE, WORKER), LAUNCHER_PACKAGE, device)
+    stopService("%s%s" % (PACKAGE, SCHEDULER), LAUNCHER_PACKAGE, device)
+    stopService("%s%s" % (PACKAGE, BROKER), LAUNCHER_PACKAGE, device)
 
 def init():
     adb(['start-server'])
@@ -53,16 +59,16 @@ def init():
 def close():
     adb(['kill-server'])
 
-def checkPackageInstalled():
-    return (PACKAGE in adb(['shell', 'pm', 'list', 'packages']))
+def checkPackageInstalled(device=None):
+    return (PACKAGE in adb(['shell', 'pm', 'list', 'packages'], device))
 
-def installPackage(package):
-    adb(['install', package])
+def installPackage(package, device=None):
+    adb(['install', package], device)
 
-def removePackage():
-    adb(['shell', 'pm', 'clear', PACKAGE])
-    adb(['shell', 'pm', 'reset-permissions', PACKAGE])
-    adb(['shell', 'pm', 'uninstall', PACKAGE])
+def removePackage(device=None):
+    adb(['shell', 'pm', 'clear', PACKAGE], device)
+    adb(['shell', 'pm', 'reset-permissions', PACKAGE], device)
+    adb(['shell', 'pm', 'uninstall', PACKAGE], device)
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
     instances = gcloud(['compute', 'instances', 'list']).split('\n')
@@ -80,41 +86,27 @@ def cloudInstanceStop(instanceName = 'hyrax'):
     if cloudInstanceRunning(instanceName):
         gcloud(['compute', 'instances', 'stop', instanceName])
 
-def startApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', entryPoint = 'MainActivity'):
-    adb(['shell', 'am', 'start', '-n', "%s/%s.%s" % (PACKAGE, applicationName, entryPoint)])
+def startApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', entryPoint = 'MainActivity', device=None):
+    adb(['shell', 'am', 'start', '-n', "%s/%s.%s" % (PACKAGE, applicationName, entryPoint)], device)
 
 
-def forceStopApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', entryPoint = 'MainActivity'):
-    adb(['shell', 'am', 'force-stop', applicationName])
+def forceStopApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', device=None):
+    adb(['shell', 'am', 'force-stop', applicationName], device)
 
-def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination="."):
-    print("pull /sdcard/Android/data/%s/%s.%s %s" % (applicationName, path, format, destination))
-    adb(['pull', "/sdcard/Android/data/%s/%s.%s" % (applicationName, path, format), destination])
+def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination=".", device=None):
+    adb(['pull', "/sdcard/Android/data/%s/%s.%s" % (applicationName, path, format), destination], device)
 
 def getDeviceIp(device):
-    info = adb(['-s', device, 'shell', 'ip', 'addr', 'show', 'wlan0'])
+    info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
     info = info[info.find('inet ')+5:]
     return info[:info.find('/')]
 
 def rebootAndWait(device):
-    adb(['-s', device, 'reboot'])
-    adb(['-s', device, 'wait-for-device'])
-    while (adb(['-s', device, 'shell', 'getprop', 'dev.bootcomplete']).find('1') == -1):
-        sleep(2)
+    adb(['reboot'], device)
+    adb(['wait-for-device'], device)
+    while (adb(['shell', 'getprop', 'dev.bootcomplete'], device).find('1') == -1):
+        sleep(5)
 
 def isServiceRunning(device, service):
     service_info = adb(['shell', 'dumpsys', 'activity', 'services', service], device)
     return service_info.find(service) != -1
-
-
-if __name__ == '__main__':
-    startApplication()
-    forceStopApplication()
-    exit()
-    cloudInstanceStart()
-    init()
-    print(listDevices())
-    print(checkPackageInstalled())
-    removePackage()
-    print(checkPackageInstalled())
-    close()
