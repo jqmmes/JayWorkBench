@@ -11,16 +11,15 @@ ASSETS=os.listdir("assets")
 EXPERIMENTS = []
 PENDING_JOBS = 0
 PENDING_WORKERS = 0
-START_TIME=0
 
-def runJob(worker):
+def runJob(worker, device_random):
     global PENDING_JOBS
     PENDING_JOBS += 1
     job = grpcControls.Job()
-    asset = ASSETS[random.randint(0,len(ASSETS)-1)]
+    asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
 
     while (asset[-4:] not in ['.png', '.jpg']):
-        asset = ASSETS[random.randint(0,len(ASSETS)-1)]
+        asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
 
     with open("assets/%s" % asset, "rb") as image:
         f = image.read()
@@ -32,6 +31,8 @@ def runJob(worker):
 
 def startWorker(experiment, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
+    device_random = random.Random()
+    device_random.seed(experiment.seed+device)
     if experiment.reboot:
         adb.rebootAndWait(device)
     adb.stopAll(device)
@@ -60,13 +61,16 @@ def startWorker(experiment, device, boot_barrier, start_barrier, complete_barrie
 
     rate = float(experiment.request_rate)/float(experiment.request_time)
 
+
     start_barrier.wait()
-    while (time()-START_TIME) < experiment.duration:
-        next_event_in = random.expovariate(rate)
-        if next_event_in > (experiment.duration-time()-START_TIME):
+    start_time=time()
+
+    while (time()-start_time) < experiment.duration:
+        next_event_in = device_random.expovariate(rate)
+        if next_event_in > experiment.duration-(time()-start_time):
             break
         sleep(next_event_in)
-        threading.Thread(target = runJob, args = (worker,)).start()
+        threading.Thread(target = runJob, args = (worker,device_random)).start()
 
     complete_barrier.wait()
 
@@ -87,8 +91,9 @@ def cleanLogs(path):
 
 
 def runExperiment(experiment):
-    global START_TIME, PENDING_JOBS
-    random.seed(experiment.seed)
+    global PENDING_JOBS
+    experiment_random = random.Random()
+    experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
 
     devices = adb.listDevices()
@@ -96,7 +101,7 @@ def runExperiment(experiment):
         print("Not Enought Devices")
         return
     devices.sort()
-    random.shuffle(devices)
+    experiment_random.shuffle(devices)
     boot_barrier = threading.Barrier(experiment.devices + 1)
     start_barrier = threading.Barrier(experiment.devices + 1)
     complete_barrier = threading.Barrier(experiment.devices + 1)
@@ -106,8 +111,7 @@ def runExperiment(experiment):
         threading.Thread(target = startWorker, args = (experiment, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
 
     boot_barrier.wait()
-    sleep(10)
-    START_TIME=time()
+    sleep(1)
     start_barrier.wait()
 
     complete_barrier.wait()
