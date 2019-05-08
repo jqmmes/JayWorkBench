@@ -77,14 +77,14 @@ def cloudInstanceRunning(instanceName = 'hyrax'):
             return True
     return False
 
-def cloudInstanceStart(instanceName = 'hyrax'):
+def cloudInstanceStart(instanceName = 'hyrax', zone = 'europe-west1-b'):
     if cloudInstanceRunning(instanceName):
         return
-    gcloud(['compute', 'instances', 'start', instanceName])
+    gcloud(['compute', 'instances', 'start', instanceName, '--zone=' + zone])
 
-def cloudInstanceStop(instanceName = 'hyrax'):
+def cloudInstanceStop(instanceName = 'hyrax', zone = 'europe-west1-b'):
     if cloudInstanceRunning(instanceName):
-        gcloud(['compute', 'instances', 'stop', instanceName])
+        gcloud(['compute', 'instances', 'stop', instanceName, '--zone=' + zone])
 
 def startApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', entryPoint = 'MainActivity', device=None):
     adb(['shell', 'am', 'start', '-n', "%s/%s.%s" % (PACKAGE, applicationName, entryPoint)], device)
