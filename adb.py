@@ -9,6 +9,7 @@ LAUNCHER_SERVICE = '.ODLauncherService'
 BROKER = '.services.BrokerAndroidService'
 SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
+DEBUG = True
 
 def adb(cmd, device=None):
     selected_device = []
@@ -19,7 +20,8 @@ def adb(cmd, device=None):
         debug += " " + i
     for i in cmd:
         debug += " " + i
-    print(debug)
+    if (DEBUG):
+        print(debug)
     result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=None)
     return result.stdout.decode('UTF-8')
 
@@ -27,14 +29,35 @@ def gcloud(cmd):
   result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE)
   return result.stdout.decode('UTF-8')
 
-def listDevices():
+def getBatteryLevel(device=None):
+    battery_details = adb(['shell', 'dumpsys', 'battery'], device)
+    level_start = battery_details.find('level:')
+    if (level_start == -1):
+        return 0
+    battery_details = battery_details[level_start + 7:]
+    level_end = battery_details.find('\n')
+    if (level_end == -1):
+        return 0
+    return int(battery_details[:level_end])
+
+def listDevices(minBattery = 15):
     devices_raw = adb(['devices']).split('\n')[1:]
     devices = []
     for dev in devices_raw:
         splitted = dev.split('\t')
         if (len(splitted) > 1 and splitted[1] == 'device'):
-            devices.append(splitted[0])
+            if (getBatteryLevel(splitted[0]) >= minBattery):
+                devices.append(splitted[0])
     return devices
+
+
+def screenOn(device = None):
+    adb(['shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'], device)
+
+def screenOff(device = None):
+    status = adb(['shell', 'dumpsys', 'power'], device)
+    if (status.find('Display Power: state=ON')):
+        adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
 
 def startService(service, package=PACKAGE, device=None, wait=False):
     adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)

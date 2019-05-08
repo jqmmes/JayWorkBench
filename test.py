@@ -117,10 +117,35 @@ def runExperiment(experiment):
     experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
 
+    adb.DEBUG = False
     devices = adb.listDevices()
     if (len(devices) < experiment.devices):
-        print("Not Enought Devices")
-        return
+        total_devices = len(adb.listDevices(0))
+        if (total_devices < experiment.devices):
+            print("Not Enought Devices")
+            return
+        print("Waiting for enough devices to charge (%d OK | %d NEEDED | %d TOTAL)" % (len(devices), experiment.devices, total_devices), end='')
+        stdout.flush()
+        while (len(devices) < experiment.devices):
+            total_devices = len(adb.listDevices(0))
+            if (total_devices < experiment.devices):
+                print("Not Enought Devices")
+                return
+            else:
+                sleep(60)
+                print('.', end='')
+                stdout.flush()
+                new_devices = adb.listDevices()
+                if (new_devices != devices):
+                    for dev in new_devices:
+                        if (dev not in devices):
+                            print("\nDevice %s OK" % dev)
+                    devices = new_devices
+                    if (len(devices) < experiment.devices):
+                        print("Waiting for enough devices to charge (%d OK | %d NEEDED | %d TOTAL)" % (len(devices), experiment.devices, total_devices), end='')
+        print()
+    adb.DEBUG = True
+
     conf = open("logs/%s/conf.cfg" % experiment.name, "w+")
     conf.write("Experiment: %s\n" % experiment.name)
     conf.write("========== CONFIG ==========\n")
@@ -160,6 +185,7 @@ def runExperiment(experiment):
         finish_barrier = threading.Barrier(experiment.devices + 1)
         producers = experiment.producers
         for device in devices[:experiment.devices]:
+            adb.screenOn(device)
             threading.Thread(target = startWorker, args = (experiment, repetition, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
             producers -= 1 # Os primeiros n devices é que produzem conteudo
 
@@ -173,6 +199,8 @@ def runExperiment(experiment):
         sleep(10)
         log_pull_barrier.wait()
         finish_barrier.wait()
+        for device in devices:
+            adb.screenOff(device)
         for cloud in experiment.clouds:
             print("Stopping %s Cloud Instance" % cloud[0])
             stdout.flush()
