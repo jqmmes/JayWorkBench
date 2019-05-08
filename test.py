@@ -175,6 +175,21 @@ def runExperiment(experiment):
                 sleep(5)
             print("\nWaiting %s Cloud DNS (%s) update" % (cloud[0], cloud[2]), end='')
             pingWait(cloud[2])
+            cloud = grpcControls.cloudClient(cloud[2], cloud[0])
+            cloud.connectLauncherService()
+            cloud.setLogName("%s_%s.csv" % (experiment.name, repetition))
+            cloud.startWorker()
+            sleep(2)
+            cloud.connectBrokerService()
+            sleep(2)
+            for model in cloud.listModels().models:
+                if model.name == experiment.model:
+                    if (cloud.setModel(model) is None):
+                        print("Failed to setScheduler on %s" % cloud[0])
+                        return
+                    break
+
+
         os.makedirs("logs/%s/%d/" % (experiment.name, repetition), exist_ok=True)
         devices.sort()
         experiment_random.shuffle(devices)
@@ -249,9 +264,11 @@ def readConfig(confName):
             elif option == "duration":
                 experiment.duration = int(config[section][option])
             elif option == "clouds":
+                clouds = []
                 for entry in config[section][option].split(','):
                     cloud_zone_address = entry.split("/")
-                    experiment.clouds += [(cloud_zone_address[0], cloud_zone_address[1], cloud_zone_address[2])]
+                    clouds += [(cloud_zone_address[0], cloud_zone_address[1], cloud_zone_address[2])]
+                    experiment.clouds = clouds
             elif option == "seed":
                 experiment.seed = config[section][option]
             elif option == "repetitions":
@@ -277,8 +294,9 @@ def help():
                     GenerationRateRequests  = Number of requests (Poisson Distribution) [INT]
                     GenerationRateSeconds   = Per ammount of time (Poisson Distribution) [INT]
                     Duration                = experiment duration [INT]
-                    TurnOnCloud             = True|False [BOOL]
                     Seed                    = Seed to use [STR]
+                    Clouds                  = Instance/Zone/IP, Instance/Zone/IP, ... [LIST]
+                    Producers               = Number of producer devices [INT]
 
         Models:
                     ssd_mobilenet_v1_fpn_coco

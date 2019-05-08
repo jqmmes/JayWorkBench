@@ -56,7 +56,7 @@ def screenOn(device = None):
 
 def screenOff(device = None):
     status = adb(['shell', 'dumpsys', 'power'], device)
-    if (status.find('Display Power: state=ON')):
+    if (status.find('Display Power: state=ON') != -1):
         adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
 
 def startService(service, package=PACKAGE, device=None, wait=False):
