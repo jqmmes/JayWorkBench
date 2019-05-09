@@ -44,10 +44,10 @@ def runJob(worker, device_random):
     print(worker.scheduleJob(job))
     PENDING_JOBS -= 1
 
-def startWorker(experiment, repetition, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
     device_random = random.Random()
-    device_random.seed(experiment.seed+device)
+    device_random.seed(experiment.seed+device+str(repetition))
     if experiment.reboot:
         adb.rebootAndWait(device)
     adb.stopAll(device)
@@ -59,42 +59,59 @@ def startWorker(experiment, repetition, is_producer, device, boot_barrier, start
     worker.startScheduler()
     worker.connectBrokerService()
     sleep(2)
-    for scheduler in worker.listSchedulers().scheduler:
-        if scheduler.name == experiment.scheduler:
-            if (worker.setScheduler(scheduler) is None):
-                print("Failed to setScheduler on %s" % device)
-                return
-            break
-    for model in worker.listModels().models:
-        if model.name == experiment.model:
-            if (worker.setModel(model) is None):
-                print("Failed to setScheduler on %s" % device)
-                return
-            break
-
-    boot_barrier.wait()
-
-    rate = float(experiment.request_rate)/float(experiment.request_time)
 
 
-    start_barrier.wait()
+    schedulers = worker.listSchedulers()
+    models = worker.listModels()
+    if (schedulers is None or models is None):
+        experiment.setFail()
+        boot_barrier.wait()
+        start_barrier.wait()
+        complete_barrier.wait()
+        log_pull_barrier.wait()
+        return
 
-    if (is_producer):
-        start_time=time()
 
-        while (time()-start_time) < experiment.duration:
-            next_event_in = device_random.expovariate(rate)
-            if next_event_in > experiment.duration-(time()-start_time):
+    if (experiment.isOK()):
+        for scheduler in schedulers.scheduler:
+            if scheduler.name == experiment.scheduler:
+                if (worker.setScheduler(scheduler) is None):
+                    print("Failed to setScheduler on %s" % device)
+                    return
                 break
-            sleep(next_event_in)
-            threading.Thread(target = runJob, args = (worker,device_random)).start()
+        for model in models.models:
+            if model.name == experiment.model:
+                if (worker.setModel(model) is None):
+                    print("Failed to setScheduler on %s" % device)
+                    return
+                break
 
-    complete_barrier.wait()
+        boot_barrier.wait()
 
-    log_pull_barrier.wait()
+        rate = float(experiment.request_rate)/float(experiment.request_time)
+
+
+        start_barrier.wait()
+
+        if (is_producer and experiment.isOK()):
+            start_time=time()
+
+            while ((time()-start_time) < experiment.duration and experiment.isOK()):
+                next_event_in = device_random.expovariate(rate)
+                if next_event_in > experiment.duration-(time()-start_time):
+                    break
+                sleep(next_event_in)
+                threading.Thread(target = runJob, args = (worker,device_random)).start()
+
+        complete_barrier.wait()
+
+        log_pull_barrier.wait()
+
     adb.stopAll(worker.name)
     worker.destroy()
-    adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%s.csv' % (experiment.name, repetition, worker.name), device=worker.name)
+
+    if (experiment.isOK()):
+        adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, worker.name), device=worker.name)
 
     finish_barrier.wait()
 
@@ -157,72 +174,108 @@ def runExperiment(experiment):
     conf.write("Rate Time: %s\n" % str(experiment.request_time) + "s")
     conf.write("Duration: %s\n" % str(experiment.duration) + "s")
     conf.write("Clouds: %s\n" % str(experiment.clouds))
+    conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
     conf.write("Seed: %s\n" % experiment.seed)
     conf.write("Repetitions: %s" % str(experiment.repetitions))
+    conf.write("Producers: %s" % e.producers)
+    conf.write("RepeatSeed: %s" % e.repeat_seed)
     conf.write("=============================\n")
     conf.close()
+
+    stopClouds(experiment)
+    for repetition in range(experiment.repetitions):
+        print("Running Repetition %d" % repetition)
+
+        complete_repetition = False
+        while (not complete_repetition):
+            os.makedirs("logs/%s/%d/" % (experiment.name, repetition), exist_ok=True)
+            devices.sort()
+            experiment_random.shuffle(devices)
+
+            for seed_repeat in experiment.repeat_seed:
+                startClouds(experiment, repetition, seed_repeat)
+                os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
+                boot_barrier = threading.Barrier(experiment.devices + 1)
+                start_barrier = threading.Barrier(experiment.devices + 1)
+                complete_barrier = threading.Barrier(experiment.devices + 1)
+                log_pull_barrier = threading.Barrier(experiment.devices + 1)
+                finish_barrier = threading.Barrier(experiment.devices + 1)
+                producers = experiment.producers
+                for device in devices[:experiment.devices]:
+                    adb.screenOn(device)
+                    threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
+                    producers -= 1 # Os primeiros n devices é que produzem conteudo
+
+                boot_barrier.wait()
+                sleep(1)
+                start_barrier.wait()
+
+                complete_barrier.wait()
+                while PENDING_JOBS > 0:
+                    sleep(5)
+                sleep(10)
+                log_pull_barrier.wait()
+                if (experiment.isOK()):
+                    pullLogsClouds(experiment, repetition, seed_repeat)
+                finish_barrier.wait()
+
+                for device in devices:
+                    adb.screenOff(device)
+
+                stopClouds(experiment)
+
+            if (experiment.isOK()):
+                complete_repetition = True
+
+
+        if (repetition != experiment.repetitions - 1):
+            print("Waiting 5s for next repetition")
+            sleep(5)
+
+def pullLogsClouds(experiment, repetition, seed_repeat):
+    for cloud in experiment.clouds:
+        log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
+        os.system("scp joaquim@%s:~/logs/ logs/%s/%d/%d/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[2], cloud[1]))
+
+def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_barrier):
+    print("Starting %s Cloud Instance" % cloud[0])
+    stdout.flush()
+    adb.cloudInstanceStart(cloud[0], cloud[1])
+    while (not adb.cloudInstanceRunning(cloud[0])):
+        sleep(5)
+    print("\nWaiting %s Cloud DNS (%s) update" % (cloud[0], cloud[2]), end='')
+    pingWait(cloud[2])
+    cloud = grpcControls.cloudClient(cloud[2], cloud[0])
+    cloud.connectLauncherService()
+    cloud.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    cloud.startWorker()
+    sleep(2)
+    cloud.connectBrokerService()
+    sleep(2)
+    models = cloud.listModels()
+    if (models is None):
+        experiment.setFail()
+    else:
+        for model in .models:
+            if model.name == experiment.model:
+                if (cloud.setModel(model) is None):
+                    print("Failed to setScheduler on %s" % cloud[0])
+                    return
+                break
+    cloud_barrier.wait()
+
+
+def startClouds(experiment, repetition, seed_repeat):
+    cloud_barrier = threading.Barrier(len(experiment.clouds) + 1)
+    for cloud in experiment.clouds:
+        threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_barrier)).start()
+    cloud_barrier.wait()
+
+def stopClouds(experiment):
     for cloud in experiment.clouds:
         print("Stopping %s Cloud Instance" % cloud[0])
         stdout.flush()
         adb.cloudInstanceStop(cloud[0], cloud[1])
-    for repetition in range(experiment.repetitions):
-        print("Running Repetition %d" % repetition)
-        for cloud in experiment.clouds:
-            print("Starting %s Cloud Instance" % cloud[0])
-            stdout.flush()
-            adb.cloudInstanceStart(cloud[0], cloud[1])
-            while (not adb.cloudInstanceRunning(cloud[0])):
-                sleep(5)
-            print("\nWaiting %s Cloud DNS (%s) update" % (cloud[0], cloud[2]), end='')
-            pingWait(cloud[2])
-            cloud = grpcControls.cloudClient(cloud[2], cloud[0])
-            cloud.connectLauncherService()
-            cloud.setLogName("%s_%s.csv" % (experiment.name, repetition))
-            cloud.startWorker()
-            sleep(2)
-            cloud.connectBrokerService()
-            sleep(2)
-            for model in cloud.listModels().models:
-                if model.name == experiment.model:
-                    if (cloud.setModel(model) is None):
-                        print("Failed to setScheduler on %s" % cloud[0])
-                        return
-                    break
-
-
-        os.makedirs("logs/%s/%d/" % (experiment.name, repetition), exist_ok=True)
-        devices.sort()
-        experiment_random.shuffle(devices)
-        boot_barrier = threading.Barrier(experiment.devices + 1)
-        start_barrier = threading.Barrier(experiment.devices + 1)
-        complete_barrier = threading.Barrier(experiment.devices + 1)
-        log_pull_barrier = threading.Barrier(experiment.devices + 1)
-        finish_barrier = threading.Barrier(experiment.devices + 1)
-        producers = experiment.producers
-        for device in devices[:experiment.devices]:
-            adb.screenOn(device)
-            threading.Thread(target = startWorker, args = (experiment, repetition, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
-            producers -= 1 # Os primeiros n devices é que produzem conteudo
-
-        boot_barrier.wait()
-        sleep(1)
-        start_barrier.wait()
-
-        complete_barrier.wait()
-        while PENDING_JOBS > 0:
-            sleep(5)
-        sleep(10)
-        log_pull_barrier.wait()
-        finish_barrier.wait()
-        for device in devices:
-            adb.screenOff(device)
-        for cloud in experiment.clouds:
-            print("Stopping %s Cloud Instance" % cloud[0])
-            stdout.flush()
-            adb.cloudInstanceStop(cloud[0], cloud[1])
-        if (repetition != experiment.repetitions - 1):
-            print("Waiting 5s for next repetition")
-            sleep(5)
 
 class Experiment:
     name = ""
@@ -234,12 +287,22 @@ class Experiment:
     request_time = 1
     duration = 0
     clouds = []
+    cloudlets = []
     seed = 0
     repetitions = 1
     producers = 0
+    repeat_seed = 1
+
+    _running_status = True
 
     def __init__(self, name):
         self.name = name
+
+    def setFail(self):
+        self._running_status = False
+
+    def isOK(self):
+        return self._running_status
 
 
 def readConfig(confName):
@@ -269,12 +332,19 @@ def readConfig(confName):
                     cloud_zone_address = entry.split("/")
                     clouds += [(cloud_zone_address[0], cloud_zone_address[1], cloud_zone_address[2])]
                     experiment.clouds = clouds
+            elif option == "cloudlets":
+                cloudlets = []
+                for entry in config[section][option].split(','):
+                    cloudlets += [entry]
+                    experiment.cloudlets = cloudlets
             elif option == "seed":
                 experiment.seed = config[section][option]
             elif option == "repetitions":
                 experiment.repetitions = int(config[section][option])
             elif option == "producers":
                 experiment.producers = int(config[section][option])
+            elif option == "repeatseed":
+                experiment.repeat_seed = int(config[section][option])
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         EXPERIMENTS.append(experiment)
@@ -297,6 +367,8 @@ def help():
                     Seed                    = Seed to use [STR]
                     Clouds                  = Instance/Zone/IP, Instance/Zone/IP, ... [LIST]
                     Producers               = Number of producer devices [INT]
+                    RepeatSeed              = Repeat experiment with same seed N times [INT]
+                    Cloudlets               = IP, ... [LIST]
 
         Models:
                     ssd_mobilenet_v1_fpn_coco
@@ -348,8 +420,11 @@ def main():
         print("Rate Time: ", str(e.request_time) + "s")
         print("Duration: ", str(e.duration) + "s")
         print("Clouds: ", e.clouds)
+        print("Cloudlets: ", e.cloudlets)
         print("Seed: ", e.seed)
         print("Repetitions: ", e.repetitions)
+        print("Producers: ", e.producers)
+        print("RepeatSeed: ", e.repeat_seed)
         print("=============================")
         runExperiment(e)
 
