@@ -177,8 +177,8 @@ def runExperiment(experiment):
     conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
     conf.write("Seed: %s\n" % experiment.seed)
     conf.write("Repetitions: %s" % str(experiment.repetitions))
-    conf.write("Producers: %s" % e.producers)
-    conf.write("RepeatSeed: %s" % e.repeat_seed)
+    conf.write("Producers: %s" % experiment.producers)
+    conf.write("RepeatSeed: %s" % experiment.repeat_seed)
     conf.write("=============================\n")
     conf.close()
 
@@ -192,7 +192,7 @@ def runExperiment(experiment):
             devices.sort()
             experiment_random.shuffle(devices)
 
-            for seed_repeat in experiment.repeat_seed:
+            for seed_repeat in range(experiment.repeat_seed):
                 startClouds(experiment, repetition, seed_repeat)
                 os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = threading.Barrier(experiment.devices + 1)
@@ -256,17 +256,20 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_barrier):
     if (models is None):
         experiment.setFail()
     else:
-        for model in .models:
+        for model in models.models:
+            print(model.name)
             if model.name == experiment.model:
+                print("OK")
                 if (cloud.setModel(model) is None):
                     print("Failed to setScheduler on %s" % cloud[0])
-                    return
+                    experiment.setFail()
                 break
     cloud_barrier.wait()
 
 
 def startClouds(experiment, repetition, seed_repeat):
     cloud_barrier = threading.Barrier(len(experiment.clouds) + 1)
+    print(len(experiment.clouds) + 1)
     for cloud in experiment.clouds:
         threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_barrier)).start()
     cloud_barrier.wait()
