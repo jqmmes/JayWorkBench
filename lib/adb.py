@@ -2,6 +2,7 @@
 #!/usr/bin/python3
 import subprocess
 from time import sleep
+from re import match
 
 PACKAGE = 'pt.up.fc.dcc.hyrax.odlib'
 LAUNCHER_PACKAGE = 'pt.up.fc.dcc.hyrax.od_launcher'
@@ -51,7 +52,7 @@ def listDevices(minBattery = 15):
     return devices
 
 def clearSystemLog(device=None):
-    adb(['logcat', '-d'], device)
+    adb(['logcat', '-c'], device)
 
 def pullSystemLog(device=None, path=""):
     destinationFile="system_log.txt"
@@ -60,7 +61,7 @@ def pullSystemLog(device=None, path=""):
     if device is not None:
         destinationFile = device + "_" + destinationFile
     with open("%s%s" % (path, destinationFile), "w+") as log:
-        log.write(adb(['logcat', 'd'], device))
+        log.write(adb(['logcat', '-d'], device))
         log.close()
 
 def screenOn(device = None):
@@ -134,7 +135,12 @@ def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination
 def getDeviceIp(device):
     info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
     info = info[info.find('inet ')+5:]
-    return info[:info.find('/')]
+    ip = info[:info.find('/')]
+    if (match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip)):
+        return ip
+    return None
+
+
 
 def rebootAndWait(device):
     adb(['reboot'], device)

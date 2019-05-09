@@ -1,9 +1,9 @@
-import lib.grpcControls
+import lib.grpcControls as grpcControls
+import lib.adb as adb
 from time import sleep, time
 import random
 import threading
 import os
-import adb
 import configparser
 from sys import argv, stdout
 
@@ -53,7 +53,23 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     adb.clearSystemLog(device)
     adb.stopAll(device)
     adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True)
-    worker = grpcControls.remoteClient(adb.getDeviceIp(device), device)
+    worker_ip = adb.getDeviceIp(device)
+    ip_fetch_retries = 5
+    while (worker_ip is None and ip_fetch_retries > 0):
+        print("Failed to obtain ip for %s retries left %d" % (device, ip_fetch_retries))
+        sleep(5)
+        worker_ip = adb.getDeviceIp(device)
+        ip_fetch_retries -= 1
+    if (worker_ip is None):
+        print("Failed to obtain ip for %s" % device)
+        experiment.setFail()
+        adb.rebootAndWait(device)
+        boot_barrier.wait()
+        start_barrier.wait()
+        complete_barrier.wait()
+        log_pull_barrier.wait()
+
+    worker = grpcControls.remoteClient(worker_ip, device)
     worker.connectLauncherService()
     worker.setLogName(experiment.name)
     worker.startWorker()
@@ -199,13 +215,17 @@ def runExperiment(experiment):
             experiment_random.shuffle(devices)
 
             for seed_repeat in range(experiment.repeat_seed):
-                startClouds(experiment, repetition, seed_repeat)
                 os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = threading.Barrier(experiment.devices + 1)
                 start_barrier = threading.Barrier(experiment.devices + 1)
                 complete_barrier = threading.Barrier(experiment.devices + 1)
                 log_pull_barrier = threading.Barrier(experiment.devices + 1)
-                finish_barrier = threading.Barrier(experiment.devices + 1)
+                finish_barrier = threading.Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
+                servers_finish_barrier = threading.Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
+
+                startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
+                startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
+
                 producers = experiment.producers
                 for device in devices[:experiment.devices]:
                     adb.screenOn(device)
@@ -222,13 +242,14 @@ def runExperiment(experiment):
                 sleep(10)
                 log_pull_barrier.wait()
                 if (experiment.isOK()):
-                    pullLogsClouds(experiment, repetition, seed_repeat)
+                    pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
+                servers_finish_barrier.wait()
                 finish_barrier.wait()
 
                 for device in devices:
                     adb.screenOff(device)
 
-                stopClouds(experiment)
+                #stopClouds(experiment)
 
             if (experiment.isOK()):
                 complete_repetition = True
@@ -238,12 +259,50 @@ def runExperiment(experiment):
             print("Waiting 5s for next repetition")
             sleep(5)
 
-def pullLogsClouds(experiment, repetition, seed_repeat):
-    for cloud in experiment.clouds:
-        log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
-        os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[0], cloud[1]))
 
-def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_barrier):
+def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
+    cloudlet_boot_barrier = threading.Barrier(len(experiment.cloudlets) + 1)
+    for cloudlet in experiment.cloudlets:
+        threading.Thread(target = startCloudletThread, args = (cloudlet, experiment, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+    cloudlet_boot_barrier.wait()
+
+def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier):
+    print("Starting %s Cloudlet Instance" % cloudlet)
+    cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet)
+
+    cloudlet_instance.stop()
+
+    cloudlet_instance.connectLauncherService()
+    cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    cloudlet_instance.startWorker()
+    sleep(2)
+    cloudlet_instance.connectBrokerService()
+    sleep(2)
+    models = cloudlet_instance.listModels()
+    if (models is None):
+        experiment.setFail()
+    else:
+        for model in models.models:
+            if model.name == experiment.model:
+                if (cloudlet_instance.setModel(model) is None):
+                    print("Failed to setScheduler on %s" % cloudlet)
+                    experiment.setFail()
+                break
+
+    cloudlet_boot_barrier.wait() #inform startCloudlets that you have booted
+
+    servers_finish_barrier.wait() #wait experiment completion to init shutdown
+    cloudlet_instance.stop()
+    finish_barrier.wait()
+
+def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
+    log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
+    for cloud in experiment.clouds:
+        os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[0], cloud[1]))
+    for cloudlet in experiment.cloudlets:
+        os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
+
+def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
     print("Starting %s Cloud Instance" % cloud[0])
     stdout.flush()
     adb.cloudInstanceStart(cloud[0], cloud[1])
@@ -251,34 +310,36 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_barrier):
         sleep(5)
     print("\nWaiting %s Cloud DNS (%s) update" % (cloud[0], cloud[2]), end='')
     pingWait(cloud[2])
-    cloud = grpcControls.cloudClient(cloud[2], cloud[0])
-    cloud.connectLauncherService()
-    cloud.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
-    cloud.startWorker()
+    cloud_instance = grpcControls.cloudClient(cloud[2], cloud[0])
+    cloud_instance.connectLauncherService()
+    cloud_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    cloud_instance.startWorker()
     sleep(2)
-    cloud.connectBrokerService()
+    cloud_instance.connectBrokerService()
     sleep(2)
-    models = cloud.listModels()
+    models = cloud_instance.listModels()
     if (models is None):
         experiment.setFail()
     else:
         for model in models.models:
-            print(model.name)
             if model.name == experiment.model:
-                print("OK")
-                if (cloud.setModel(model) is None):
+                if (cloud_instance.setModel(model) is None):
                     print("Failed to setScheduler on %s" % cloud[0])
                     experiment.setFail()
                 break
-    cloud_barrier.wait()
+    cloud_boot_barrier.wait()
+    servers_finish_barrier.wait()
+    print("Stopping %s Cloud Instance" % cloud[0])
+    stdout.flush()
+    adb.cloudInstanceStop(cloud[0], cloud[1])
+    finish_barrier.wait()
 
 
-def startClouds(experiment, repetition, seed_repeat):
-    cloud_barrier = threading.Barrier(len(experiment.clouds) + 1)
-    print(len(experiment.clouds) + 1)
+def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
+    cloud_boot_barrier = threading.Barrier(len(experiment.clouds) + 1)
     for cloud in experiment.clouds:
-        threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_barrier)).start()
-    cloud_barrier.wait()
+        threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+    cloud_boot_barrier.wait()
 
 def stopClouds(experiment):
     for cloud in experiment.clouds:

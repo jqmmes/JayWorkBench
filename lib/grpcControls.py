@@ -1,9 +1,9 @@
-import lib.protobuf.Launcher_pb2
-import lib.protobuf.Launcher_pb2_grpc
-import lib.protobuf.Cloud_pb2
-import lib.protobuf.Cloud_pb2_grpc
-import lib.protobuf.ODProto_pb2
-import lib.protobuf.ODProto_pb2_grpc
+import lib.protobuf.Launcher_pb2 as Launcher_pb2
+import lib.protobuf.Launcher_pb2_grpc as Launcher_pb2_grpc
+import lib.protobuf.Cloud_pb2 as Cloud_pb2
+import lib.protobuf.Cloud_pb2_grpc as Cloud_pb2_grpc
+import lib.protobuf.ODProto_pb2 as ODProto_pb2
+import lib.protobuf.ODProto_pb2_grpc as ODProto_pb2_grpc
 
 from google.protobuf import empty_pb2 as google_empty
 from google.protobuf.wrappers_pb2 import BoolValue as google_bool
@@ -30,7 +30,6 @@ class cloudClient:
         print("GRPC %s (%s) __init__" % (self.name, self.ip))
 
     def launcherStubStatusCallback(self, status):
-        print(status)
         self.launcherStubStatus = status
 
     def brokerStubStatusCallback(self, status):
@@ -124,6 +123,16 @@ class cloudClient:
             sleep(5)
             self.setLogName(log_name, retries-1)
 
+    def stop(self, retries=5):
+        if retries <= 0:
+            print("GRPC %s (%s) stop FAIL" % (self.name, self.ip))
+            return
+        if (self.launcherStubReady()):
+            print("GRPC %s (%s) stop %s" % (self.name, self.ip, self.launcherStub.Stop(Cloud_pb2.Empty()).value))
+        else:
+            sleep(5)
+            self.stop(retries-1)
+
     def destroy(self):
         if self.launcherChannel is not None:
             self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
@@ -149,7 +158,6 @@ class remoteClient:
         print("GRPC %s (%s) __init__" % (self.name, self.ip))
 
     def launcherStubStatusCallback(self, status):
-        print(status)
         self.launcherStubStatus = status
 
     def brokerStubStatusCallback(self, status):

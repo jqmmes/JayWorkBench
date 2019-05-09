@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='odcloudservice',
   syntax='proto3',
   serialized_options=_b('\n!pt.up.fc.dcc.hyrax.odcloud.protocB\013ODCloudGRPC'),
-  serialized_pb=_b('\n\x0b\x43loud.proto\x12\x0eodcloudservice\"\x1a\n\tBoolValue\x12\r\n\x05value\x18\x01 \x01(\x08\"\x07\n\x05\x45mpty\"\x15\n\x06String\x12\x0b\n\x03str\x18\x01 \x01(\t2\x97\x01\n\x0fLauncherService\x12\x41\n\x0bStartWorker\x12\x15.odcloudservice.Empty\x1a\x19.odcloudservice.BoolValue\"\x00\x12\x41\n\nSetLogName\x12\x16.odcloudservice.String\x1a\x19.odcloudservice.BoolValue\"\x00\x42\x30\n!pt.up.fc.dcc.hyrax.odcloud.protocB\x0bODCloudGRPCb\x06proto3')
+  serialized_pb=_b('\n\x0b\x43loud.proto\x12\x0eodcloudservice\"\x1a\n\tBoolValue\x12\r\n\x05value\x18\x01 \x01(\x08\"\x07\n\x05\x45mpty\"\x15\n\x06String\x12\x0b\n\x03str\x18\x01 \x01(\t2\xd3\x01\n\x0fLauncherService\x12\x41\n\x0bStartWorker\x12\x15.odcloudservice.Empty\x1a\x19.odcloudservice.BoolValue\"\x00\x12:\n\x04Stop\x12\x15.odcloudservice.Empty\x1a\x19.odcloudservice.BoolValue\"\x00\x12\x41\n\nSetLogName\x12\x16.odcloudservice.String\x1a\x19.odcloudservice.BoolValue\"\x00\x42\x30\n!pt.up.fc.dcc.hyrax.odcloud.protocB\x0bODCloudGRPCb\x06proto3')
 )
 
 
@@ -147,7 +147,7 @@ _LAUNCHERSERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   serialized_start=92,
-  serialized_end=243,
+  serialized_end=303,
   methods=[
   _descriptor.MethodDescriptor(
     name='StartWorker',
@@ -159,9 +159,18 @@ _LAUNCHERSERVICE = _descriptor.ServiceDescriptor(
     serialized_options=None,
   ),
   _descriptor.MethodDescriptor(
+    name='Stop',
+    full_name='odcloudservice.LauncherService.Stop',
+    index=1,
+    containing_service=None,
+    input_type=_EMPTY,
+    output_type=_BOOLVALUE,
+    serialized_options=None,
+  ),
+  _descriptor.MethodDescriptor(
     name='SetLogName',
     full_name='odcloudservice.LauncherService.SetLogName',
-    index=1,
+    index=2,
     containing_service=None,
     input_type=_STRING,
     output_type=_BOOLVALUE,

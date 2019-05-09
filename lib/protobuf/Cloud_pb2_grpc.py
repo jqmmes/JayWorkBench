@@ -19,6 +19,11 @@ class LauncherServiceStub(object):
         request_serializer=Cloud__pb2.Empty.SerializeToString,
         response_deserializer=Cloud__pb2.BoolValue.FromString,
         )
+    self.Stop = channel.unary_unary(
+        '/odcloudservice.LauncherService/Stop',
+        request_serializer=Cloud__pb2.Empty.SerializeToString,
+        response_deserializer=Cloud__pb2.BoolValue.FromString,
+        )
     self.SetLogName = channel.unary_unary(
         '/odcloudservice.LauncherService/SetLogName',
         request_serializer=Cloud__pb2.String.SerializeToString,
@@ -37,6 +42,13 @@ class LauncherServiceServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def Stop(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
   def SetLogName(self, request, context):
     # missing associated documentation comment in .proto file
     pass
@@ -49,6 +61,11 @@ def add_LauncherServiceServicer_to_server(servicer, server):
   rpc_method_handlers = {
       'StartWorker': grpc.unary_unary_rpc_method_handler(
           servicer.StartWorker,
+          request_deserializer=Cloud__pb2.Empty.FromString,
+          response_serializer=Cloud__pb2.BoolValue.SerializeToString,
+      ),
+      'Stop': grpc.unary_unary_rpc_method_handler(
+          servicer.Stop,
           request_deserializer=Cloud__pb2.Empty.FromString,
           response_serializer=Cloud__pb2.BoolValue.SerializeToString,
       ),
