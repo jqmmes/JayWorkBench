@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #!/usr/bin/python3
 import subprocess
-from time import sleep
+from time import sleep, time
 from re import match
 
 PACKAGE = 'pt.up.fc.dcc.hyrax.odlib'
@@ -72,12 +72,16 @@ def screenOff(device = None):
     if (status.find('Display Power: state=ON') != -1):
         adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
 
-def startService(service, package=PACKAGE, device=None, wait=False):
+def startService(service, package=PACKAGE, device=None, wait=False, timeout=120): # 2mins timeout
     adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)
+    start_time = time()
     if wait:
         while not isServiceRunning(device, service):
             sleep(0.5)
+            if (time()-start_time > timeout):
+                return False
         sleep(4)
+    return True
 
 def stopService(service, package=PACKAGE, device=None):
     adb(['shell', 'am', 'stopservice', "%s/%s" % (package, service)], device)

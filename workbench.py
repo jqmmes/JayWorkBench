@@ -88,23 +88,32 @@ def getDeviceIp(device):
 def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
     #adb.screenOn(device)
+    print("START_WORKER\t%s" % device)
     device_random = random.Random()
     device_random.seed(experiment.seed+device+str(repetition))
     if experiment.reboot:
-        sleep(device_random.randint(0,120))
+        sleep_duration = device_random.randint(0,15*experiment.devices)
+        sleep(sleep_duration)
+        print("REBOOT_WORKER\t%s" % device)
         adb.rebootAndWait(device)
+        print("REBOOT_WORKER_COMPLETE\t%s" % device)
     adb.clearSystemLog(device)
+    print("STOP_ALL_SERVICE\t%s" % device)
     adb.stopAll(device)
-    adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True)
+    print("STARTING_LAUNCH_SERVICE\t%s" % device)
+    if not adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True):
+        print("FAILED_LAUNCH_SERVICE\t%s" % device)
+        skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+        return
 
     try:
         worker_ip = getDeviceIp(device)
-
         if (worker_ip is None):
-            print("Failed to obtain ip for %s" % device)
+            print("FAILED_OBTAIN_IP\t%s" % device)
             skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
             adb.rebootAndWait(device)
             return
+        print("STARTING_SERVICES\t%s" % device)
         worker = grpcControls.remoteClient(worker_ip, device)
         worker.connectLauncherService()
         worker.setLogName(experiment.name)
@@ -113,7 +122,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         worker.connectBrokerService()
         sleep(2)
     except:
-        print("Error Starting Worker")
+        print("Error Starting Worker %s" % device)
         skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         return
 
@@ -122,7 +131,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     schedulers = worker.listSchedulers()
     models = worker.listModels()
     if (schedulers is None or models is None):
-        print("Error getting schedulers or models")
+        print("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device)
         skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         return
 
@@ -141,6 +150,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
                 return
             break
 
+    print("WAIT_ON_BARRIER\tBOOT_BARRIER\t%s" % device)
     if not barrierWithTimeout(boot_barrier, 240, experiment, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
         return
 
@@ -148,6 +158,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
 
     rate = float(experiment.request_rate)/float(experiment.request_time)
 
+    print("WAIT_ON_BARRIER\SSTART_BARRIER\t%s" % device)
     start_barrier.wait()
 
     start_time=time()
@@ -158,9 +169,10 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         sleep(next_event_in)
         threading.Thread(target = runJob, args = (worker,device_random)).start()
 
+    print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device)
     if not barrierWithTimeout(complete_barrier, 240 + 0 if is_producer else experiment.duration, experiment, log_pull_barrier, finish_barrier):
         return
-
+    print("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device)
     log_pull_barrier.wait()
 
     try:
@@ -179,7 +191,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     os.makedirs(system_log_path, exist_ok=True)
     cleanLogs(system_log_path)
     adb.pullSystemLog(device, system_log_path)
-
+    print("WAIT_ON_BARRIER\FFINISH_BARRIER\t%s" % device)
     finish_barrier.wait()
     adb.screenOff(device)
 
@@ -198,12 +210,13 @@ def cleanLogs(path):
 
 def runExperiment(experiment):
     global PENDING_JOBS
+    grpcControls.DEBUG = True
     printExperiment(stdout, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
 
-    adb.DEBUG = False
+    #adb.DEBUG = False
     devices = adb.listDevices(0)
     if (len(devices) < experiment.devices):
         os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
@@ -227,7 +240,7 @@ def runExperiment(experiment):
                 experiment.setOK()
 
                 # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
-                if not checkBattery(40, *devices[:experiment.devices]):
+                if not checkBattery(30, *devices[:experiment.devices]):
                     experiment.setFail()
                     os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
                     return
@@ -247,11 +260,12 @@ def runExperiment(experiment):
                 for device in devices[:experiment.devices]:
                     threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
-
+                print("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
                 boot_barrier.wait()
                 sleep(1)
+                print("WAIT_ON_BARRIER\SSTART_BARRIER\tMAIN_LOOP")
                 start_barrier.wait()
-
+                print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
                 complete_barrier.wait()
                 completetion_timeout_start = time()
                 while PENDING_JOBS > 0 and experiment.isOK():
@@ -261,12 +275,14 @@ def runExperiment(experiment):
                         os.system("touch logs/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
                         break
                 sleep(2)
-
+                print("WAIT_ON_BARRIER\LLOG_PULL_BARRIER\tMAIN_LOOP")
                 log_pull_barrier.wait()
                 if (experiment.isOK()):
                     pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
 
+                print("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
                 servers_finish_barrier.wait() # Command Servers to begin shutdown
+                print("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
                 finish_barrier.wait()
 
                 if (experiment.isOK()):
@@ -366,11 +382,14 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
                     print("Failed to setScheduler on %s" % cloud[0])
                     experiment.setFail()
                 break
+    print("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud[0])
     cloud_boot_barrier.wait()
+    print("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud[0])
     servers_finish_barrier.wait()
     print("Stopping %s Cloud Instance" % cloud[0])
     stdout.flush()
     adb.cloudInstanceStop(cloud[0], cloud[1])
+    print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud[0])
     finish_barrier.wait()
 
 
@@ -525,8 +544,8 @@ def printExperiment(conf, experiment):
     conf.write("Devices: %s\n" % str(experiment.devices))
     conf.write("Reboot: %s\n" % experiment.reboot)
     conf.write("Rate: %s\n" % str(experiment.request_rate))
-    conf.write("Rate Time: %s\n" % str(experiment.request_time) + "s")
-    conf.write("Duration: %s\n" % str(experiment.duration) + "s")
+    conf.write("Rate Time: %s" % str(experiment.request_time) + "s\n")
+    conf.write("Duration: %s" % str(experiment.duration) + "s\n")
     conf.write("Clouds: %s\n" % str(experiment.clouds))
     conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
     conf.write("Seed: %s\n" % experiment.seed)
