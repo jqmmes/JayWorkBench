@@ -6,11 +6,23 @@ import threading
 import os
 import configparser
 from sys import argv, stdout
+import sys
 
 ASSETS=os.listdir("assets")
 EXPERIMENTS = []
 PENDING_JOBS = 0
 PENDING_WORKERS = 0
+
+
+
+def brokenBarrierExceptionHook(exception_type, exception, traceback):
+    if (exception_type is threading.BrokenBarrierError):
+        pass
+    else:
+        print("%s: %s" % (exception_type.__name__, exception))
+        #raise exception
+
+sys.excepthook = brokenBarrierExceptionHook
 
 def ping(hostname):
     response = os.system("ping -c 1 %s >/dev/null 2>&1" % hostname)
@@ -40,39 +52,59 @@ def runJob(worker, device_random):
         f = image.read()
         b = bytes(f)
         job.addBytes(b)
-    print("%s\t%s" % (asset, job.id))
+    print("{}\t{}\tJOB_SUBMIT\t{}".format(time(), job.id, asset))
     try:
-        print(worker.scheduleJob(job))
-    except:
-        print("Job Failed")
+        worker.scheduleJob(job)
+        print("{}\t{}\tJOB_COMPLETE".format(time(), job.id))
+    except Exception as job_exception:
+        print("{}\t{}\tJOB_FAILED".format(time(), job.id))
     PENDING_JOBS -= 1
+
+def barrierWithTimeout(barrier, timeout, experiment=None, *skip_barriers):
+    try:
+        barrier.wait(timeout=timeout)
+    except Exception as barrier_exception:
+        skipBarriers(experiment, *skip_barriers)
+        return False
+    if (barrier.broken):
+        skipBarriers(experiment, *skip_barriers)
+        return False
+    return True
+
+def skipBarriers(experiment, *skip_barriers):
+    print("ERROR\tSKIP_BARRIERS")
+    if experiment:
+        experiment.setFail()
+    for barrier in skip_barriers:
+        barrier.wait()
+
+def getDeviceIp(device):
+    for n in range(5):
+        worker_ip = adb.getDeviceIp(device)
+        return worker_ip if worker_ip is not None else sleep(5)
+    return None
+
 
 def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
+    #adb.screenOn(device)
     device_random = random.Random()
     device_random.seed(experiment.seed+device+str(repetition))
     if experiment.reboot:
+        sleep(device_random.randint(0,120))
         adb.rebootAndWait(device)
     adb.clearSystemLog(device)
     adb.stopAll(device)
     adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True)
-    worker_ip = adb.getDeviceIp(device)
-    ip_fetch_retries = 5
-    while (worker_ip is None and ip_fetch_retries > 0):
-        print("Failed to obtain ip for %s retries left %d" % (device, ip_fetch_retries))
-        sleep(5)
-        worker_ip = adb.getDeviceIp(device)
-        ip_fetch_retries -= 1
-    if (worker_ip is None):
-        print("Failed to obtain ip for %s" % device)
-        experiment.setFail()
-        adb.rebootAndWait(device)
-        boot_barrier.wait()
-        start_barrier.wait()
-        complete_barrier.wait()
-        log_pull_barrier.wait()
 
     try:
+        worker_ip = getDeviceIp(device)
+
+        if (worker_ip is None):
+            print("Failed to obtain ip for %s" % device)
+            skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+            adb.rebootAndWait(device)
+            return
         worker = grpcControls.remoteClient(worker_ip, device)
         worker.connectLauncherService()
         worker.setLogName(experiment.name)
@@ -80,91 +112,56 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         worker.startScheduler()
         worker.connectBrokerService()
         sleep(2)
-    except Exception as e:
+    except:
         print("Error Starting Worker")
-        experiment.setFail()
-        boot_barrier.wait()
-        start_barrier.wait()
-        complete_barrier.wait()
-        log_pull_barrier.wait()
-        finish_barrier.wait()
+        skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         return
+
 
 
     schedulers = worker.listSchedulers()
     models = worker.listModels()
     if (schedulers is None or models is None):
         print("Error getting schedulers or models")
-        experiment.setFail()
-        boot_barrier.wait()
-        start_barrier.wait()
-        complete_barrier.wait()
-        log_pull_barrier.wait()
-        finish_barrier.wait()
+        skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         return
 
+    for scheduler in schedulers.scheduler:
+        if scheduler.name == experiment.scheduler and experiment.isOK():
+            if (worker.setScheduler(scheduler) is None):
+                print("Failed to setScheduler on %s" % device)
+                skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                return
+            break
+    for model in models.models:
+        if model.name == experiment.model and experiment.isOK():
+            if (worker.setModel(model) is None):
+                print("Failed to setScheduler on %s" % device)
+                skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                return
+            break
 
+    if not barrierWithTimeout(boot_barrier, 240, experiment, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+        return
 
-    if (experiment.isOK()):
-        for scheduler in schedulers.scheduler:
-            if scheduler.name == experiment.scheduler:
-                if (worker.setScheduler(scheduler) is None):
-                    print("Failed to setScheduler on %s" % device)
-                    return
-                break
-        for model in models.models:
-            if model.name == experiment.model:
-                if (worker.setModel(model) is None):
-                    print("Failed to setScheduler on %s" % device)
-                    return
-                break
+    adb.screenOff(device)
 
-        try:
-            boot_barrier.wait(timeout=240) # 5min timeout
-        except:
-            experiment.setFail()
-            start_barrier.wait()
-            complete_barrier.wait()
-            log_pull_barrier.wait()
-            finish_barrier.wait()
-            return
-        if (boot_barrier.broken):
-            experiment.setFail()
-            start_barrier.wait()
-            complete_barrier.wait()
-            log_pull_barrier.wait()
-            finish_barrier.wait()
-            return
+    rate = float(experiment.request_rate)/float(experiment.request_time)
 
+    start_barrier.wait()
 
-        rate = float(experiment.request_rate)/float(experiment.request_time)
+    start_time=time()
+    while (((time()-start_time) < experiment.duration) and experiment.isOK() and is_producer):
+        next_event_in = device_random.expovariate(rate)
+        if next_event_in > experiment.duration-(time()-start_time):
+            break
+        sleep(next_event_in)
+        threading.Thread(target = runJob, args = (worker,device_random)).start()
 
+    if not barrierWithTimeout(complete_barrier, 240 + 0 if is_producer else experiment.duration, experiment, log_pull_barrier, finish_barrier):
+        return
 
-        start_barrier.wait()
-
-        if (is_producer and experiment.isOK()):
-            start_time=time()
-
-            while ((time()-start_time) < experiment.duration and experiment.isOK()):
-                next_event_in = device_random.expovariate(rate)
-                if next_event_in > experiment.duration-(time()-start_time):
-                    break
-                sleep(next_event_in)
-                threading.Thread(target = runJob, args = (worker,device_random)).start()
-        try:
-            complete_barrier.wait(timeout=experiment.duration+240)
-        except:
-            experiment.setFail()
-            log_pull_barrier.wait()
-            finish_barrier.wait()
-            return
-        if (complete_barrier.broken):
-            experiment.setFail()
-            log_pull_barrier.wait()
-            finish_barrier.wait()
-            return
-
-        log_pull_barrier.wait()
+    log_pull_barrier.wait()
 
     try:
         adb.stopAll(worker.name)
@@ -173,6 +170,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         print("Error Stopping Worker")
 
 
+
+    adb.screenOn(device)
     if (experiment.isOK()):
         adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, worker.name), device=worker.name)
 
@@ -182,6 +181,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     adb.pullSystemLog(device, system_log_path)
 
     finish_barrier.wait()
+    adb.screenOff(device)
 
 
 def cleanLogs(path):
@@ -198,56 +198,20 @@ def cleanLogs(path):
 
 def runExperiment(experiment):
     global PENDING_JOBS
+    printExperiment(stdout, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
 
     adb.DEBUG = False
-    devices = adb.listDevices()
+    devices = adb.listDevices(0)
     if (len(devices) < experiment.devices):
-        total_devices = len(adb.listDevices(0))
-        if (total_devices < experiment.devices):
-            print("Not Enought Devices")
-            return
-        print("Waiting for enough devices to charge (%d OK | %d NEEDED | %d TOTAL)" % (len(devices), experiment.devices, total_devices), end='')
-        stdout.flush()
-        while (len(devices) < experiment.devices):
-            total_devices = len(adb.listDevices(0))
-            if (total_devices < experiment.devices):
-                print("Not Enought Devices")
-                return
-            else:
-                sleep(60)
-                print('.', end='')
-                stdout.flush()
-                new_devices = adb.listDevices()
-                if (new_devices != devices):
-                    for dev in new_devices:
-                        if (dev not in devices):
-                            print("\nDevice %s OK" % dev)
-                    devices = new_devices
-                    if (len(devices) < experiment.devices):
-                        print("Waiting for enough devices to charge (%d OK | %d NEEDED | %d TOTAL)" % (len(devices), experiment.devices, total_devices), end='')
-        print()
-    adb.DEBUG = True
+        os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
+        return
 
+    #adb.DEBUG = True
     conf = open("logs/%s/conf.cfg" % experiment.name, "w+")
-    conf.write("Experiment: %s\n" % experiment.name)
-    conf.write("========== CONFIG ==========\n")
-    conf.write("Scheduler: %s\n" % experiment.scheduler)
-    conf.write("TF Model: %s\n" % experiment.model)
-    conf.write("Devices: %s\n" % str(experiment.devices))
-    conf.write("Reboot: %s\n" % experiment.reboot)
-    conf.write("Rate: %s\n" % str(experiment.request_rate))
-    conf.write("Rate Time: %s\n" % str(experiment.request_time) + "s")
-    conf.write("Duration: %s\n" % str(experiment.duration) + "s")
-    conf.write("Clouds: %s\n" % str(experiment.clouds))
-    conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
-    conf.write("Seed: %s\n" % experiment.seed)
-    conf.write("Repetitions: %s" % str(experiment.repetitions))
-    conf.write("Producers: %s" % experiment.producers)
-    conf.write("RepeatSeed: %s" % experiment.repeat_seed)
-    conf.write("=============================\n")
+    printExperiment(conf, experiment)
     conf.close()
 
     stopClouds(experiment)
@@ -259,38 +223,14 @@ def runExperiment(experiment):
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.repeat_seed):
-            complete_repetition = False
-            experiment.setOK()
-            while (not complete_repetition):
-                total_devices = adb.listDevices(0)
-                break_loop = False
-                # Validate that all devices keep connected
-                for device in devices[:experiment.devices]:
-                    if (device not in total_devices):
-                        print("Not Enought Devices")
-                        break_loop = True
-                        break
-                if (break_loop):
-                    break
-                # Validate that all devices have enought battery
-                total_devices = adb.listDevices(15) # Minimum 15% battery to run experiment
-                for device in devices[:experiment.devices]:
-                    if (device not in total_devices):
-                        for _device in total_devices:
-                            adb.screenOff(_device)
-                        while (device not in total_devices):
-                            sleep(240)
-                            if device not in adb.listDevices():
-                                print("Not Enought Devices")
-                                break_loop = True
-                                break
-                            sleep(5)
-                            if device in adb.listDevices(15):
-                                break
-                    if (break_loop):
-                        break
-                if (break_loop):
-                    break
+            while (True):
+                experiment.setOK()
+
+                # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
+                if not checkBattery(40, *devices[:experiment.devices]):
+                    experiment.setFail()
+                    os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
+                    return
 
                 os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = threading.Barrier(experiment.devices + 1)
@@ -305,7 +245,6 @@ def runExperiment(experiment):
 
                 producers = experiment.producers
                 for device in devices[:experiment.devices]:
-                    adb.screenOn(device)
                     threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
 
@@ -314,26 +253,51 @@ def runExperiment(experiment):
                 start_barrier.wait()
 
                 complete_barrier.wait()
-                while PENDING_JOBS > 0:
-                    sleep(5)
-                sleep(10)
+                completetion_timeout_start = time()
+                while PENDING_JOBS > 0 and experiment.isOK():
+                    sleep(2)
+                    if (time()-completetion_timeout_start > experiment.timeout):
+                        print("COMPLETION_TIMEOUT_EXCEDED")
+                        os.system("touch logs/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
+                        break
+                sleep(2)
+
                 log_pull_barrier.wait()
                 if (experiment.isOK()):
                     pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
-                servers_finish_barrier.wait()
+
+                servers_finish_barrier.wait() # Command Servers to begin shutdown
                 finish_barrier.wait()
 
-                for device in devices:
-                    adb.screenOff(device)
-
                 if (experiment.isOK()):
-                    complete_repetition = True
+                    break
 
 
         if (repetition != experiment.repetitions - 1):
             print("Waiting 5s for next repetition")
             sleep(5)
 
+def checkBatteryDevice(min_battery, device, battery_barrier):
+    adb.screenOff(device)
+    battery_level = adb.getBatteryLevel(device)
+    if (battery_level < min_battery):
+        while (battery_level < max(0, min(100, min_battery + 10))):
+            print("NOT_ENOUGH_BATTERY ON {} ({}%)".format(device, battery_level))
+            sleep(240)
+            battery_level = adb.getBatteryLevel(device)
+    barrierWithTimeout(battery_barrier, 3600)
+
+
+def checkBattery(min_battery, *devices):
+    battery_barrier = threading.Barrier(len(devices) + 1)
+    for device in devices:
+        threading.Thread(target = checkBatteryDevice, args = (min_battery, device, battery_barrier)).start()
+    if not barrierWithTimeout(battery_barrier, 3600):
+        all_devices = adb.listDevices(0)
+        for device in devices:
+            if device not in devices:
+                return False
+    return True
 
 def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
     cloudlet_boot_barrier = threading.Barrier(len(experiment.cloudlets) + 1)
@@ -437,6 +401,7 @@ class Experiment:
     repetitions = 1
     producers = 0
     repeat_seed = 1
+    timeout = 900 # 15 Mins
 
     _running_status = True
 
@@ -493,6 +458,8 @@ def readConfig(confName):
                 experiment.producers = int(config[section][option])
             elif option == "repeatseed":
                 experiment.repeat_seed = int(config[section][option])
+            elif option == "repeatseed":
+                experiment.timeout = int(config[section][option])
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         EXPERIMENTS.append(experiment)
@@ -517,6 +484,7 @@ def help():
                     Producers               = Number of producer devices [INT]
                     RepeatSeed              = Repeat experiment with same seed N times [INT]
                     Cloudlets               = IP, ... [LIST]
+                    Timeout                 = Max time after experiment duration to cancel execution
 
         Models:
                     ssd_mobilenet_v1_fpn_coco
@@ -549,6 +517,25 @@ def help():
                     EstimatedTimeScheduler
         ================================================ HELP ================================================''')
 
+def printExperiment(conf, experiment):
+    conf.write("Experiment: %s\n" % experiment.name)
+    conf.write("========== CONFIG ==========\n")
+    conf.write("Scheduler: %s\n" % experiment.scheduler)
+    conf.write("TF Model: %s\n" % experiment.model)
+    conf.write("Devices: %s\n" % str(experiment.devices))
+    conf.write("Reboot: %s\n" % experiment.reboot)
+    conf.write("Rate: %s\n" % str(experiment.request_rate))
+    conf.write("Rate Time: %s\n" % str(experiment.request_time) + "s")
+    conf.write("Duration: %s\n" % str(experiment.duration) + "s")
+    conf.write("Clouds: %s\n" % str(experiment.clouds))
+    conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
+    conf.write("Seed: %s\n" % experiment.seed)
+    conf.write("Repetitions: %s\n" % str(experiment.repetitions))
+    conf.write("Producers: %s\n" % experiment.producers)
+    conf.write("RepeatSeed: %s\n" % experiment.repeat_seed)
+    conf.write("Timeout: %s\n" % experiment.timeout)
+    conf.write("=============================\n")
+
 def main():
     if (len(argv) < 2):
         print("\tPlease provide config file!")
@@ -558,23 +545,8 @@ def main():
         help()
     for i in range(1, len(argv)):
         readConfig(argv[i])
+    #EXPERIMENTS.sort(key=lambda e: e.devices-e.producers+len(e.clouds)+e.request_time, reverse=True)
     for e in EXPERIMENTS:
-        print("Experiment: " + e.name)
-        print("========== CONFIG ==========")
-        print("Scheduler: ", e.scheduler)
-        print("TF Model: ", e.model)
-        print("Devices: ", str(e.devices))
-        print("Reboot: ", e.reboot)
-        print("Rate: ", str(e.request_rate))
-        print("Rate Time: ", str(e.request_time) + "s")
-        print("Duration: ", str(e.duration) + "s")
-        print("Clouds: ", e.clouds)
-        print("Cloudlets: ", e.cloudlets)
-        print("Seed: ", e.seed)
-        print("Repetitions: ", e.repetitions)
-        print("Producers: ", e.producers)
-        print("RepeatSeed: ", e.repeat_seed)
-        print("=============================")
         runExperiment(e)
 
 if __name__ == '__main__':
