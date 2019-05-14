@@ -52,12 +52,14 @@ def runJob(worker, device_random):
         f = image.read()
         b = bytes(f)
         job.addBytes(b)
-    print("{}\t{}\tJOB_SUBMIT\t{}".format(time(), job.id, asset))
+    print("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), job.id, asset, worker.name))
     try:
-        worker.scheduleJob(job)
-        print("{}\t{}\tJOB_COMPLETE".format(time(), job.id))
+        if not worker.scheduleJob(job):
+            print("{}\t{}\tJOB_FAILED\tFAILED_SCHEDULE\t{}".format(time(), job.id, worker.name))
+        else:
+            print("{}\t{}\tJOB_COMPLETE\t{}".format(time(), job.id, worker.name))
     except Exception as job_exception:
-        print("{}\t{}\tJOB_FAILED".format(time(), job.id))
+        print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), job.id, worker.name))
     PENDING_JOBS -= 1
 
 def barrierWithTimeout(barrier, timeout, experiment=None, *skip_barriers):
@@ -145,7 +147,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     for model in models.models:
         if model.name == experiment.model and experiment.isOK():
             if (worker.setModel(model) is None):
-                print("Failed to setScheduler on %s" % device)
+                print("Failed to setModel on %s" % device)
                 skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
                 return
             break
@@ -170,7 +172,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         threading.Thread(target = runJob, args = (worker,device_random)).start()
 
     print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device)
-    if not barrierWithTimeout(complete_barrier, 240 + 0 if is_producer else experiment.duration, experiment, log_pull_barrier, finish_barrier):
+    if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + 0 if is_producer else experiment.duration, experiment, log_pull_barrier, finish_barrier):
         return
     print("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device)
     log_pull_barrier.wait()
@@ -191,7 +193,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     os.makedirs(system_log_path, exist_ok=True)
     cleanLogs(system_log_path)
     adb.pullSystemLog(device, system_log_path)
-    print("WAIT_ON_BARRIER\FFINISH_BARRIER\t%s" % device)
+    print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device)
     finish_barrier.wait()
     adb.screenOff(device)
 
@@ -261,29 +263,37 @@ def runExperiment(experiment):
                     threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                 print("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
-                boot_barrier.wait()
+                barrierWithTimeout(boot_barrier, 900, experiment) # 15m
+                #boot_barrier.wait()
                 sleep(1)
                 print("WAIT_ON_BARRIER\SSTART_BARRIER\tMAIN_LOOP")
-                start_barrier.wait()
-                print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
-                complete_barrier.wait()
+                barrierWithTimeout(start_barrier, 60, experiment)
+                #start_barrier.wait()
+
+                #complete_barrier.wait()
                 completetion_timeout_start = time()
-                while PENDING_JOBS > 0 and experiment.isOK():
+                while (PENDING_JOBS > 0 and experiment.isOK()) or experiment.duration > time()-completetion_timeout_start:
                     sleep(2)
-                    if (time()-completetion_timeout_start > experiment.timeout):
+                    if (time()-completetion_timeout_start > experiment.duration+experiment.timeout):
                         print("COMPLETION_TIMEOUT_EXCEDED")
                         os.system("touch logs/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
                         break
                 sleep(2)
+                print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
+                barrierWithTimeout(complete_barrier, 240, experiment)
+                sleep(1)
                 print("WAIT_ON_BARRIER\LLOG_PULL_BARRIER\tMAIN_LOOP")
-                log_pull_barrier.wait()
+                barrierWithTimeout(log_pull_barrier, 60, experiment)
+                #log_pull_barrier.wait()
                 if (experiment.isOK()):
                     pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
 
                 print("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
-                servers_finish_barrier.wait() # Command Servers to begin shutdown
+                #servers_finish_barrier.wait() # Command Servers to begin shutdown
+                barrierWithTimeout(servers_finish_barrier, 60, experiment)
                 print("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
-                finish_barrier.wait()
+                #finish_barrier.wait()
+                barrierWithTimeout(finish_barrier, 240, experiment)
 
                 if (experiment.isOK()):
                     break
@@ -420,7 +430,7 @@ class Experiment:
     repetitions = 1
     producers = 0
     repeat_seed = 1
-    timeout = 900 # 15 Mins
+    timeout = 1500 # 25 Mins
 
     _running_status = True
 
@@ -565,6 +575,7 @@ def main():
     for i in range(1, len(argv)):
         readConfig(argv[i])
     #EXPERIMENTS.sort(key=lambda e: e.devices-e.producers+len(e.clouds)+e.request_time, reverse=True)
+    grpcControls.DEBUG = False
     for e in EXPERIMENTS:
         runExperiment(e)
 

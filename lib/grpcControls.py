@@ -13,6 +13,11 @@ from grpc import ChannelConnectivity
 
 from time import sleep, time
 import uuid
+from sys import excepthook
+def exceptionHook(exception_type, exception, traceback):
+    print("%s: %s" % (exception_type.__name__, exception))
+
+excepthook = exceptionHook
 
 DEBUG = False
 
@@ -235,8 +240,12 @@ class remoteClient:
                 print("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
+            try:
+                start_worker = self.launcherStub.StartWorker(Launcher_pb2.Empty()).value
+            except:
+                start_worker = False
             if DEBUG:
-                print("GRPC %s (%s) startWorker %s" % (self.name, self.ip, self.launcherStub.StartWorker(Launcher_pb2.Empty()).value))
+                print("GRPC %s (%s) startWorker %s" % (self.name, self.ip, start_worker))
         else:
             sleep(5)
             self.startWorker(retries-1)
@@ -247,8 +256,12 @@ class remoteClient:
                 print("GRPC %s (%s) startScheduler FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
+            try:
+                start_scheduler = self.launcherStub.StartScheduler(Launcher_pb2.Empty()).value
+            except:
+                start_scheduler = False
             if DEBUG:
-                print("GRPC %s (%s) startScheduler %s" % (self.name, self.ip, self.launcherStub.StartScheduler(Launcher_pb2.Empty()).value))
+                print("GRPC %s (%s) startScheduler %s" % (self.name, self.ip, start_scheduler))
         else:
             sleep(5)
             self.startScheduler(retries-1)
@@ -259,7 +272,10 @@ class remoteClient:
         if retries <= 0:
             return self.schedulers
         if (self.brokerStubReady()):
-            self.schedulers = self.brokerStub.getSchedulers(google_empty.Empty())
+            try:
+                self.schedulers = self.brokerStub.getSchedulers(google_empty.Empty())
+            except:
+                self.schedulers = None
         if (self.schedulers is not None):
             return self.schedulers
         sleep(5)
@@ -271,7 +287,10 @@ class remoteClient:
         if retries <= 0:
             return self.models
         if (self.brokerStubReady()):
-            self.models = self.brokerStub.getModels(google_empty.Empty())
+            try:
+                self.models = self.brokerStub.getModels(google_empty.Empty())
+            except:
+                self.Models = None
         if (self.models is not None):
             return self.models
         sleep(5)
@@ -287,7 +306,10 @@ class remoteClient:
         if (self.brokerStubReady()):
             if DEBUG:
                 print("GRPC %s (%s) setScheduler DONE" % (self.name, self.ip))
-            return self.brokerStub.setScheduler(scheduler)
+            try:
+                return self.brokerStub.setScheduler(scheduler)
+            except:
+                return None
         sleep(5)
         return self.setModel(scheduler, retries-1)
 
@@ -301,13 +323,19 @@ class remoteClient:
         if (self.brokerStubReady()):
             if DEBUG:
                 print("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
-            return self.brokerStub.setModel(model)
+            try:
+                return self.brokerStub.setModel(model)
+            except:
+                return None
         sleep(5)
         return self.setModel(model, retries-1)
 
     def scheduleJob(self, job):
         if (self.brokerStubReady()):
-            return self.brokerStub.scheduleJob(job.getProto())
+            try:
+                return self.brokerStub.scheduleJob(job.getProto())
+            except:
+                return False
 
     def setLogName(self, log_name, retries=5):
         if retries <= 0:
@@ -317,19 +345,29 @@ class remoteClient:
         if (self.launcherStubReady()):
             name = Launcher_pb2.String()
             name.str = log_name
+            try:
+                log_name = self.launcherStub.SetLogName(name).value
+            except:
+                log_name = "FAIL_TO_SET_LOGNAME"
             if DEBUG:
-                print("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, self.launcherStub.SetLogName(name).value))
+                print("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, log_name))
         else:
             sleep(5)
             self.setLogName(log_name, retries-1)
 
     def destroy(self):
         if self.launcherChannel is not None:
-            self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
-            self.launcherChannel.close()
+            try:
+                self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
+                self.launcherChannel.close()
+            except:
+                pass
         if self.brokerChannel is not None:
-            self.brokerChannel.unsubscribe(self.brokerStubStatusCallback)
-            self.brokerChannel.close()
+            try:
+                self.brokerChannel.unsubscribe(self.brokerStubStatusCallback)
+                self.brokerChannel.close()
+            except:
+                pass
 
 class Job:
     id = ""
