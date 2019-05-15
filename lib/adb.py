@@ -26,6 +26,10 @@ def adb(cmd, device=None):
     result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=None)
     return result.stdout.decode('UTF-8')
 
+def setBrightness(device=None, brightness=0):
+    adb(['shell', 'settings', 'put', 'system', 'screen_brightness_mode', str(0)], device)
+    adb(['shell', 'settings', 'put', 'system', 'screen_brightness', str(brightness)], device)
+
 def gcloud(cmd):
   result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE)
   return result.stdout.decode('UTF-8')
@@ -65,7 +69,10 @@ def pullSystemLog(device=None, path=""):
         log.close()
 
 def screenOn(device = None):
-    adb(['shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'], device)
+    #adb(['shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'], device)
+    status = adb(['shell', 'dumpsys', 'power'], device)
+    if (status.find('Display Power: state=OFF') != -1):
+        adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
 
 def screenOff(device = None):
     status = adb(['shell', 'dumpsys', 'power'], device)
@@ -106,9 +113,9 @@ def installPackage(package, device=None):
     adb(['install', package], device)
 
 def removePackage(device=None):
-    adb(['shell', 'pm', 'clear', PACKAGE], device)
-    adb(['shell', 'pm', 'reset-permissions', PACKAGE], device)
-    adb(['shell', 'pm', 'uninstall', PACKAGE], device)
+    adb(['shell', 'pm', 'clear', LAUNCHER_PACKAGE], device)
+    adb(['shell', 'pm', 'reset-permissions', LAUNCHER_PACKAGE], device)
+    adb(['shell', 'pm', 'uninstall', LAUNCHER_PACKAGE], device)
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
     instances = gcloud(['compute', 'instances', 'list']).split('\n')

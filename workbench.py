@@ -89,7 +89,6 @@ def getDeviceIp(device):
 
 def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
-    #adb.screenOn(device)
     print("START_WORKER\t%s" % device)
     device_random = random.Random()
     device_random.seed(experiment.seed+device+str(repetition))
@@ -99,6 +98,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         print("REBOOT_WORKER\t%s" % device)
         adb.rebootAndWait(device)
         print("REBOOT_WORKER_COMPLETE\t%s" % device)
+    adb.screenOn(device)
+    adb.setBrightness(device, 0)
     adb.clearSystemLog(device)
     print("STOP_ALL_SERVICE\t%s" % device)
     adb.stopAll(device)
@@ -156,7 +157,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     if not barrierWithTimeout(boot_barrier, 240, experiment, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
         return
 
-    adb.screenOff(device)
+
+    #adb.screenOff(device)
 
     rate = float(experiment.request_rate)/float(experiment.request_time)
 
@@ -174,6 +176,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + 0 if is_producer else experiment.duration, experiment, log_pull_barrier, finish_barrier):
         return
+    adb.screenOff(device)
     print("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device)
     log_pull_barrier.wait()
 
@@ -185,13 +188,12 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
 
 
 
-    adb.screenOn(device)
+
     if (experiment.isOK()):
         adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, worker.name), device=worker.name)
 
     system_log_path = "sys_logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
     os.makedirs(system_log_path, exist_ok=True)
-    cleanLogs(system_log_path)
     adb.pullSystemLog(device, system_log_path)
     print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device)
     finish_barrier.wait()
@@ -217,6 +219,7 @@ def runExperiment(experiment):
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
+    cleanLogs("sys_logs/%s/" % experiment.name)
 
     #adb.DEBUG = False
     devices = adb.listDevices(0)
@@ -282,7 +285,7 @@ def runExperiment(experiment):
                 print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(complete_barrier, 240, experiment)
                 sleep(1)
-                print("WAIT_ON_BARRIER\LLOG_PULL_BARRIER\tMAIN_LOOP")
+                print("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(log_pull_barrier, 60, experiment)
                 #log_pull_barrier.wait()
                 if (experiment.isOK()):
@@ -572,12 +575,19 @@ def main():
         return
     if argv[1].lower() == "help":
         help()
-    for i in range(1, len(argv)):
-        readConfig(argv[i])
-    #EXPERIMENTS.sort(key=lambda e: e.devices-e.producers+len(e.clouds)+e.request_time, reverse=True)
-    grpcControls.DEBUG = False
-    for e in EXPERIMENTS:
-        runExperiment(e)
+    elif argv[1].lower() == "install":
+        for device in adb.listDevices():
+            adb.removePackage(device)
+            adb.installPackage('apps/ODLauncher-release.apk', device)
+    else:
+        for device in adb.listDevices():
+            adb.screenOff(device)
+        for i in range(1, len(argv)):
+            readConfig(argv[i])
+        EXPERIMENTS.sort(key=lambda e: e.devices-e.producers+len(e.clouds)+e.request_time, reverse=True)
+        grpcControls.DEBUG = False
+        for e in EXPERIMENTS:
+            runExperiment(e)
 
 if __name__ == '__main__':
     main()
