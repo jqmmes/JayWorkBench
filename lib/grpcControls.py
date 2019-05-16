@@ -346,14 +346,16 @@ class remoteClient:
             name = Launcher_pb2.String()
             name.str = log_name
             try:
-                log_name = self.launcherStub.SetLogName(name).value
-            except:
-                log_name = "FAIL_TO_SET_LOGNAME"
-            if DEBUG:
-                print("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, log_name))
-        else:
-            sleep(5)
-            self.setLogName(log_name, retries-1)
+                log_status = self.launcherStub.SetLogName(name).value
+            except Exception:
+                print(Exception)
+                log_status = False
+            if log_status:
+                if DEBUG:
+                    print("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, log_status))
+                return
+        sleep(5)
+        self.setLogName(log_name, retries-1)
 
     def destroy(self):
         if self.launcherChannel is not None:

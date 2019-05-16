@@ -3,6 +3,7 @@
 import subprocess
 from time import sleep, time
 from re import match
+import os
 
 PACKAGE = 'pt.up.fc.dcc.hyrax.odlib'
 LAUNCHER_PACKAGE = 'pt.up.fc.dcc.hyrax.od_launcher'
@@ -10,20 +11,40 @@ LAUNCHER_SERVICE = '.ODLauncherService'
 BROKER = '.services.BrokerAndroidService'
 SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
-DEBUG = True
+DEBUG = False
+
+class Device:
+    name = ""
+    ip = ""
+    status = False
+    connected_wifi = False
+
+    def __init__(self, name, ip = "", status = False, wifi = False):
+        self.name = name
+        self.ip = ip
+        self.status = status
+        self.connected_wifi = wifi
+
+FNULL = open(os.devnull, "w")
 
 def adb(cmd, device=None):
     selected_device = []
     if(device != None):
-        selected_device = ['-s', device]
-    debug = "adb"
-    for i in selected_device:
-        debug += " " + i
-    for i in cmd:
-        debug += " " + i
+        if (device.connected_wifi):
+            selected_device = ['-s', "%s:5555" % device.ip]
+        else:
+            selected_device = ['-s', device.name]
     if (DEBUG):
+        if device is not None:
+            debug = "[%s]\tadb" % device.name
+        else:
+            debug = "adb"
+        for i in selected_device:
+            debug += " " + i
+        for i in cmd:
+            debug += " " + i
         print(debug)
-    result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=None)
+    result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 
 def setBrightness(device=None, brightness=0):
@@ -45,14 +66,33 @@ def getBatteryLevel(device=None):
         return 0
     return int(battery_details[:level_end])
 
+def connectWifiADB(device):
+    status = adb(['connect', "%s:5555" % device.ip])
+    if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
+        device.connected_wifi = True
+        return (device, True)
+    return (device, False)
+
+def disconnectWifiADB(device):
+    adb(['disconnect', "%s:5555" % device.ip])
+
 def listDevices(minBattery = 15):
     devices_raw = adb(['devices']).split('\n')[1:]
     devices = []
     for dev in devices_raw:
         splitted = dev.split('\t')
         if (len(splitted) > 1 and splitted[1] == 'device'):
-            if (getBatteryLevel(splitted[0]) >= minBattery):
-                devices.append(splitted[0])
+            new_device = Device(splitted[0], status = (splitted[1] == 'device' ))
+            if (getBatteryLevel(new_device) >= minBattery):
+                new_device.ip =  getDeviceIp(new_device)
+                if (new_device.name == new_device.ip):
+                    continue
+                device_wifi_adb = False
+                for sub_dev in devices_raw:
+                    if "%s:5555" % new_device.ip in sub_dev.split('\t')[0]:
+                        new_device.connected_wifi = True
+                        break
+                devices.append(new_device)
     return devices
 
 def clearSystemLog(device=None):
@@ -63,7 +103,7 @@ def pullSystemLog(device=None, path=""):
     if path != "" and path[-1] != "/":
         path += "/"
     if device is not None:
-        destinationFile = device + "_" + destinationFile
+        destinationFile = device.name + "_" + destinationFile
     with open("%s%s" % (path, destinationFile), "w+") as log:
         log.write(adb(['logcat', '-d'], device))
         log.close()
@@ -83,10 +123,14 @@ def startService(service, package=PACKAGE, device=None, wait=False, timeout=120)
     adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)
     start_time = time()
     if wait:
+        retries = 0
         while not isServiceRunning(device, service):
+            retries += 1
             sleep(0.5)
             if (time()-start_time > timeout):
                 return False
+            if ((retries % 5) == 0):
+                adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)
         sleep(4)
     return True
 
@@ -143,21 +187,29 @@ def forceStopApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', device=No
 def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination=".", device=None):
     adb(['pull', "/sdcard/Android/data/%s/%s.%s" % (applicationName, path, format), destination], device)
 
-def getDeviceIp(device):
-    info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
-    info = info[info.find('inet ')+5:]
-    ip = info[:info.find('/')]
-    if (match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip)):
-        return ip
+def getDeviceIp(device, timeout=120):
+    start_time = time()
+    while time()-start_time < timeout:
+        info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
+        info = info[info.find('inet ')+5:]
+        ip = info[:info.find('/')]
+        if (match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip)):
+            return ip
+        sleep(2)
     return None
 
 
 
-def rebootAndWait(device):
+def rebootAndWait(device, timeout=300):
+    start_time = time()
     adb(['reboot'], device)
     adb(['wait-for-device'], device)
     while (adb(['shell', 'getprop', 'dev.bootcomplete'], device).find('1') == -1):
+        if (time()-start_time > timeout):
+            return False
         sleep(5)
+    return True
+
 
 def isServiceRunning(device, service):
     service_info = adb(['shell', 'dumpsys', 'activity', 'services', service], device)
