@@ -13,6 +13,7 @@ EXPERIMENTS = []
 PENDING_JOBS = 0
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
+ALL_DEVICES = []
 
 
 
@@ -106,6 +107,7 @@ def rebootDevice(device, device_random, max_sleep_random=10):
 
 def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
+    adb.connectWifiADB(device)
     print("START_WORKER\t%s" % device.name)
     device_random = random.Random()
     device_random.seed(experiment.seed+device.name+str(repetition))
@@ -119,6 +121,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
             else:
                 print("SWITCHING_TO_WIFI_ADB\t%s\t%s" % (device.name, device.ip))
                 device = use_wifi_adb[0]
+        adb.connectWifiADB(device)
     sleep(2)
     adb.screenOn(device)
     adb.setBrightness(device, 0)
@@ -193,6 +196,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     start_time=time()
     while (((time()-start_time) < experiment.duration) and experiment.isOK() and is_producer):
         next_event_in = device_random.expovariate(rate)
+        print("NEXT_EVENT_IN\t{}".format(next_event_in))
         if next_event_in > experiment.duration-(time()-start_time):
             break
         sleep(next_event_in)
@@ -239,7 +243,7 @@ def cleanLogs(path):
 
 
 def runExperiment(experiment):
-    global PENDING_JOBS
+    global PENDING_JOBS, ALL_DEVICES
     printExperiment(stdout, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
@@ -247,7 +251,7 @@ def runExperiment(experiment):
     cleanLogs("sys_logs/%s/" % experiment.name)
 
     #adb.DEBUG = False
-    devices = adb.listDevices(0)
+    devices = ALL_DEVICES #adb.listDevices(0)
     if (len(devices) < experiment.devices):
         os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
@@ -259,13 +263,14 @@ def runExperiment(experiment):
 
     stopClouds(experiment)
     for repetition in range(experiment.repetitions):
-        print("Running Repetition %d" % repetition)
+        print("=========================\tREPETITION {}\t========================".format(repetition))
 
         os.makedirs("logs/%s/%d/" % (experiment.name, repetition), exist_ok=True)
         devices.sort(key=lambda e: e.name, reverse=False)
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.repeat_seed):
+            print("=========================\tSEED_REPEAT {}\t========================".format(seed_repeat))
             while (True):
                 experiment.setOK()
 
@@ -337,6 +342,10 @@ def runExperiment(experiment):
 def checkBatteryDevice(min_battery, device, battery_barrier):
     adb.screenOff(device)
     battery_level = adb.getBatteryLevel(device)
+    if (battery_level < 0):
+        print("INVALID_BATTERY_CONTINUING ON {}".format(device.name))
+        barrierWithTimeout(battery_barrier, 3600)
+        return
     if (battery_level < min_battery):
         while (battery_level < max(0, min(100, min_battery + 10))):
             print("NOT_ENOUGH_BATTERY ON {} ({}%)".format(device.name, battery_level))
@@ -351,7 +360,7 @@ def checkBattery(min_battery, *devices):
         threading.Thread(target = checkBatteryDevice, args = (min_battery, device, battery_barrier)).start()
     if not barrierWithTimeout(battery_barrier, 3600):
         all_devices = adb.listDevices(0)
-        for device in devices:
+        for device in all_devices:
             if device not in devices:
                 return False
     return True
@@ -579,7 +588,7 @@ def help():
 
 def printExperiment(conf, experiment):
     conf.write("Experiment: %s\n" % experiment.name)
-    conf.write("========== CONFIG ==========\n")
+    conf.write("==============\tCONFIG\t==============\n")
     conf.write("Scheduler: %s\n" % experiment.scheduler)
     conf.write("TF Model: %s\n" % experiment.model)
     conf.write("Devices: %s\n" % str(experiment.devices))
@@ -594,9 +603,9 @@ def printExperiment(conf, experiment):
     conf.write("Producers: %s\n" % experiment.producers)
     conf.write("RepeatSeed: %s\n" % experiment.repeat_seed)
     conf.write("Timeout: %s\n" % experiment.timeout)
-    conf.write("=============================\n")
 
 def main():
+    global ALL_DEVICES
     if (len(argv) < 2):
         print("\tPlease provide config file!")
         help()
@@ -612,12 +621,16 @@ def main():
             grpcControls.DEBUG = True
         if "DEBUG_ADB" in os.environ and int(os.environ["DEBUG_ADB"]) == 1:
             adb.DEBUG = True
-        for device in adb.listDevices():
+        ALL_DEVICES = adb.listDevices()
+        #for device in adb.listDevices():
+        print("==============\tDEVICES\t==============")
+        for device in ALL_DEVICES:
+            print("{} ({})".format(device.name, device.ip))
             adb.screenOff(device)
+        print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices-e.producers-len(e.clouds)+e.request_time, reverse=True)
-        grpcControls.DEBUG = True
+        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers+100*len(e.clouds)-e.request_time, reverse=False)
         for e in EXPERIMENTS:
             runExperiment(e)
 

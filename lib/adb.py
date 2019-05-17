@@ -59,11 +59,11 @@ def getBatteryLevel(device=None):
     battery_details = adb(['shell', 'dumpsys', 'battery'], device)
     level_start = battery_details.find('level:')
     if (level_start == -1):
-        return 0
+        return -1
     battery_details = battery_details[level_start + 7:]
     level_end = battery_details.find('\n')
     if (level_end == -1):
-        return 0
+        return -1
     return int(battery_details[:level_end])
 
 def connectWifiADB(device):
@@ -75,6 +75,7 @@ def connectWifiADB(device):
 
 def disconnectWifiADB(device):
     adb(['disconnect', "%s:5555" % device.ip])
+    device.connected_wifi = False
 
 def listDevices(minBattery = 15):
     devices_raw = adb(['devices']).split('\n')[1:]
@@ -84,8 +85,8 @@ def listDevices(minBattery = 15):
         if (len(splitted) > 1 and splitted[1] == 'device'):
             new_device = Device(splitted[0], status = (splitted[1] == 'device' ))
             if (getBatteryLevel(new_device) >= minBattery):
-                new_device.ip =  getDeviceIp(new_device)
-                if (new_device.name == new_device.ip):
+                new_device.ip = getDeviceIp(new_device)
+                if (len(new_device.name) > 5 and new_device.name[:-5] == new_device.ip):
                     continue
                 device_wifi_adb = False
                 for sub_dev in devices_raw:
@@ -203,7 +204,14 @@ def getDeviceIp(device, timeout=120):
 def rebootAndWait(device, timeout=300):
     start_time = time()
     adb(['reboot'], device)
-    adb(['wait-for-device'], device)
+    if (device.connected_wifi):
+        device.connected_wifi = False
+        while (not connectWifiADB(device)[1]):
+            if (time()-start_time > timeout):
+                return False
+            sleep(5)
+    else:
+        adb(['wait-for-device'], device)
     while (adb(['shell', 'getprop', 'dev.bootcomplete'], device).find('1') == -1):
         if (time()-start_time > timeout):
             return False

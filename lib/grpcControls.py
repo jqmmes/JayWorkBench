@@ -19,7 +19,7 @@ def exceptionHook(exception_type, exception, traceback):
 
 excepthook = exceptionHook
 
-DEBUG = False
+DEBUG = True
 
 class cloudClient:
     launcherChannel = None
