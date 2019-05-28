@@ -291,6 +291,9 @@ def runExperiment(experiment):
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
+                if (len(experiment.clouds) == 0):
+                    stopClouds(experiment)
+
                 producers = experiment.producers
                 for device in devices[:experiment.devices]:
                     threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
@@ -630,7 +633,7 @@ def main():
         print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers+100*len(e.clouds)-e.request_time, reverse=False)
+        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time, reverse=True)
         for e in EXPERIMENTS:
             runExperiment(e)
 
