@@ -131,36 +131,36 @@ if __name__ == '__main__':
             if (os.path.exists("logs/{}/conf.cfg".format(entry))):
                 conf = open("logs/{}/conf.cfg".format(entry), "r").read().split("\n")
                 for line in conf:
-                    if line.find('Rate Time: '):
+                    if line.find('Rate Time: ') == 0:
                         rate = int(line[11:-1])
-                    if line.find('Producers: '):
-                        producers = int(line[11:-1])
+                    if line.find('Producers: ') == 0:
+                        producers = int(line[11:])
             if "lost_devices_mid_experience_CANCELED" not in repetitions:
+                counter = 0
+
+                devices = 0
+                clouds = 0
+                max_queue = 0
+                avg_queue = 0
+                total_jobs = 0
+                avg_jobs_device = 0
+                max_jobs_device = 0
+                avg_jobs_cloud = 0
+                max_jobs_cloud = 0
+                devs_with_1_plus_jobs = 0
+                execution_time_avg = 0
+                execution_time_max = 0
+                execution_time_min = 0
+                execution_time_device_avg = 0
+                execution_time_device_max = 0
+                execution_time_device_min = 0
+                execution_time_cloud_avg = 0
+                execution_time_cloud_max = 0
+                execution_time_cloud_min = 0
+                avg_experiment_time = 0
+                max_experiment_time = 0
                 for repeat in repetitions:
                     if os.path.isdir("logs/{}/{}".format(entry, repeat)):
-                        counter = 0
-
-                        devices = 0
-                        clouds = 0
-                        max_queue = 0
-                        avg_queue = 0
-                        total_jobs = 0
-                        avg_jobs_device = 0
-                        max_jobs_device = 0
-                        avg_jobs_cloud = 0
-                        max_jobs_cloud = 0
-                        jobs_with_1_plus_jobs = 0
-                        execution_time_avg = 0
-                        execution_time_max = 0
-                        execution_time_min = 0
-                        execution_time_device_avg = 0
-                        execution_time_device_max = 0
-                        execution_time_device_min = 0
-                        execution_time_cloud_avg = 0
-                        execution_time_cloud_max = 0
-                        execution_time_cloud_min = 0
-                        avg_experiment_time = 0
-                        max_experiment_time = 0
                         for dir in os.listdir("logs/{}/{}".format(entry, repeat)):
                             counter += 1
                             if os.path.isdir("logs/{}/{}/{}".format(entry, repeat, dir)):
@@ -177,7 +177,7 @@ if __name__ == '__main__':
                                     max_jobs_device = 0
                                     avg_jobs_cloud = 0
                                     max_jobs_cloud = 0
-                                    jobs_with_1_plus_jobs = 0
+                                    devs_with_1_plus_jobs = 0
                                     execution_time_avg = 0
                                     execution_time_max = 0
                                     execution_time_min = 0
@@ -254,7 +254,7 @@ if __name__ == '__main__':
                                         max_jobs_device += max(device_jobs)
                                         avg_jobs_cloud += min(cloud_jobs)
                                         max_jobs_cloud += max(cloud_jobs)
-                                        jobs_with_1_plus_jobs += (len(device_jobs)+len(cloud_jobs))
+                                        devs_with_1_plus_jobs += (len(device_jobs)+len(cloud_jobs))
                                         execution_time_avg += (sum(device_execution_time_avg)+sum(cloud_execution_time_avg)) / (len(device_execution_time_avg)+len(cloud_execution_time_avg))
                                         execution_time_max += max(max(device_execution_time_max), max(cloud_execution_time_max))
                                         execution_time_min += min(min(device_execution_time_min), min(cloud_execution_time_min))
@@ -275,7 +275,7 @@ if __name__ == '__main__':
                                         total_jobs += sum(device_jobs)
                                         avg_jobs_device += sum(device_jobs)/len(device_jobs)
                                         max_jobs_device += max(device_jobs)
-                                        jobs_with_1_plus_jobs += len(device_jobs)
+                                        devs_with_1_plus_jobs += len(device_jobs)
                                         execution_time_avg += (sum(device_execution_time_avg)+sum(cloud_execution_time_avg)) / (len(device_execution_time_avg)+len(cloud_execution_time_avg))
                                         execution_time_max += max(device_execution_time_max)
                                         execution_time_min += min(device_execution_time_min)
@@ -292,13 +292,13 @@ if __name__ == '__main__':
                                     print(producers, end=',')
                                     print(rate, end=',')
                                     print(max_queue, end=',')
-                                    print(avg_queue, end=',')
+                                    print("%.2f" % avg_queue, end=',')
                                     print(total_jobs, end=',')
-                                    print(avg_jobs_device, end=',')
+                                    print("%.2f" % avg_jobs_device, end=',')
                                     print(max_jobs_device, end=',')
-                                    print(avg_jobs_cloud, end=',')
+                                    print("%.2f" % avg_jobs_cloud, end=',')
                                     print(max_jobs_cloud, end=',')
-                                    print(jobs_with_1_plus_jobs, end=',')
+                                    print(devs_with_1_plus_jobs, end=',')
                                     print(round(execution_time_avg), end=',')
                                     print(round(execution_time_max), end=',')
                                     print(round(execution_time_min), end=',')
@@ -311,31 +311,31 @@ if __name__ == '__main__':
                                     print(round(avg_experiment_time), end=',')
                                     print(round(max_experiment_time))
 
-                        if COMPRESSED_PRINT:
-                            print("{}/{}".format(entry, repeat), end=',')
-                            print(devices/counter, end=',')
-                            print(clouds/counter, end=',')
-                            print(producers, end=',')
-                            print(rate, end=',')
-                            print(max_queue/counter, end=',')
-                            print(avg_queue/counter, end=',')
-                            print(total_jobs/counter, end=',')
-                            print(avg_jobs_device/counter, end=',')
-                            print(max_jobs_device/counter, end=',')
-                            print(avg_jobs_cloud/counter, end=',')
-                            print(max_jobs_cloud/counter, end=',')
-                            print(jobs_with_1_plus_jobs/counter, end=',')
-                            print(round(execution_time_avg/counter), end=',')
-                            print(round(execution_time_max/counter), end=',')
-                            print(round(execution_time_min/counter), end=',')
-                            print(round(execution_time_device_avg/counter), end=',')
-                            print(round(execution_time_device_max/counter), end=',')
-                            print(round(execution_time_device_min/counter), end=',')
-                            print(round(execution_time_cloud_avg/counter), end=',')
-                            print(round(execution_time_cloud_max/counter), end=',')
-                            print(round(execution_time_cloud_min/counter), end=',')
-                            print(round(avg_experiment_time/counter), end=',')
-                            print(round(max_experiment_time/counter))
+                if COMPRESSED_PRINT:
+                    print("{}".format(entry), end=',')
+                    print(int(devices/counter), end=',')
+                    print(int(clouds/counter), end=',')
+                    print(producers, end=',')
+                    print(rate, end=',')
+                    print("%.2f" % (max_queue/counter), end=',')
+                    print("%.2f" % (avg_queue/counter), end=',')
+                    print("%.2f" % (total_jobs/counter), end=',')
+                    print("%.2f" % (avg_jobs_device/counter), end=',')
+                    print("%.2f" % (max_jobs_device/counter), end=',')
+                    print("%.2f" % (avg_jobs_cloud/counter), end=',')
+                    print("%.2f" % (max_jobs_cloud/counter), end=',')
+                    print("%.2f" % (devs_with_1_plus_jobs/counter), end=',')
+                    print(round(execution_time_avg/counter), end=',')
+                    print(round(execution_time_max/counter), end=',')
+                    print(round(execution_time_min/counter), end=',')
+                    print(round(execution_time_device_avg/counter), end=',')
+                    print(round(execution_time_device_max/counter), end=',')
+                    print(round(execution_time_device_min/counter), end=',')
+                    print(round(execution_time_cloud_avg/counter), end=',')
+                    print(round(execution_time_cloud_max/counter), end=',')
+                    print(round(execution_time_cloud_min/counter), end=',')
+                    print(round(avg_experiment_time/counter), end=',')
+                    print(round(max_experiment_time/counter))
 
 
     #data = readCSV(argv[1])
