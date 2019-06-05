@@ -275,7 +275,7 @@ def runExperiment(experiment):
                 experiment.setOK()
 
                 # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
-                if not checkBattery(30, *devices[:experiment.devices]):
+                if not checkBattery(25, *devices[:experiment.devices]):
                     experiment.setFail()
                     os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
                     return
