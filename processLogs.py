@@ -336,6 +336,3 @@ if __name__ == '__main__':
                     print(round(execution_time_cloud_min/counter), end=',')
                     print(round(avg_experiment_time/counter), end=',')
                     print(round(max_experiment_time/counter))
-
-
-    #data = readCSV(argv[1])
