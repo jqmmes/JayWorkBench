@@ -122,7 +122,7 @@ def processLogsCloud(data):
 
 
 if __name__ == '__main__':
-    print('EXPERIMENT,DEVICES,CLOUDS,PRODUCERS,RATE,MAX_QUEUE_SIZE,AVG_QUEUE_SIZE,TOTAL_JOBS,AVG_JOBS_DEVICE,MAX_JOBS_DEVICES,AVG_JOBS_CLOUD,MAX_JOBS_CLOUD,DEVICES_WITH_1+JOB,EXECUTION_TIME_AVG,EXECUTION_TIME_MAX,EXECUTION_TIME_MIN,EXECUTION_TIME_DEVICE_AVG,EXECUTION_TIME_DEVICE_MAX,EXECUTION_TIME_DEVICE_MIN,EXECUTION_TIME_CLOUD_AVG,EXECUTION_TIME_CLOUD_MAX,EXECUTION_TIME_CLOUD_MIN,AVG_EXPERIMENT_TIME,MAX_EXPERIMENT_TIME')
+    print('EXPERIMENT,DEVICES,CLOUDS,CLOUDLETS,PRODUCERS,RATE,MAX_QUEUE_SIZE,AVG_QUEUE_SIZE,TOTAL_JOBS,AVG_JOBS_DEVICE,MAX_JOBS_DEVICES,AVG_JOBS_CLOUD,MAX_JOBS_CLOUD,DEVICES_WITH_1+JOB,EXECUTION_TIME_AVG,EXECUTION_TIME_MAX,EXECUTION_TIME_MIN,EXECUTION_TIME_DEVICE_AVG,EXECUTION_TIME_DEVICE_MAX,EXECUTION_TIME_DEVICE_MIN,EXECUTION_TIME_CLOUD_AVG,EXECUTION_TIME_CLOUD_MAX,EXECUTION_TIME_CLOUD_MIN,AVG_EXPERIMENT_TIME,MAX_EXPERIMENT_TIME')
     for entry in os.listdir("logs"):
         if os.path.isdir("logs/{}".format(entry)):
             repetitions = os.listdir("logs/{}".format(entry))
@@ -140,6 +140,7 @@ if __name__ == '__main__':
 
                 devices = 0
                 clouds = 0
+                cloudlets = 0
                 max_queue = 0
                 avg_queue = 0
                 total_jobs = 0
@@ -166,10 +167,12 @@ if __name__ == '__main__':
                             if os.path.isdir("logs/{}/{}/{}".format(entry, repeat, dir)):
                                 device_data = []
                                 cloud_data = []
+                                cloudlet_data = []
                                 if not COMPRESSED_PRINT:
                                     print("{}/{}/{}".format(entry, repeat, dir), end=',')
                                     devices = 0
                                     clouds = 0
+                                    cloudlets = 0
                                     max_queue = 0
                                     avg_queue = 0
                                     total_jobs = 0
@@ -196,6 +199,8 @@ if __name__ == '__main__':
                                     data = readCSV("logs/{}/{}/{}/{}".format(entry, repeat, dir, device))
                                     if device == "hyrax_europe-west1-b.csv":
                                         cloud_data.append(processLogsCloud(data))
+                                    elif device[:9] == "cloudlet_":
+                                        cloudlet_data.append(processLogsCloud(data))
                                     else:
                                         device_data.append(processLogs(data))
                                 device_jobs = []
@@ -225,7 +230,7 @@ if __name__ == '__main__':
                                         device_queue.append(0)
                                     if (result[2].max and result[2].min):
                                         device_total_experiment_time.append(result[2].max-result[2].min)
-
+                                cloud_data += cloudlet_data
                                 for result in cloud_data:
                                     cloud_jobs.append(result[0].num)
                                     if (result[0].min):
@@ -244,7 +249,8 @@ if __name__ == '__main__':
                                 try:
                                     if len(cloud_queue) > 0 and len(cloud_execution_time_avg) > 0 and len(cloud_execution_time_max) > 0 and len(cloud_execution_time_min) > 0 and len(cloud_jobs) > 0 and len(cloud_total_experiment_time) > 0:
                                         devices += len(device_data)
-                                        clouds += len(cloud_data)
+                                        clouds += len(cloud_data)-len(cloudlet_data)
+                                        cloudlets = len(cloudlet_data)
                                         max_device_queue = max(device_queue) if len(device_queue) > 0 else 0
                                         max_cloud_queue = max(cloud_queue) if len(cloud_queue) > 0 else 0
                                         max_queue += max(max_device_queue, max_cloud_queue)
@@ -289,6 +295,7 @@ if __name__ == '__main__':
                                 if not COMPRESSED_PRINT:
                                     print(devices, end=',')
                                     print(clouds, end=',')
+                                    print(cloudlets, end=',')
                                     print(producers, end=',')
                                     print(rate, end=',')
                                     print(max_queue, end=',')
@@ -315,6 +322,7 @@ if __name__ == '__main__':
                     print("{}".format(entry), end=',')
                     print(int(devices/counter), end=',')
                     print(int(clouds/counter), end=',')
+                    print(int(cloudlets/counter), end=',')
                     print(producers, end=',')
                     print(rate, end=',')
                     print("%.2f" % (max_queue/counter), end=',')

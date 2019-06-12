@@ -5,6 +5,9 @@ import lib.protobuf.Cloud_pb2_grpc as Cloud_pb2_grpc
 import lib.protobuf.ODProto_pb2 as ODProto_pb2
 import lib.protobuf.ODProto_pb2_grpc as ODProto_pb2_grpc
 
+import lib.protobuf.cloudlet.CloudletControl_pb2 as CloudletControl_pb2
+import lib.protobuf.cloudlet.CloudletControl_pb2_grpc as CloudletControl_pb2_grpc
+
 from google.protobuf import empty_pb2 as google_empty
 from google.protobuf.wrappers_pb2 import BoolValue as google_bool
 
@@ -20,6 +23,70 @@ def exceptionHook(exception_type, exception, traceback):
 excepthook = exceptionHook
 
 DEBUG = True
+
+class cloudletControl:
+    protoChannel = None
+    channelStatus = ChannelConnectivity.SHUTDOWN
+    protoStub = None
+    port = 50049
+    name = ""
+
+    def __init__(self, ip, name):
+        self.ip = ip
+        self.name = name
+
+    def connect(self, retries=5):
+        try:
+            self.protoChannel = grpc.insecure_channel('%s:50049' % self.ip)
+            self.protoStub = CloudletControl_pb2_grpc.CloudletControlStub(self.protoChannel)
+            sleep(1)
+            self.__checkChannelStatus()
+            if DEBUG:
+                print("GRPC %s connect" % (self.ip))
+        except:
+            sleep(5)
+            if (retries-1 > 0):
+                self.connect(retries-1)
+            else:
+                if DEBUG:
+                    print("GRPC %s connect FAIL" % (self.ip))
+
+    def channelCallback(self, status):
+        self.channelStatus = status
+
+    def __checkChannelStatus(self):
+        if (self.channelStatus == ChannelConnectivity.READY):
+            return True
+        if (self.protoChannel is not None):
+            self.protoChannel.subscribe(self.channelCallback, True)
+            sleep(0.5)
+            return self.channelStatus == ChannelConnectivity.READY
+        else:
+            return False
+
+    def start(self, retries=5):
+        if retries <= 0:
+            if DEBUG:
+                print("GRPC %s start FAIL" % (self.ip))
+            return
+        if (self.__checkChannelStatus()):
+            if DEBUG:
+                print("GRPC %s start %s" % (self.ip, self.protoStub.startODLauncher(CloudletControl_pb2.Empty())))
+        else:
+            sleep(5)
+            self.start(retries-1)
+
+    def stop(self, retries=5):
+        if retries <= 0:
+            if DEBUG:
+                print("GRPC %s stop FAIL" % (self.ip))
+            return
+        if (self.__checkChannelStatus()):
+            if DEBUG:
+                print("GRPC %s stop %s" % (self.ip, self.protoStub.stopODLauncher(CloudletControl_pb2.Empty())))
+        else:
+            sleep(5)
+            self.stop(retries-1)
 
 class cloudClient:
     launcherChannel = None

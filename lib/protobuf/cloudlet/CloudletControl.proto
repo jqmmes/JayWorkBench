@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+message Empty {}
+
+service CloudletControl {
+  rpc startODLauncher(Empty) returns (Empty);
+  rpc stopODLauncher(Empty) returns (Empty);
+}

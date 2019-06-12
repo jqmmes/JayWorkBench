@@ -7,6 +7,7 @@ import os
 import configparser
 from sys import argv, stdout
 import sys
+import subprocess
 
 ASSETS=os.listdir("assets")
 EXPERIMENTS = []
@@ -15,7 +16,7 @@ PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
 
-
+FNULL = open(os.devnull, "w")
 
 def brokenBarrierExceptionHook(exception_type, exception, traceback):
     if (exception_type is threading.BrokenBarrierError):
@@ -114,13 +115,19 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     if experiment.reboot:
         if not rebootDevice(device, device_random, experiment.devices):
             sleep(10)
-            use_wifi_adb = adb.connectWifiADB(device)
-            if not use_wifi_adb[1]:
-                print("FAILED_SWITCHING_TO_WIFI_ADB\t%s\t%s" % (device.name, device.ip))
-                skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
-            else:
-                print("SWITCHING_TO_WIFI_ADB\t%s\t%s" % (device.name, device.ip))
-                device = use_wifi_adb[0]
+            retries = 0
+            while True:
+                wifi_adb = adb.connectWifiADB(device)
+                if wifi_adb[1]:
+                    device = wifi_adb[0]
+                    break
+                if retries > 3:
+                    print("FAILED_SWITCHING_TO_WIFI_ADB\t%s\t%s" % (device.name, device.ip))
+                    skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                    return
+                adb.enableWifiADB(device)
+                sleep(1)
+                retries += 1
         adb.connectWifiADB(device)
     sleep(2)
     adb.screenOn(device)
@@ -272,12 +279,11 @@ def runExperiment(experiment):
         for seed_repeat in range(experiment.repeat_seed):
             print("=========================\tSEED_REPEAT {}\t========================".format(seed_repeat))
             while (True):
+                timeout = False
                 experiment.setOK()
 
                 # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
-                if not checkBattery(25, *devices[:experiment.devices]):
-                    experiment.setFail()
-                    os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
+                if not neededDevicesAvailable:
                     return
 
                 os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
@@ -342,6 +348,17 @@ def runExperiment(experiment):
             print("Waiting 5s for next repetition")
             sleep(5)
 
+def neededDevicesAvailable(experiment, devices, retries=5):
+    if retries < 0:
+        experiment.setFail()
+        os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
+        return False
+    if not checkBattery(25, *devices[:experiment.devices]):
+        sleep(240)
+        return neededDevicesAvailable(experiment, devices, retries-1)
+    else:
+        return True
+
 def checkBatteryDevice(min_battery, device, battery_barrier):
     adb.screenOff(device)
     battery_level = adb.getBatteryLevel(device)
@@ -374,8 +391,26 @@ def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, 
         threading.Thread(target = startCloudletThread, args = (cloudlet, experiment, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
     cloudlet_boot_barrier.wait()
 
+def killLocalCloudlet():
+    pid = os.popen("jps -lV | grep ODCloud.jar | cut -d' ' -f1").read()[:-1]
+    if pid != '':
+        subprocess.run(['kill', '-9', pid])
+
+
 def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier):
     print("Starting %s Cloudlet Instance" % cloudlet)
+
+    #killLocalCloudlet()
+    #os.system("/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java -jar /home/joaquim/ODCloud/ODCloud.jar&") #stderr=FNULL
+    #sleep(2)
+
+    cloudlet_control = grpcControls.cloudletControl(cloudlet, "%s_cloudlet" % cloudlet)
+    cloudlet_control.connect()
+    cloudlet_control.stop()
+    cloudlet_control.start()
+    sleep(2)
+
+
     cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet)
 
     cloudlet_instance.stop()
@@ -401,6 +436,8 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
 
     servers_finish_barrier.wait() #wait experiment completion to init shutdown
     cloudlet_instance.stop()
+    cloudlet_control.stop()
+    #killLocalCloudlet()
     finish_barrier.wait()
 
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
@@ -408,7 +445,10 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     for cloud in experiment.clouds:
         os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[0], cloud[1]))
     for cloudlet in experiment.cloudlets:
-        os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
+        if (cloudlet == '127.0.0.1'):
+            os.system("cp /home/joaquim/ODCloud/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (log_name, experiment.name, repetition, seed_repeat, cloudlet))
+        else:
+            os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
     print("Starting %s Cloud Instance" % cloud[0])
@@ -633,7 +673,7 @@ def main():
         print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time, reverse=True)
+        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time, reverse=False)
         for e in EXPERIMENTS:
             runExperiment(e)
 

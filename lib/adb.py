@@ -66,6 +66,9 @@ def getBatteryLevel(device=None):
         return -1
     return int(battery_details[:level_end])
 
+def enableWifiADB(device):
+    adb(['tcpip', '5555'], device)
+
 def connectWifiADB(device):
     status = adb(['connect', "%s:5555" % device.ip])
     if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
