@@ -400,10 +400,6 @@ def killLocalCloudlet():
 def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier):
     print("Starting %s Cloudlet Instance" % cloudlet)
 
-    #killLocalCloudlet()
-    #os.system("/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java -jar /home/joaquim/ODCloud/ODCloud.jar&") #stderr=FNULL
-    #sleep(2)
-
     cloudlet_control = grpcControls.cloudletControl(cloudlet, "%s_cloudlet" % cloudlet)
     cloudlet_control.connect()
     cloudlet_control.stop()
@@ -656,7 +652,7 @@ def main():
     if argv[1].lower() == "help":
         help()
     elif argv[1].lower() == "install":
-        for device in adb.listDevices():
+        for device in adb.listDevices(0):
             adb.removePackage(device)
             adb.installPackage('apps/ODLauncher-release.apk', device)
     else:
@@ -664,8 +660,7 @@ def main():
             grpcControls.DEBUG = True
         if "DEBUG_ADB" in os.environ and int(os.environ["DEBUG_ADB"]) == 1:
             adb.DEBUG = True
-        ALL_DEVICES = adb.listDevices()
-        #for device in adb.listDevices():
+        ALL_DEVICES = adb.listDevices(0)
         print("==============\tDEVICES\t==============")
         for device in ALL_DEVICES:
             print("{} ({})".format(device.name, device.ip))
