@@ -89,7 +89,7 @@ def getDeviceIp(device):
         return worker_ip if worker_ip is not None else sleep(5)
     return None
 
-def rebootDevice(device, device_random, max_sleep_random=10):
+def rebootDevice(device, device_random, max_sleep_random=10, retries=3):
     global LAST_REBOOT_TIME
     while True:
         sleep_duration = device_random.randint(0,10*max_sleep_random)
@@ -102,8 +102,12 @@ def rebootDevice(device, device_random, max_sleep_random=10):
                 print("REBOOT_WORKER_COMPLETE\t%s" % device.name)
                 return True
             else:
-                print("REBOOT_WORKER_FAIL\t%s" % device.name)
-                return False
+                if (retries > 0):
+                    print("REBOOT_WORKER_RETRY\t%s" % device.name)
+                    return rebootDevice(device, device_random, 10, retries - 1)
+                else:
+                    print("REBOOT_WORKER_FAIL\t%s" % device.name)
+                    return False
 
 
 def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
