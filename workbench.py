@@ -65,6 +65,26 @@ def runJob(worker, device_random):
         print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), job.id, worker.name))
     PENDING_JOBS -= 1
 
+def calibrateWorker(worker, device_random):
+    job = grpcControls.Job("WORKER_CALIBRATION")
+    asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
+
+    while (asset[-4:] not in ['.png', '.jpg']):
+        asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
+
+    with open("assets/%s" % asset, "rb") as image:
+        f = image.read()
+        b = bytes(f)
+        job.addBytes(b)
+    print("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), job.id, asset, worker.name))
+    try:
+        if not worker.calibrateWorker(job):
+            print("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), job.id, worker.name))
+        else:
+            print("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), job.id, worker.name))
+    except Exception as job_exception:
+        print("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), job.id, worker.name))
+
 def barrierWithTimeout(barrier, timeout, experiment=None, *skip_barriers):
     try:
         barrier.wait(timeout=timeout)
@@ -116,6 +136,11 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     print("START_WORKER\t%s" % device.name)
     device_random = random.Random()
     device_random.seed(experiment.seed+device.name+str(repetition))
+    rate = float(experiment.request_rate)/float(experiment.request_time)
+    print('GENERATING_JOBS\tRATE: {}\t{}'.format(rate, device.name))
+    job_intervals = []
+    while(sum(job_intervals) < experiment.duration):
+        job_intervals.append(device_random.expovariate(rate))
     if experiment.reboot:
         if not rebootDevice(device, device_random, experiment.devices):
             sleep(10)
@@ -196,22 +221,21 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         print("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
         return
 
+    print("CALIBRATION\t{}".format(device.name))
+    calibrateWorker(worker, device_random)
 
-    #adb.screenOff(device)
+    sleep(15)
 
-    rate = float(experiment.request_rate)/float(experiment.request_time)
 
     print("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
     start_barrier.wait()
 
-    start_time=time()
-    while (((time()-start_time) < experiment.duration) and experiment.isOK() and is_producer):
-        next_event_in = device_random.expovariate(rate)
-        print("NEXT_EVENT_IN\t{}".format(next_event_in))
-        if next_event_in > experiment.duration-(time()-start_time):
-            break
-        sleep(next_event_in)
+    i = 0
+    while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
+        print("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
+        sleep(job_intervals[i])
         threading.Thread(target = runJob, args = (worker,device_random)).start()
+        i = i+1
 
     print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, log_pull_barrier, finish_barrier):
@@ -229,14 +253,20 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
 
 
 
+    try:
+        if (experiment.isOK()):
+            adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+    except:
+        experiment.setFail()
 
-    if (experiment.isOK()):
-        adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
-
-    system_log_path = "sys_logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
-    os.makedirs(system_log_path, exist_ok=True)
-    adb.pullSystemLog(device, system_log_path)
+    try:
+        system_log_path = "sys_logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
+        os.makedirs(system_log_path, exist_ok=True)
+        adb.pullSystemLog(device, system_log_path)
+    except:
+        None
     print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
+
     finish_barrier.wait()
     adb.screenOff(device)
 
@@ -403,6 +433,8 @@ def killLocalCloudlet():
 
 def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier):
     print("Starting %s Cloudlet Instance" % cloudlet)
+    device_random = random.Random()
+    device_random.seed(experiment.seed+cloudlet+str(repetition))
 
     cloudlet_control = grpcControls.cloudletControl(cloudlet, "%s_cloudlet" % cloudlet)
     cloudlet_control.connect()
@@ -433,6 +465,9 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
                 break
 
     cloudlet_boot_barrier.wait() #inform startCloudlets that you have booted
+
+    print("CALIBRATION\t{}".format(cloudlet))
+    calibrateWorker(cloudlet_instance, device_random)
 
     servers_finish_barrier.wait() #wait experiment completion to init shutdown
     cloudlet_instance.stop()

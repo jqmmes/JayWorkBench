@@ -116,6 +116,11 @@ class BrokerServiceStub(object):
         request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         response_deserializer=ODProto__pb2.Status.FromString,
         )
+    self.calibrateWorker = channel.unary_unary(
+        '/BrokerService/calibrateWorker',
+        request_serializer=ODProto__pb2.Job.SerializeToString,
+        response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+        )
 
 
 class BrokerServiceServicer(object):
@@ -264,6 +269,13 @@ class BrokerServiceServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def calibrateWorker(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
 
 def add_BrokerServiceServicer_to_server(servicer, server):
   rpc_method_handlers = {
@@ -366,6 +378,11 @@ def add_BrokerServiceServicer_to_server(servicer, server):
           servicer.stopService,
           request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
           response_serializer=ODProto__pb2.Status.SerializeToString,
+      ),
+      'calibrateWorker': grpc.unary_unary_rpc_method_handler(
+          servicer.calibrateWorker,
+          request_deserializer=ODProto__pb2.Job.FromString,
+          response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(

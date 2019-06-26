@@ -27,10 +27,10 @@ class Device:
 
 FNULL = open(os.devnull, "w")
 
-def adb(cmd, device=None):
+def adb(cmd, device=None, force_usb=False):
     selected_device = []
     if(device != None):
-        if (device.connected_wifi):
+        if (device.connected_wifi and not force_usb):
             selected_device = ['-s', "%s:5555" % device.ip]
         else:
             selected_device = ['-s', device.name]
@@ -202,10 +202,10 @@ def getDeviceIp(device, timeout=120):
         sleep(2)
     return None
 
-
-
 def rebootAndWait(device, timeout=300):
     start_time = time()
+    adb(['reboot'], device, True)
+    sleep(2)
     adb(['reboot'], device)
     if (device.connected_wifi):
         device.connected_wifi = False

@@ -210,6 +210,13 @@ class cloudClient:
             sleep(5)
             self.setLogName(log_name, retries-1)
 
+    def calibrateWorker(self, job):
+        if (self.brokerStubReady()):
+            try:
+                return self.brokerStub.calibrateWorker(job.getProto())
+            except:
+                return False
+
     def stop(self, retries=5):
         if retries <= 0:
             if DEBUG:
@@ -404,6 +411,13 @@ class remoteClient:
             except:
                 return False
 
+    def calibrateWorker(self, job):
+        if (self.brokerStubReady()):
+            try:
+                return self.brokerStub.calibrateWorker(job.getProto())
+            except:
+                return False
+
     def setLogName(self, log_name, retries=5):
         if retries <= 0:
             if DEBUG:
@@ -442,8 +456,8 @@ class Job:
     id = ""
     data = None
 
-    def __init__(self):
-        self.id = str(uuid.uuid4())
+    def __init__(self, id=str(uuid.uuid4())):
+        self.id = id
 
     def addBytes(self, bytes):
         self.data = bytes
