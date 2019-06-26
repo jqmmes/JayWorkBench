@@ -291,13 +291,11 @@ def runExperiment(experiment):
     cleanLogs("logs/%s/" % experiment.name)
     cleanLogs("sys_logs/%s/" % experiment.name)
 
-    #adb.DEBUG = False
     devices = ALL_DEVICES #adb.listDevices(0)
     if (len(devices) < experiment.devices):
         os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
 
-    #adb.DEBUG = True
     conf = open("logs/%s/conf.cfg" % experiment.name, "w+")
     printExperiment(conf, experiment)
     conf.close()
@@ -341,14 +339,11 @@ def runExperiment(experiment):
                 print("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
                 if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment): # 15m
                     print("BROKEN_BARRIER\tBOOT_BARRIER\tMAIN")
-                #boot_barrier.wait()
                 sleep(1)
                 print("WAIT_ON_BARRIER\tSTART_BARRIER\tMAIN_LOOP")
                 if not barrierWithTimeout(start_barrier, 60, experiment):
                     print("BROKEN_BARRIER\tSTART_BARRIER\tMAIN")
-                #start_barrier.wait()
 
-                #complete_barrier.wait()
                 completetion_timeout_start = time()
                 while (PENDING_JOBS > 0 and experiment.isOK()) or experiment.duration > time()-completetion_timeout_start:
                     sleep(2)
@@ -363,15 +358,12 @@ def runExperiment(experiment):
                 sleep(1)
                 print("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(log_pull_barrier, 60, experiment)
-                #log_pull_barrier.wait()
                 if (experiment.isOK()):
                     pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
 
                 print("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
-                #servers_finish_barrier.wait() # Command Servers to begin shutdown
                 barrierWithTimeout(servers_finish_barrier, 60, experiment)
                 print("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
-                #finish_barrier.wait()
                 barrierWithTimeout(finish_barrier, 240, experiment)
 
                 if (experiment.isOK()):
@@ -472,7 +464,6 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
     servers_finish_barrier.wait() #wait experiment completion to init shutdown
     cloudlet_instance.stop()
     cloudlet_control.stop()
-    #killLocalCloudlet()
     finish_barrier.wait()
 
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
