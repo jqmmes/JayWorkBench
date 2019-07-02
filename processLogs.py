@@ -35,13 +35,14 @@ def processLogs(data):
     jobData = data\
               .filter(data.JOB_ID.isNotNull())\
               .select('JOB_ID','TIMESTAMP','CLASS_METHOD_LINE','OPERATION', 'ACTIONS')
-    queue_data = jobData.filter(jobData.OPERATION == 'JOB_QUEUED').filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService_queueJob$ODLib_Common_40')
+    queue_data = jobData.filter(jobData.OPERATION == 'JOB_QUEUED').filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService_queueJob$ODLib_Common_40').filter(jobData.JOB_ID != 'WORKER_CALIBRATION')
 
     queue_data = queue_data.select(queue_data.TIMESTAMP, queue_data.ACTIONS.substr(15, 4).alias("QUEUE_SIZE")).withColumn('QUEUE_SIZE', F.col('QUEUE_SIZE').cast('integer'))
 
     start = jobData\
               .filter(jobData.OPERATION == 'INIT')\
               .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_scheduleJob$ODLib_Common_78')\
+              .filter(jobData.JOB_ID != 'WORKER_CALIBRATION')\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .withColumnRenamed('TIMESTAMP', 'START_TIME')
@@ -50,6 +51,7 @@ def processLogs(data):
     localhost_execution_start = jobData\
                 .filter(jobData.OPERATION == 'INIT')\
                 .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_executeJob$ODLib_Common_72')\
+                .filter(jobData.JOB_ID != 'WORKER_CALIBRATION')\
                 .drop('OPERATION')\
                 .drop('CLASS_METHOD_LINE')\
                 .drop('ACTIONS')\
@@ -59,6 +61,7 @@ def processLogs(data):
     localhost_execution_end = jobData\
                 .filter(jobData.OPERATION == 'COMPLETE')\
                 .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_132')\
+                .filter(jobData.JOB_ID != 'WORKER_CALIBRATION')\
                 .drop('OPERATION')\
                 .drop('CLASS_METHOD_LINE')\
                 .drop('ACTIONS')\
@@ -68,6 +71,7 @@ def processLogs(data):
     end = jobData\
               .filter(jobData.OPERATION == 'COMPLETE')\
               .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCClient$executeJob$1_run_48')\
+              .filter(jobData.JOB_ID != 'WORKER_CALIBRATION')\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .withColumnRenamed('TIMESTAMP', 'END_TIME')
@@ -83,8 +87,8 @@ def processLogs(data):
                          F.avg('EXECUTION_TIME').alias('avg'),\
                          F.min('EXECUTION_TIME').alias('min'),\
                          F.max('EXECUTION_TIME').alias('max'),\
-
                          )
+
     # localhost jobs
     localhost_jobs_stats = localhost_jobs.agg(F.count('EXECUTION_TIME').alias('num'),\
                          F.avg('EXECUTION_TIME').alias('avg'),\
@@ -112,12 +116,13 @@ def processLogsCloud(data):
     jobData = data\
               .filter(data.JOB_ID.isNotNull())\
               .select('JOB_ID','TIMESTAMP','CLASS_METHOD_LINE','OPERATION', 'ACTIONS')
-    queue_data = jobData.filter(jobData.OPERATION == 'JOB_QUEUED').filter(jobData.CLASS_METHOD_LINE == 'services.worker.grpc.WorkerGRPCServer$grpcImpl$1_execute_22')
+    queue_data = jobData.filter(jobData.OPERATION == 'JOB_QUEUED').filter(jobData.CLASS_METHOD_LINE == 'services.worker.grpc.WorkerGRPCServer$grpcImpl$1_execute_22').filter(jobData.JOB_ID != 'WORKER_CALIBRATION')
     queue_data = queue_data.select(queue_data.TIMESTAMP, queue_data.ACTIONS.substr(15, 4).alias("QUEUE_SIZE")).withColumn('QUEUE_SIZE', F.col('QUEUE_SIZE').cast('integer'))
 
     start = jobData\
               .filter(jobData.OPERATION == 'INIT')\
               .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCServer$grpcImpl$1_executeJob_20')\
+              .filter(jobData.JOB_ID != 'WORKER_CALIBRATION')\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .withColumnRenamed('TIMESTAMP', 'START_TIME')
@@ -125,6 +130,7 @@ def processLogsCloud(data):
     end = jobData\
               .filter(jobData.OPERATION == 'END')\
               .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+              .filter(jobData.JOB_ID != 'WORKER_CALIBRATION')\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .withColumnRenamed('TIMESTAMP', 'END_TIME')
@@ -365,7 +371,7 @@ if __name__ == '__main__':
                                         avg_queue_cloud += (sum(cloud_queue)/len(cloud_queue)) if len(cloud_queue) > 0 else 0
 
                                         total_jobs += sum(device_jobs)
-                                        avg_jobs_device += (sum(device_jobs)/len(device_jobs))
+                                        avg_jobs_device += (sum(device_jobs)/producers)
                                         max_jobs_device += max(device_jobs)
                                         avg_jobs_cloud += min(cloud_jobs)
                                         max_jobs_cloud += max(cloud_jobs)
@@ -411,7 +417,7 @@ if __name__ == '__main__':
 
 
                                         total_jobs += sum(device_jobs) if len(device_jobs) else 0
-                                        avg_jobs_device += sum(device_jobs)/len(device_jobs) if len(device_jobs) > 0 else 0
+                                        avg_jobs_device += sum(device_jobs)/producers if producers > 0 else 0
                                         max_jobs_device += max(device_jobs) if len(device_jobs) > 0 else 0
                                         devs_with_1_plus_jobs += len(device_jobs)
                                         execution_time_avg += ((sum(device_execution_time_avg)+sum(cloud_execution_time_avg)) / (len(device_execution_time_avg)+len(cloud_execution_time_avg))) if ((len(device_execution_time_avg)+len(cloud_execution_time_avg))) > 0 else 0
@@ -497,6 +503,8 @@ if __name__ == '__main__':
                                     print(execution_time_device_reveived_max)
 
                 if COMPRESSED_PRINT:
+                    if counter == 0:
+                        continue
                     print("{}".format(entry), end=',')
                     print(int(devices/counter), end=',')
                     print(int(clouds/counter), end=',')

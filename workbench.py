@@ -315,7 +315,7 @@ def runExperiment(experiment):
                 experiment.setOK()
 
                 # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
-                if not neededDevicesAvailable:
+                if not neededDevicesAvailable(experiment, devices):
                     return
 
                 os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
@@ -385,6 +385,17 @@ def neededDevicesAvailable(experiment, devices, retries=5):
     else:
         return True
 
+def checkBattery(min_battery, *devices):
+    battery_barrier = threading.Barrier(len(devices) + 1)
+    for device in devices:
+        threading.Thread(target = checkBatteryDevice, args = (min_battery, device, battery_barrier)).start()
+    if not barrierWithTimeout(battery_barrier, 3600):
+        all_devices = adb.listDevices(0)
+        for device in all_devices:
+            if device not in devices:
+                return False
+    return True
+
 def checkBatteryDevice(min_battery, device, battery_barrier):
     adb.screenOff(device)
     battery_level = adb.getBatteryLevel(device)
@@ -398,18 +409,6 @@ def checkBatteryDevice(min_battery, device, battery_barrier):
             sleep(240)
             battery_level = adb.getBatteryLevel(device)
     barrierWithTimeout(battery_barrier, 3600)
-
-
-def checkBattery(min_battery, *devices):
-    battery_barrier = threading.Barrier(len(devices) + 1)
-    for device in devices:
-        threading.Thread(target = checkBatteryDevice, args = (min_battery, device, battery_barrier)).start()
-    if not barrierWithTimeout(battery_barrier, 3600):
-        all_devices = adb.listDevices(0)
-        for device in all_devices:
-            if device not in devices:
-                return False
-    return True
 
 def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
     cloudlet_boot_barrier = threading.Barrier(len(experiment.cloudlets) + 1)
@@ -695,6 +694,7 @@ def main():
         for device in ALL_DEVICES:
             print("{} ({})".format(device.name, device.ip))
             adb.screenOff(device)
+            adb.rebootAndWait(device)
         print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
