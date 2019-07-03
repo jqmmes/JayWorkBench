@@ -1,0 +1,5 @@
+*.csv
+logs*
+*.cfg
+sys_logs*
+assets*
