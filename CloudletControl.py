@@ -10,7 +10,10 @@ from time import sleep
 class CloudletControl(CloudletControl_pb2_grpc.CloudletControlServicer):
 
     def startODLauncher(self, request, context):
-        os.system("/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java -jar /home/joaquim/ODCloud/ODCloud.jar&")
+        path = "/usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java"
+        if os.path.exists("/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java"):
+            path = "/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java"
+        os.system("%s -jar /home/joaquim/ODCloud/ODCloud.jar&" % path)
         return CloudletControl_pb2.Empty()
 
     def stopODLauncher(self, request, context):
