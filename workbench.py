@@ -15,7 +15,7 @@ PENDING_JOBS = 0
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
-START_WORKER = False
+
 
 FNULL = open(os.devnull, "w")
 
@@ -187,7 +187,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         worker = grpcControls.remoteClient(worker_ip, device.name)
         worker.connectLauncherService()
         worker.setLogName(experiment.name)
-        if START_WORKER:
+        if experiment.start_worker:
             worker.startWorker()
         worker.startScheduler()
         worker.connectBrokerService()
@@ -201,7 +201,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
 
 
     schedulers = worker.listSchedulers()
-    if START_WORKER:
+    if experiment.start_worker:
         models = worker.listModels()
     if (schedulers is None):# or models is None):
         print("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
@@ -215,7 +215,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
                 skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
                 return
             break
-    if START_WORKER:
+    if experiment.start_worker:
         for model in models.models:
             if model.name == experiment.model and experiment.isOK():
                 if (worker.setModel(model) is None):
@@ -229,7 +229,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         print("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
         return
 
-    if START_WORKER:
+    if experiment.start_worker:
         print("CALIBRATION\t{}".format(device.name))
         calibrateWorker(worker, device_random)
 
@@ -551,6 +551,7 @@ class Experiment:
     producers = 0
     repeat_seed = 1
     timeout = 1500 # 25 Mins
+    start_worker = True
 
     _running_status = True
 
@@ -607,8 +608,10 @@ def readConfig(confName):
                 experiment.producers = int(config[section][option])
             elif option == "repeatseed":
                 experiment.repeat_seed = int(config[section][option])
-            elif option == "repeatseed":
+            elif option == "timeout":
                 experiment.timeout = int(config[section][option])
+            elif option == "startworkers":
+                experiment.start_worker = config[section][option] == "True"
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         EXPERIMENTS.append(experiment)
@@ -634,6 +637,7 @@ def help():
                     RepeatSeed              = Repeat experiment with same seed N times [INT]
                     Cloudlets               = IP, ... [LIST]
                     Timeout                 = Max time after experiment duration to cancel execution
+                    StartWorkers            = Start Device Workers [BOOL] (Default True)
 
         Models:
                     ssd_mobilenet_v1_fpn_coco
