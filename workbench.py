@@ -276,6 +276,17 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         None
     print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
 
+    log_available = False
+    for entry in os.listdir('logs/%s/%d/%d/' % experiment.name, repetition, seed_repeat):
+        if entry == '%s.csv' % device.name:
+            log_available = True
+            break
+
+    if not log_available:
+        experiment.setFail()
+
+
+
     finish_barrier.wait()
     adb.screenOff(device)
 
