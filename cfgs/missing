@@ -1,0 +1,80 @@
+[SingleDeviceSchedulerRemote]
+      Strategy = SingleDeviceScheduler [REMOTE]
+      Model = ssd_mobilenet_v1_fpn_coco
+      Devices = 2
+      GenerationRateRequests = 1
+      GenerationRateSeconds = 10
+      Duration = 240
+      Seed = SINGLE
+      Repetitions = 1
+      Producers = 1
+      RebootDevices = True
+      RepeatSeed = 3
+
+[SingleDeviceSchedulerRemote_5s]
+      Strategy = SingleDeviceScheduler [REMOTE]
+      Model = ssd_mobilenet_v1_fpn_coco
+      Devices = 2
+      GenerationRateRequests = 1
+      GenerationRateSeconds = 5
+      Duration = 240
+      Seed = SINGLE
+      Repetitions = 1
+      Producers = 1
+      RebootDevices = True
+      RepeatSeed = 3
+
+[EstimatedTimeSchedulerCloudlet_04_20s]
+      Strategy = EstimatedTimeScheduler
+      Model = ssd_mobilenet_v1_fpn_coco
+      Devices = 8
+      GenerationRateRequests = 1
+      GenerationRateSeconds = 20
+      Duration = 240
+      Seed = MULTI
+      Repetitions = 1
+      RepeatSeed = 3
+      Producers = 8
+      RebootDevices = True
+      Cloudlets = 127.0.0.1
+
+[MultiDeviceSchedulerLocalCloudletRemoteRandom_04]
+      Strategy = MultiDeviceScheduler [Random] [LOCAL, REMOTE]
+      Model = ssd_mobilenet_v1_fpn_coco
+      Devices = 8
+      Producers = 8
+      GenerationRateRequests = 1
+      GenerationRateSeconds = 10
+      Duration = 240
+      Seed = MULTI
+      Repetitions = 1
+      RebootDevices = True
+      RepeatSeed = 3
+      Cloudlets = 127.0.0.1
+
+[EstimatedTimeSchedulerCloudlet_04_40s]
+      Strategy = EstimatedTimeScheduler
+      Model = ssd_mobilenet_v1_fpn_coco
+      Devices = 8
+      GenerationRateRequests = 1
+      GenerationRateSeconds = 40
+      Duration = 240
+      Seed = MULTI
+      Repetitions = 1
+      RepeatSeed = 3
+      Producers = 8
+      RebootDevices = True
+      Cloudlets = 127.0.0.1
+
+[EstimatedTimeScheduler_04_40s]
+      Strategy = EstimatedTimeScheduler
+      Model = ssd_mobilenet_v1_fpn_coco
+      Devices = 8
+      GenerationRateRequests = 1
+      GenerationRateSeconds = 40
+      Duration = 240
+      Seed = MULTI
+      Repetitions = 1
+      RepeatSeed = 3
+      Producers = 8
+      RebootDevices = True

@@ -9,7 +9,7 @@ from sys import argv, stdout
 import sys
 import subprocess
 
-ASSETS=os.listdir("assets")
+
 EXPERIMENTS = []
 PENDING_JOBS = 0
 PENDING_WORKERS = 0
@@ -43,7 +43,7 @@ def pingWait(hostname):
         sleep(2)
     print("")
 
-def runJob(worker, device_random):
+def runJob(worker, device_random, assets_dir="assets"):
     global PENDING_JOBS
     PENDING_JOBS += 1
     job = grpcControls.Job()
@@ -52,7 +52,7 @@ def runJob(worker, device_random):
     while (asset[-4:] not in ['.png', '.jpg']):
         asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
 
-    with open("assets/%s" % asset, "rb") as image:
+    with open("%s/%s" % (assets_dir, asset), "rb") as image:
         f = image.read()
         b = bytes(f)
         job.addBytes(b)
@@ -66,14 +66,14 @@ def runJob(worker, device_random):
         print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), job.id, worker.name))
     PENDING_JOBS -= 1
 
-def calibrateWorker(worker, device_random):
+def calibrateWorker(worker, device_random, assets_dir="assets"):
     job = grpcControls.Job("WORKER_CALIBRATION")
     asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
 
     while (asset[-4:] not in ['.png', '.jpg']):
         asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
 
-    with open("assets/%s" % asset, "rb") as image:
+    with open("%s/%s" % (assets_dir, asset), "rb") as image:
         f = image.read()
         b = bytes(f)
         job.addBytes(b)
@@ -231,9 +231,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
 
     if experiment.start_worker:
         print("CALIBRATION\t{}".format(device.name))
-        calibrateWorker(worker, device_random)
-
-    sleep(15)
+        #calibrateWorker(worker, device_random, experiment.assets)
+        #sleep(15)
 
 
     print("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
@@ -243,7 +242,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
         print("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
         sleep(job_intervals[i])
-        threading.Thread(target = runJob, args = (worker,device_random)).start()
+        threading.Thread(target = runJob, args = (worker,device_random,experiment.assets)).start()
         i = i+1
 
     print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
@@ -304,12 +303,13 @@ def cleanLogs(path):
 
 
 def runExperiment(experiment):
-    global PENDING_JOBS, ALL_DEVICES
+    global PENDING_JOBS, ALL_DEVICES, ASSETS
     printExperiment(stdout, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
     cleanLogs("sys_logs/%s/" % experiment.name)
+    ASSETS=os.listdir(experiment.assets)
 
     devices = ALL_DEVICES #adb.listDevices(0)
     if (len(devices) < experiment.devices):
@@ -454,19 +454,19 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
     cloudlet_control.connect()
     cloudlet_control.stop()
     cloudlet_control.start()
-    sleep(2)
+    sleep(1)
 
 
     cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet)
 
-    cloudlet_instance.stop()
+    #cloudlet_instance.stop()
 
     cloudlet_instance.connectLauncherService()
     cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
     cloudlet_instance.startWorker()
-    sleep(2)
+    sleep(1)
     cloudlet_instance.connectBrokerService()
-    sleep(2)
+    sleep(1)
     models = cloudlet_instance.listModels()
     if (models is None):
         experiment.setFail()
@@ -481,7 +481,7 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
     cloudlet_boot_barrier.wait() #inform startCloudlets that you have booted
 
     print("CALIBRATION\t{}".format(cloudlet))
-    calibrateWorker(cloudlet_instance, device_random)
+    #calibrateWorker(cloudlet_instance, device_random, experiment.assets)
 
     servers_finish_barrier.wait() #wait experiment completion to init shutdown
     cloudlet_instance.stop()
@@ -563,6 +563,7 @@ class Experiment:
     repeat_seed = 1
     timeout = 1500 # 25 Mins
     start_worker = True
+    assets = "assets"
 
     _running_status = True
 
@@ -623,6 +624,8 @@ def readConfig(confName):
                 experiment.timeout = int(config[section][option])
             elif option == "startworkers":
                 experiment.start_worker = config[section][option] == "True"
+            elif option == "assets":
+                experiment.assets = config[section][option]
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         EXPERIMENTS.append(experiment)
@@ -649,6 +652,7 @@ def help():
                     Cloudlets               = IP, ... [LIST]
                     Timeout                 = Max time after experiment duration to cancel execution
                     StartWorkers            = Start Device Workers [BOOL] (Default True)
+                    Assets                  = Assets directory [assets] (Default Value)
 
         Models:
                     ssd_mobilenet_v1_fpn_coco

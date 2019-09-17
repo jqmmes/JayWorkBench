@@ -99,6 +99,19 @@ def listDevices(minBattery = 15):
                 devices.append(new_device)
     return devices
 
+def mkdir(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+    status = adb(['shell', 'mkdir', '%s%s' % (basepath, path)], device)
+    if ('File exists' in status):
+        return True # Return true if folder already exists
+    return False
+
+def rmFiles(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+    status = adb(['shell', 'rm', '-rf', '%s%s/' % (basepath, path)], device)
+    mkdir(path, basepath, device)
+
+def pushFile(filePath, path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device):
+    adb(['push', filePath, '%s%s/' % (basepath, path)], device)
+
 def clearSystemLog(device=None):
     adb(['logcat', '-c'], device)
 
