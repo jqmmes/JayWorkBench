@@ -109,8 +109,8 @@ def rmFiles(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath=
     status = adb(['shell', 'rm', '-rf', '%s%s/' % (basepath, path)], device)
     mkdir(path, basepath, device)
 
-def pushFile(filePath, path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device):
-    adb(['push', filePath, '%s%s/' % (basepath, path)], device)
+def pushFile(filePath, fileName, path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device):
+    adb(['push', '%s/%s' % (filePath, fileName), '%s%s/%s' % (basepath, path, fileName)], device)
 
 def clearSystemLog(device=None):
     adb(['logcat', '-c'], device)
