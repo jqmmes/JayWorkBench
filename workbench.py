@@ -154,6 +154,14 @@ def rebootDevice(device, device_random, max_sleep_random=10, retries=3):
 
 def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
+    if (adb.freeSpace(device=device) < 1.0):
+        print('LOW_SDCARD_SPACE\t%s' % device.name)
+        adb.uninstallPackage(device)
+        print('PACKAGE_UNINSTALLED\t%s' % device.name)
+        adb.pushFile('apps', 'ODLauncher-release.apk', path='', device=device)
+        print('PACKAGE_PUSHED\t%s' % device.name)
+        adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
+        print('PACKAGE_INSTALLED\t%s' % device.name)
     adb.connectWifiADB(device)
     print("START_WORKER\t%s" % device.name)
     device_random = random.Random()

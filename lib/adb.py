@@ -112,6 +112,15 @@ def rmFiles(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath=
 def pushFile(filePath, fileName, path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
     adb(['push', '%s/%s' % (filePath, fileName), '%s%s/%s' % (basepath, path, fileName)], device)
 
+def freeSpace(partition='/sdcard/', device=None):
+    try:
+        status = adb(['shell', 'df', '-h', partition], device).split('\n')[1].split()[3]
+        if (status.find('G') == -1):
+            return 0
+        return float(status[:status.find('G')])
+    except:
+        return 0
+
 def clearSystemLog(device=None):
     adb(['logcat', '-c'], device)
 
@@ -173,10 +182,16 @@ def checkPackageInstalled(device=None):
 def installPackage(package, device=None):
     adb(['install', package], device)
 
+def pmInstallPackage(packagePath, package, device=None):
+    adb(['shell', 'pm', 'install', '/sdcard/%s' % package], device)
+
+def uninstallPackage(device=None):
+    adb(['shell', 'pm', 'uninstall', LAUNCHER_PACKAGE], device)
+
 def removePackage(device=None):
     adb(['shell', 'pm', 'clear', LAUNCHER_PACKAGE], device)
     adb(['shell', 'pm', 'reset-permissions', LAUNCHER_PACKAGE], device)
-    adb(['shell', 'pm', 'uninstall', LAUNCHER_PACKAGE], device)
+    uninstallPackage(device)
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
     instances = gcloud(['compute', 'instances', 'list']).split('\n')
