@@ -173,7 +173,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     while(sum(job_intervals) < experiment.duration):
         job_intervals.append(device_random.expovariate(rate))
         asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
-        while (asset[-4:] not in ['.png', '.jpg']):
+        while ((asset[-4:] not in ['.png', '.jpg'] and experiment.asset_type == 'image') or (asset[-4:] not in ['.mp4'] and experiment.asset_type == 'video')):
             asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
         print('SELECTED_ASSET\t{}\t{}'.format(asset, device.name))
         asset_list.append(asset)
@@ -195,10 +195,13 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
                 retries += 1
         adb.connectWifiADB(device)
     sleep(2)
+    print("LISTING_FILES_ON_DEVICE\t%s" % device.name)
+    files_on_device = adb.listFiles(device=device)
     print('PUSHING_ASSETS\t%s' % device.name)
     for asset in asset_list:
-        print('PUSHING_ASSET\t%s\t%s' % (asset, device.name))
-        adb.pushFile(experiment.assets, asset, device=device)
+        if (asset not in files_on_device):
+            print('PUSHING_ASSET\t%s\t%s' % (asset, device.name))
+            adb.pushFile(experiment.assets, asset, device=device)
     adb.screenOn(device)
     adb.setBrightness(device, 0)
     adb.clearSystemLog(device)
@@ -600,6 +603,7 @@ class Experiment:
     timeout = 1500 # 25 Mins
     start_worker = True
     assets = "assets"
+    asset_type = "image"
 
     _running_status = True
 
@@ -662,6 +666,8 @@ def readConfig(confName):
                 experiment.start_worker = config[section][option] == "True"
             elif option == "assets":
                 experiment.assets = config[section][option]
+            elif option == "assettype":
+                experiment.asset_type = config[section][option]
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         EXPERIMENTS.append(experiment)
@@ -689,6 +695,7 @@ def help():
                     Timeout                 = Max time after experiment duration to cancel execution
                     StartWorkers            = Start Device Workers [BOOL] (Default True)
                     Assets                  = Assets directory [assets] (Default Value)
+                    AssetType               = Asset Type (image/video) [image] (Default Value)
 
         Models:
                     ssd_mobilenet_v1_fpn_coco

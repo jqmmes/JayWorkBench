@@ -112,6 +112,16 @@ def rmFiles(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath=
 def pushFile(filePath, fileName, path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
     adb(['push', '%s/%s' % (filePath, fileName), '%s%s/%s' % (basepath, path, fileName)], device)
 
+def listFiles(filePath='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+    status = adb(['ls', basepath+filePath], device).split('\n')
+    files = []
+    for entry in status:
+        try:
+            files.append(entry.split()[3])
+        except:
+            continue
+    return files
+
 def freeSpace(partition='/sdcard/', device=None):
     try:
         status = adb(['shell', 'df', '-h', partition], device).split('\n')[1].split()[3]
