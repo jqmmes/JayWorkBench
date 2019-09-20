@@ -222,6 +222,7 @@ if __name__ == '__main__':
                         for dir in os.listdir("logs/{}/{}".format(entry, repeat)):
                             counter += 1
                             if os.path.isdir("logs/{}/{}/{}".format(entry, repeat, dir)):
+                                #print("logs/{}/{}/{}".format(entry, repeat, dir))
                                 device_data = []
                                 cloud_data = []
                                 cloudlet_data = []
@@ -338,8 +339,8 @@ if __name__ == '__main__':
                                             device_queue.append(int(result[3]))
                                     else:
                                         device_queue.append(0)
-                                    if (result[4].max and result[4].min):
-                                        device_total_experiment_time.append(result[4].max-result[4].min)
+                                    if (result[4].max and result[4].min and isinstance(result[4].max, int) and isinstance(result[4].min, int)):
+                                        device_total_experiment_time.append(int(result[4].max)-int(result[4].min))
 
 
                                 cloud_data += cloudlet_data

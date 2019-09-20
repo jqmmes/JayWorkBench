@@ -46,6 +46,7 @@ def pingWait(hostname):
 def runJob(worker, device_random, assets_dir="assets"):
     global PENDING_JOBS
     PENDING_JOBS += 1
+    # Criar o job no python
     job = grpcControls.Job()
     asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
 
@@ -56,7 +57,10 @@ def runJob(worker, device_random, assets_dir="assets"):
         f = image.read()
         b = bytes(f)
         job.addBytes(b)
+
+
     print("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), job.id, asset, worker.name))
+    # Fazer schedule no python. Maneira antiga
     try:
         if not worker.scheduleJob(job):
             print("{}\t{}\tJOB_FAILED\tFAILED_SCHEDULE\t{}".format(time(), job.id, worker.name))
@@ -64,6 +68,19 @@ def runJob(worker, device_random, assets_dir="assets"):
             print("{}\t{}\tJOB_COMPLETE\t{}".format(time(), job.id, worker.name))
     except Exception as job_exception:
         print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), job.id, worker.name))
+    PENDING_JOBS -= 1
+
+def createJob(worker, device_random, asset_id):
+    global PENDING_JOBS
+    PENDING_JOBS += 1
+    print("{}\t{}\tJOB_SUBMIT\t{}".format(time(), asset_id, worker.name))
+    try:
+        if not worker.createJob(asset_id):
+            print("{}\t{}\tJOB_FAILED\tFAILED_SCHEDULE\t{}".format(time(), asset_id, worker.name))
+        else:
+            print("{}\t{}\tJOB_COMPLETE\t{}".format(time(), asset_id, worker.name))
+    except Exception as job_exception:
+        print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), asset_id, worker.name))
     PENDING_JOBS -= 1
 
 def calibrateWorker(worker, device_random, assets_dir="assets"):
@@ -144,8 +161,14 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     rate = float(experiment.request_rate)/float(experiment.request_time)
     print('GENERATING_JOBS\tRATE: {}\t{}'.format(rate, device.name))
     job_intervals = []
+    asset_list = []
     while(sum(job_intervals) < experiment.duration):
         job_intervals.append(device_random.expovariate(rate))
+        asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
+        while (asset[-4:] not in ['.png', '.jpg']):
+            asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
+        print('SELECTED_ASSET\t{}\t{}'.format(asset, device.name))
+        asset_list.append(asset)
     if experiment.reboot:
         if not rebootDevice(device, device_random, experiment.devices):
             sleep(10)
@@ -164,6 +187,10 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
                 retries += 1
         adb.connectWifiADB(device)
     sleep(2)
+    print('PUSHING_ASSETS\t%s' % device.name)
+    for asset in asset_list:
+        print('PUSHING_ASSET\t%s\t%s' % (asset, device.name))
+        adb.pushFile(experiment.assets, asset, device=device)
     adb.screenOn(device)
     adb.setBrightness(device, 0)
     adb.clearSystemLog(device)
@@ -242,7 +269,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
         print("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
         sleep(job_intervals[i])
-        threading.Thread(target = runJob, args = (worker,device_random,experiment.assets)).start()
+        #threading.Thread(target = runJob, args = (worker,device_random,experiment.assets)).start()
+        threading.Thread(target = createJob, args = (worker,device_random,asset_list[i])).start()
         i = i+1
 
     print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)

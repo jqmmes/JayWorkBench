@@ -411,6 +411,15 @@ class remoteClient:
             except:
                 return False
 
+    def createJob(self, asset_id):
+        if (self.brokerStubReady()):
+            try:
+                asset_id_str = ODProto_pb2.String()
+                asset_id_str.str = asset_id
+                return self.brokerStub.createJob(asset_id_str)
+            except:
+                return False
+
     def calibrateWorker(self, job):
         if (self.brokerStubReady()):
             try:
