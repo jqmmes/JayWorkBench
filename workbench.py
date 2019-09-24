@@ -202,6 +202,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         if (asset not in files_on_device):
             print('PUSHING_ASSET\t%s\t%s' % (asset, device.name))
             adb.pushFile(experiment.assets, asset, device=device)
+            files_on_device.append(asset)
     adb.screenOn(device)
     adb.setBrightness(device, 0)
     adb.clearSystemLog(device)
