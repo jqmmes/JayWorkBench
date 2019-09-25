@@ -118,13 +118,18 @@ class BrokerServiceStub(object):
         )
     self.calibrateWorker = channel.unary_unary(
         '/BrokerService/calibrateWorker',
-        request_serializer=ODProto__pb2.Job.SerializeToString,
+        request_serializer=ODProto__pb2.String.SerializeToString,
         response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
         )
     self.createJob = channel.unary_unary(
         '/BrokerService/createJob',
         request_serializer=ODProto__pb2.String.SerializeToString,
         response_deserializer=ODProto__pb2.Results.FromString,
+        )
+    self.setSettings = channel.unary_unary(
+        '/BrokerService/setSettings',
+        request_serializer=ODProto__pb2.Settings.SerializeToString,
+        response_deserializer=ODProto__pb2.Status.FromString,
         )
 
 
@@ -288,6 +293,13 @@ class BrokerServiceServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
+  def setSettings(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
 
 def add_BrokerServiceServicer_to_server(servicer, server):
   rpc_method_handlers = {
@@ -393,13 +405,18 @@ def add_BrokerServiceServicer_to_server(servicer, server):
       ),
       'calibrateWorker': grpc.unary_unary_rpc_method_handler(
           servicer.calibrateWorker,
-          request_deserializer=ODProto__pb2.Job.FromString,
+          request_deserializer=ODProto__pb2.String.FromString,
           response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
       ),
       'createJob': grpc.unary_unary_rpc_method_handler(
           servicer.createJob,
           request_deserializer=ODProto__pb2.String.FromString,
           response_serializer=ODProto__pb2.Results.SerializeToString,
+      ),
+      'setSettings': grpc.unary_unary_rpc_method_handler(
+          servicer.setSettings,
+          request_deserializer=ODProto__pb2.Settings.FromString,
+          response_serializer=ODProto__pb2.Status.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(
@@ -580,7 +597,7 @@ class WorkerServiceStub(object):
     """
     self.execute = channel.unary_unary(
         '/WorkerService/execute',
-        request_serializer=ODProto__pb2.Job.SerializeToString,
+        request_serializer=ODProto__pb2.WorkerJob.SerializeToString,
         response_deserializer=ODProto__pb2.Results.FromString,
         )
     self.selectModel = channel.unary_unary(
@@ -649,7 +666,7 @@ def add_WorkerServiceServicer_to_server(servicer, server):
   rpc_method_handlers = {
       'execute': grpc.unary_unary_rpc_method_handler(
           servicer.execute,
-          request_deserializer=ODProto__pb2.Job.FromString,
+          request_deserializer=ODProto__pb2.WorkerJob.FromString,
           response_serializer=ODProto__pb2.Results.SerializeToString,
       ),
       'selectModel': grpc.unary_unary_rpc_method_handler(

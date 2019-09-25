@@ -24,6 +24,11 @@ excepthook = exceptionHook
 
 DEBUG = True
 
+def getProtoString(str):
+    string = ODProto_pb2.String()
+    string.str = str
+    return string
+
 class cloudletControl:
     protoChannel = None
     channelStatus = ChannelConnectivity.SHUTDOWN
@@ -190,9 +195,10 @@ class cloudClient:
                 print("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
             return None
         if (self.brokerStubReady()):
+            status = self.brokerStub.setModel(model)
             if DEBUG:
                 print("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
-            return self.brokerStub.setModel(model)
+            return status
         sleep(5)
         return self.setModel(model, retries-1)
 
@@ -210,10 +216,10 @@ class cloudClient:
             sleep(5)
             self.setLogName(log_name, retries-1)
 
-    def calibrateWorker(self, job):
+    def calibrateWorker(self, asset_id):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.calibrateWorker(job.getProto())
+                return self.brokerStub.calibrateWorker(getProtoString(asset_id))
             except:
                 return False
 
@@ -414,16 +420,24 @@ class remoteClient:
     def createJob(self, asset_id):
         if (self.brokerStubReady()):
             try:
-                asset_id_str = ODProto_pb2.String()
-                asset_id_str.str = asset_id
-                return self.brokerStub.createJob(asset_id_str)
+                return self.brokerStub.createJob(getProtoString(asset_id))
             except:
                 return False
 
-    def calibrateWorker(self, job):
+    def calibrateWorker(self, asset_id):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.calibrateWorker(job.getProto())
+                return self.brokerStub.calibrateWorker(getProtoString(asset_id))
+            except:
+                return False
+
+    def setSettings(self, settings_map):
+        if (self.brokerStubReady()):
+            try:
+                settings_proto = ODProto_pb2.Settings()
+                for key in settings_map:
+                    settings_proto.setting[key] = settings_map[key]
+                return self.brokerStub.setSettings(settings_proto)
             except:
                 return False
 

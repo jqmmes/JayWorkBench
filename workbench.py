@@ -70,7 +70,7 @@ def runJob(worker, device_random, assets_dir="assets"):
         print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), job.id, worker.name))
     PENDING_JOBS -= 1
 
-def createJob(worker, device_random, asset_id):
+def createJob(worker, asset_id):
     global PENDING_JOBS
     PENDING_JOBS += 1
     print("{}\t{}\tJOB_SUBMIT\t{}".format(time(), asset_id, worker.name))
@@ -83,25 +83,26 @@ def createJob(worker, device_random, asset_id):
         print("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), asset_id, worker.name))
     PENDING_JOBS -= 1
 
-def calibrateWorker(worker, device_random, assets_dir="assets"):
-    job = grpcControls.Job("WORKER_CALIBRATION")
-    asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
+def calibrateWorker(worker, device=None, asset_id=""):
+    print("CALIBRATION\t{}".format(worker.name))
+    asset = asset_id
+    if (asset == ""):
+        device_random = random.Random()
+        device_random.seed(device.name)
+        files_on_device = adb.listFiles(device=device)
 
-    while (asset[-4:] not in ['.png', '.jpg']):
-        asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
+        asset = files_on_device[device_random.randint(0,len(files_on_device)-1)]
+        while (asset[-4:] not in ['.png', '.jpg']):
+            asset = files_on_device[device_random.randint(0,len(files_on_device)-1)]
 
-    with open("%s/%s" % (assets_dir, asset), "rb") as image:
-        f = image.read()
-        b = bytes(f)
-        job.addBytes(b)
-    print("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), job.id, asset, worker.name))
+    print("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), "CALIBRATION_JOB", asset, worker.name))
     try:
-        if not worker.calibrateWorker(job):
-            print("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), job.id, worker.name))
+        if not worker.calibrateWorker(asset):
+            print("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
         else:
-            print("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), job.id, worker.name))
+            print("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), "CALIBRATION_JOB", worker.name))
     except Exception as job_exception:
-        print("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), job.id, worker.name))
+        print("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
 
 def barrierWithTimeout(barrier, timeout, experiment=None, *skip_barriers):
     if experiment is not None:
@@ -152,7 +153,7 @@ def rebootDevice(device, device_random, max_sleep_random=10, retries=3):
                     return False
 
 
-def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+def startWorker(experiment, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
     if (adb.freeSpace(device=device) < 1.0):
         print('LOW_SDCARD_SPACE\t%s' % device.name)
@@ -163,7 +164,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
         print('PACKAGE_INSTALLED\t%s' % device.name)
     adb.connectWifiADB(device)
-    print("START_WORKER\t%s" % device.name)
+    print("START_DEVICE\t%s" % device.name)
     device_random = random.Random()
     device_random.seed(experiment.seed+device.name+str(repetition))
     rate = float(experiment.request_rate)/float(experiment.request_time)
@@ -175,8 +176,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
         while ((asset[-4:] not in ['.png', '.jpg'] and experiment.asset_type == 'image') or (asset[-4:] not in ['.mp4'] and experiment.asset_type == 'video')):
             asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
-        print('SELECTED_ASSET\t{}\t{}'.format(asset, device.name))
         asset_list.append(asset)
+    print('SELECTED_ASSET\t{} ASSETS\t{}'.format(len(asset_list), device.name))
     if experiment.reboot:
         if not rebootDevice(device, device_random, experiment.devices):
             sleep(10)
@@ -226,7 +227,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         worker = grpcControls.remoteClient(worker_ip, device.name)
         worker.connectLauncherService()
         worker.setLogName(experiment.name)
-        if experiment.start_worker:
+        if is_worker:
             worker.startWorker()
         worker.startScheduler()
         worker.connectBrokerService()
@@ -237,10 +238,11 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         return
 
-
+    if experiment.settings:
+        worker.setSettings(experiment.settings)
 
     schedulers = worker.listSchedulers()
-    if experiment.start_worker:
+    if is_worker:
         models = worker.listModels()
     if (schedulers is None):# or models is None):
         print("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
@@ -254,7 +256,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
                 skipBarriers(experiment, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
                 return
             break
-    if experiment.start_worker:
+    if is_worker:
         for model in models.models:
             if model.name == experiment.model and experiment.isOK():
                 if (worker.setModel(model) is None):
@@ -268,11 +270,8 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
         print("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
         return
 
-    if experiment.start_worker:
-        print("CALIBRATION\t{}".format(device.name))
-        #calibrateWorker(worker, device_random, experiment.assets)
-        #sleep(15)
-
+    if is_worker and experiment.calibration:
+        calibrateWorker(worker, device)
 
     print("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
     start_barrier.wait()
@@ -281,8 +280,7 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, device, boot_b
     while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
         print("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
         sleep(job_intervals[i])
-        #threading.Thread(target = runJob, args = (worker,device_random,experiment.assets)).start()
-        threading.Thread(target = createJob, args = (worker,device_random,asset_list[i])).start()
+        threading.Thread(target = createJob, args = (worker,asset_list[i])).start()
         i = i+1
 
     print("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
@@ -393,9 +391,11 @@ def runExperiment(experiment):
                     stopClouds(experiment)
 
                 producers = experiment.producers
+                workers = experiment.workers
                 for device in devices[:experiment.devices]:
-                    threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
+                    threading.Thread(target = startWorker, args = (experiment, repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
+                    workers -= 1 # Os primeiros n devices é que são workers
                 print("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
                 if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment): # 15m
                     print("BROKEN_BARRIER\tBOOT_BARRIER\tMAIN")
@@ -520,8 +520,8 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
 
     cloudlet_boot_barrier.wait() #inform startCloudlets that you have booted
 
-    print("CALIBRATION\t{}".format(cloudlet))
-    #calibrateWorker(cloudlet_instance, device_random, experiment.assets)
+    if (experiment.calibration):
+        calibrateWorker(cloudlet_instance, asset_id="%s.jpg" % experiment.asset_quality)
 
     servers_finish_barrier.wait() #wait experiment completion to init shutdown
     cloudlet_instance.stop()
@@ -603,8 +603,12 @@ class Experiment:
     repeat_seed = 1
     timeout = 1500 # 25 Mins
     start_worker = True
+    workers = -1
     assets = "assets"
     asset_type = "image"
+    calibration = False
+    asset_quality = "SD"
+    settings = {}
 
     _running_status = True
 
@@ -665,12 +669,25 @@ def readConfig(confName):
                 experiment.timeout = int(config[section][option])
             elif option == "startworkers":
                 experiment.start_worker = config[section][option] == "True"
+            elif option == "workers":
+                experiment.workers = int(config[section][option])
             elif option == "assets":
                 experiment.assets = config[section][option]
             elif option == "assettype":
                 experiment.asset_type = config[section][option]
+            elif option == "calibration":
+                experiment.calibration = config[section][option] == "True"
+            elif option == "Assetquality":
+                if (config[section][option] in ["SD", "HD", "UHD"]):
+                    experiment.asset_quality = config[section][option]
+            elif option == "settings":
+                for entry in config[section][option].split(';'):
+                    setting = entry.split(':')
+                    experiment.settings[setting[0].strip()] = setting[1].strip()
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
+        if (experiment.workers == -1 or experiment.workers > experiment.devices):
+            experiment.workers = experiment.devices
         EXPERIMENTS.append(experiment)
 
 def help():
@@ -694,9 +711,13 @@ def help():
                     RepeatSeed              = Repeat experiment with same seed N times [INT]
                     Cloudlets               = IP, ... [LIST]
                     Timeout                 = Max time after experiment duration to cancel execution
-                    StartWorkers            = Start Device Workers [BOOL] (Default True)
+                    StartWorkers            = Start Device Worker devices [INT]
+                    Workers                 = Number of Workers [BOOL] (Default True)
                     Assets                  = Assets directory [assets] (Default Value)
                     AssetType               = Asset Type (image/video) [image] (Default Value)
+                    Calibration             = Run ODLib calibration before begin [BOOL] (Default False)
+                    Settings                = Set ODLib settings (setting: value;...) [LIST]
+                    AssetQuality            = Inform about asset quality (SD/HD/UHD) [STR] (Default SD)
 
         Models:
                     ssd_mobilenet_v1_fpn_coco
