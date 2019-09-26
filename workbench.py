@@ -201,7 +201,6 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, is_worker, dev
     print('PUSHING_ASSETS\t%s' % device.name)
     for asset in asset_list:
         if (asset not in files_on_device):
-            print('PUSHING_ASSET\t%s\t%s' % (asset, device.name))
             adb.pushFile(experiment.assets, asset, device=device)
             files_on_device.append(asset)
     adb.screenOn(device)
@@ -748,6 +747,22 @@ def help():
                     SmartScheduler
 
                     EstimatedTimeScheduler
+
+            Settings:
+                    CLOUD_IP
+                    GRPC_MAX_MESSAGE_SIZE
+                    RTTHistorySize
+                    pingTimeout
+                    RTTDelayMillis
+                    PING_PAYLOAD_SIZE
+                    averageComputationTimesToStore
+                    workingThreads
+                    workerStatusUpdateInterval
+                    AUTO_STATUS_UPDATE_INTERVAL_MS
+                    RTTDelayMillisFailRetry
+                    RTTDelayMillisFailAttempts
+                    DEVICE_ID
+                    BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE]
         ================================================ HELP ================================================''')
 
 def printExperiment(conf, experiment):
