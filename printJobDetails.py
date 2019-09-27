@@ -211,7 +211,7 @@ if __name__ == '__main__':
         exit()
     if argv[1] == "avg" and len(argv) < 3:
         exit()
-    init = 2
+    init = 1
     if (argv[1] != "avg"):
         init = 1
         print('ORIGIN,DESTINATION,', end='')
