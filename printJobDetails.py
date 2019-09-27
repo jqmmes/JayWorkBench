@@ -207,13 +207,17 @@ def processDir(dir, avg):
 
 
 if __name__ == '__main__':
-    if len(argv) < 3:
+    if len(argv) < 2:
         exit()
+    if argv[1] == "avg" and len(argv) < 3:
+        exit()
+    init = 2
     if (argv[1] != "avg"):
-        print('ORIGIN,DESTINATION,'),
-    print('TOTAL_DURATION,SCHEDULER_DECISION,DATA_TRANSFER,QUEUE,IMAGE_LOAD,DETECTION,RESULT_TRANSFER')
-    for dir in argv[2:]:
+        init = 1
+        print('ORIGIN,DESTINATION,', end='')
+    print('TOTAL_DURATION,SCHEDULER_DECISION,DATA_TRANSFER,QUEUE,IMAGE_LOAD,DETECTION')#,RESULT_TRANSFER')
+    for dir in argv[init:]:
         for row in processDir(dir, argv[1] == "avg"):
             if (argv[1] != "avg"):
-                print('{},{},'.format(row.ORIGIN_NODE, row.DESTINATION_NODE)),
-            print('{},{},{},{},{},{},{}'.format(row.TOTAL_DURATION, row.SCHEDULER_DECISION, row.DATA_TRANSFER, row.QUEUE, row.IMAGE_LOAD, row.DETECTION, row.RESULT_TRANSFER))
+                print('{},{},'.format(row.ORIGIN_NODE, row.DESTINATION_NODE), end=''),
+            print('{},{},{},{},{},{}'.format(row.TOTAL_DURATION, row.SCHEDULER_DECISION, row.DATA_TRANSFER, row.QUEUE, row.IMAGE_LOAD, row.DETECTION))#, row.RESULT_TRANSFER))
