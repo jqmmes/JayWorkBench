@@ -291,38 +291,49 @@ def startWorker(experiment, repetition, seed_repeat, is_producer, is_worker, dev
     log_pull_barrier.wait()
 
     try:
-        adb.stopAll(device)
+        print("STOP_WORKER\tSTART\t%s" % device.name)
         worker.destroy()
+        adb.stopAll(device)
+        print("STOP_WORKER\tCOMPLETE\t%s" % device.name)
     except:
-        print("Error Stopping Worker")
+        print("STOP_WORKER\tERROR\t%s" % device.name)
 
 
 
     try:
         if (experiment.isOK()):
+            print("PULLING_LOG\t%s\tLOG" % device.name)
             adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+            print("PULLING_LOG\t%s\tLOG\tOK" % device.name)
     except:
+        print("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
         experiment.setFail()
 
     try:
+        print("PULLING_LOG\t%s\tSYS_LOG" % device.name)
         system_log_path = "sys_logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
         os.makedirs(system_log_path, exist_ok=True)
         adb.pullSystemLog(device, system_log_path)
+        print("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
     except:
+        print("PULLING_LOG\t%s\tSYS_LOG\tERROR" % device.name)
         None
-    print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
 
+
+    print("CHECKING_LOG\t%s" % device.name)
     log_available = False
     for entry in os.listdir('logs/%s/%d/%d/' % (experiment.name, repetition, seed_repeat)):
         if entry == '%s.csv' % device.name:
+            print("CHECKING_LOG\t%s\tOK" % device.name)
             log_available = True
             break
 
     if not log_available:
+        print("CHECKING_LOG\t%s\tFAILED" % device.name)
         experiment.setFail()
 
 
-
+    print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
     finish_barrier.wait()
     adb.screenOff(device)
 
@@ -438,7 +449,7 @@ def neededDevicesAvailable(experiment, devices, retries=5):
         experiment.setFail()
         os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
         return False
-    if not checkBattery(25, *devices[:experiment.devices]):
+    if not checkBattery(20, *devices[:experiment.devices]):
         sleep(5)
         return neededDevicesAvailable(experiment, devices, retries-1)
     else:
@@ -809,7 +820,7 @@ def main():
         print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time, reverse=False)
+        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
         for e in EXPERIMENTS:
             runExperiment(e)
 

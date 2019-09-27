@@ -237,11 +237,21 @@ class cloudClient:
 
     def destroy(self):
         if self.launcherChannel is not None:
-            self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
-            self.launcherChannel.close()
+            try:
+                if (self.launcherStubStatus == ChannelConnectivity.TRANSIENT_FAILURE or self.launcherStubStatus == ChannelConnectivity.SHUTDOWN):
+                    self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
+                if (self.launcherStubStatus == ChannelConnectivity.TRANSIENT_FAILURE or self.launcherStubStatus == ChannelConnectivity.SHUTDOWN):
+                    self.launcherChannel.close()
+            except:
+                pass
         if self.brokerChannel is not None:
-            self.brokerChannel.unsubscribe(self.brokerStubStatusCallback)
-            self.brokerChannel.close()
+            try:
+                if (self.brokerChannel == ChannelConnectivity.TRANSIENT_FAILURE or self.brokerChannel == ChannelConnectivity.SHUTDOWN):
+                    self.brokerChannel.unsubscribe(self.brokerStubStatusCallback)
+                if (self.brokerChannel == ChannelConnectivity.TRANSIENT_FAILURE or self.brokerChannel == ChannelConnectivity.SHUTDOWN):
+                    self.brokerChannel.close()
+            except:
+                pass
 
 class remoteClient:
     launcherChannel = None
@@ -315,6 +325,8 @@ class remoteClient:
         return self.__checkChannelStatus(self.brokerChannel, self.brokerStubStatus, self.brokerStubStatusCallback)
 
     def startWorker(self, retries=5):
+        print(self.brokerStubStatus)
+        print(self.launcherStubStatus)
         if retries <= 0:
             if DEBUG:
                 print("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
@@ -464,14 +476,18 @@ class remoteClient:
     def destroy(self):
         if self.launcherChannel is not None:
             try:
-                self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
-                self.launcherChannel.close()
+                if (self.launcherStubStatus == ChannelConnectivity.TRANSIENT_FAILURE or self.launcherStubStatus == ChannelConnectivity.SHUTDOWN):
+                    self.launcherChannel.unsubscribe(self.launcherStubStatusCallback)
+                if (self.launcherStubStatus == ChannelConnectivity.TRANSIENT_FAILURE or self.launcherStubStatus == ChannelConnectivity.SHUTDOWN):
+                    self.launcherChannel.close()
             except:
                 pass
         if self.brokerChannel is not None:
             try:
-                self.brokerChannel.unsubscribe(self.brokerStubStatusCallback)
-                self.brokerChannel.close()
+                if (self.brokerChannel == ChannelConnectivity.TRANSIENT_FAILURE or self.brokerChannel == ChannelConnectivity.SHUTDOWN):
+                    self.brokerChannel.unsubscribe(self.brokerStubStatusCallback)
+                if (self.brokerChannel == ChannelConnectivity.TRANSIENT_FAILURE or self.brokerChannel == ChannelConnectivity.SHUTDOWN):
+                    self.brokerChannel.close()
             except:
                 pass
 

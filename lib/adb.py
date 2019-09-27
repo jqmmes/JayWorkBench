@@ -242,8 +242,8 @@ def getDeviceIp(device, timeout=120):
 
 def rebootAndWait(device, timeout=300):
     start_time = time()
-    adb(['reboot'], device, True)
-    sleep(2)
+    #adb(['reboot'], device, True)
+    #sleep(2)
     adb(['reboot'], device)
     if (device.connected_wifi):
         device.connected_wifi = False
