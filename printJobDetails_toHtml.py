@@ -4,16 +4,6 @@ from pyspark.sql import functions as F
 from sys import argv
 import os
 
-# Initialize Spark
-spark = SparkSession\
-        .builder\
-        .appName("LogProcessing")\
-        .master("local[*]")\
-        .getOrCreate()
-
-sc = spark.sparkContext
-sc.setLogLevel("OFF")
-
 # Functions
 def readCSV(file, debug=False):
     if debug:
@@ -207,19 +197,70 @@ def processDir(dir, avg):
                          F.avg('RESULT_TRANSFER').alias('RESULT_TRANSFER')).collect()
     return data.collect()
 
+def printHtml_init(element):
+    print('''<html>
+    <head>
+      <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+      <script type="text/javascript">
+        google.charts.load('current', {'packages':['timeline']});
+        google.charts.setOnLoadCallback(drawChart);
+        function drawChart() {''')
+    print("          var container = document.getElementById('%s');" % element)
+    print('''          var chart = new google.visualization.Timeline(container);
+          var dataTable = new google.visualization.DataTable();
+
+          dataTable.addColumn({ type: 'string', id: 'Job' });
+          dataTable.addColumn({ type: 'string', id: 'Name' });
+          dataTable.addColumn({ type: 'number', id: 'Start' });
+          dataTable.addColumn({ type: 'number', id: 'End' });
+          dataTable.addRows([''')
+
+
+def printHtml_end(element):
+    print('''          ]);
+          var options = {
+          timeline: { showRowLabels: true, showBarLabels: false },
+            avoidOverlappingGridLines: false
+          };
+
+          chart.draw(dataTable, options);
+          }
+        </script>
+    </head>
+    <body>''')
+    print("        <div id=\"{}\" style=\"height: 100%;\"></div>".format(element))
+    print('''    </body>
+</html>''')
+
 
 if __name__ == '__main__':
+    printHtml_init("element")
+    # Initialize Spark
+    spark = SparkSession\
+            .builder\
+            .appName("LogProcessing")\
+            .master("local[*]")\
+            .getOrCreate()
+
+    sc = spark.sparkContext
+    sc.setLogLevel("OFF")
     if len(argv) < 2:
         exit()
-    if argv[1] == "avg" and len(argv) < 3:
+    if argv[1] == "device" and len(argv) < 3:
         exit()
     init = 1
-    if (argv[1] != "avg"):
-        init = 1
-        print('ORIGIN,DESTINATION,', end='')
-    print('TOTAL_DURATION,SCHEDULER_DECISION,DATA_TRANSFER,QUEUE,IMAGE_LOAD,DETECTION')#,RESULT_TRANSFER')
+    actions = ['SCHEDULER_DECISION','DATA_TRANSFER','QUEUE','IMAGE_LOAD','DETECTION']
     for dir in argv[init:]:
+        job = 0
         for row in processDir(dir, argv[1] == "avg"):
-            if (argv[1] != "avg"):
-                print('{},{},'.format(row.ORIGIN_NODE, row.DESTINATION_NODE), end=''),
-            print('{},{},{},{},{},{}'.format(row.TOTAL_DURATION, row.SCHEDULER_DECISION, row.DATA_TRANSFER, row.QUEUE, row.IMAGE_LOAD, row.DETECTION))#, row.RESULT_TRANSFER))
+            row_name = "[{}] {} -> {}".format(job, row.ORIGIN_NODE, row.DESTINATION_NODE)
+            if argv[1] == "device":
+                row_name = "{}".format(row.DESTINATION_NODE)
+            init = row.START_TIME
+            i = 0
+            action_value = [row.SCHEDULER_DECISION, row.DATA_TRANSFER, row.QUEUE, row.IMAGE_LOAD, row.DETECTION]
+            for i in range(len(actions)):
+                    print("['{}', '{}', {}, {}],".format(row_name, actions[i], init, init+int(action_value[i])))
+                    init = init+int(action_value[i])
+            job += 1
+    printHtml_end("element")

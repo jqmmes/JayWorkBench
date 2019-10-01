@@ -13,7 +13,13 @@ class CloudletControl(CloudletControl_pb2_grpc.CloudletControlServicer):
         path = "/usr/lib/jvm/java-1.8.0-openjdk-amd64/bin/java"
         if os.path.exists("/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java"):
             path = "/usr/lib/jvm/java-1.11.0-openjdk-amd64/bin/java"
-        os.system("%s -jar /home/joaquim/ODCloud/ODCloud.jar&" % path)
+        if not os.path.exists(path):
+            if os.path.exists("/Library/Java/JavaVirtualMachines/openjdk-12.0.1.jdk/Contents/Home/bin/java"):
+                path = "/Library/Java/JavaVirtualMachines/openjdk-12.0.1.jdk/Contents/Home/bin/java"
+        od_path = "/home/joaquim"
+        if not os.path.exists(od_path):
+            od_path = "/Users/joaquim"
+        os.system("%s -jar %s/ODCloud/ODCloud.jar&" % (path, od_path))
         return CloudletControl_pb2.Empty()
 
     def stopODLauncher(self, request, context):
