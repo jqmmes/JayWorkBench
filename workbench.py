@@ -449,7 +449,7 @@ def neededDevicesAvailable(experiment, devices, retries=5):
         experiment.setFail()
         os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
         return False
-    if not checkBattery(0, *devices[:experiment.devices]):
+    if not checkBattery(20, *devices[:experiment.devices]):
         sleep(5)
         return neededDevicesAvailable(experiment, devices, retries-1)
     else:
@@ -826,7 +826,7 @@ def main():
         print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
+        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=True)
         for e in EXPERIMENTS:
             runExperiment(e)
 
