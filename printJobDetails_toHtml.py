@@ -260,7 +260,7 @@ if __name__ == '__main__':
             i = 0
             action_value = [row.SCHEDULER_DECISION, row.DATA_TRANSFER, row.QUEUE, row.IMAGE_LOAD, row.DETECTION]
             for i in range(len(actions)):
-                    print("['{}', '{}', {}, {}],".format(row_name, actions[i], init, init+int(action_value[i])))
+                    print("['{}', '{} from {}', {}, {}],".format(row_name, actions[i], row.ORIGIN_NODE, init, init+int(action_value[i])))
                     init = init+int(action_value[i])
             job += 1
     printHtml_end("element")
