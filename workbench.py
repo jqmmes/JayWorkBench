@@ -449,7 +449,7 @@ def neededDevicesAvailable(experiment, devices, retries=5):
         experiment.setFail()
         os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
         return False
-    if not checkBattery(0, *devices[:experiment.devices]):
+    if not checkBattery(20, *devices[:experiment.devices]):
         sleep(5)
         return neededDevicesAvailable(experiment, devices, retries-1)
     else:
