@@ -1,6 +1,7 @@
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql import DataFrame
 from sys import argv
 import os
 
@@ -23,7 +24,7 @@ def readCSV(file, debug=False):
 def writeCSV(df, path):
     df.write.csv(path, header=True, mode='overwrite')
 
-def processDir(dir, avg):
+def processDir(dir, avg, local=True, remote=True, cloud=True):
     jobData = None
     if not os.path.isdir(dir):
         return []
@@ -76,78 +77,79 @@ def processDir(dir, avg):
               .drop('NODE_NAME')\
               .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
-    # 'DESTINATION_NODE','JOB_ID', 'TIMESTAMP'
-    queue_job = jobData\
-                .filter(jobData.OPERATION == 'INIT')\
-                .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_executeJob$ODLib_Common_86')\
-                .drop('OPERATION')\
-                .drop('CLASS_METHOD_LINE')\
-                .drop('ACTIONS')\
-                .withColumnRenamed('NODE_NAME', 'DESTINATION_NODE')\
-                .withColumnRenamed('TIMESTAMP', 'QUEUE_TIME')
+    if local or remote:
+        # 'DESTINATION_NODE','JOB_ID', 'TIMESTAMP'
+        queue_job = jobData\
+                    .filter(jobData.OPERATION == 'INIT')\
+                    .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_executeJob$ODLib_Common_86')\
+                    .drop('OPERATION')\
+                    .drop('CLASS_METHOD_LINE')\
+                    .drop('ACTIONS')\
+                    .withColumnRenamed('NODE_NAME', 'DESTINATION_NODE')\
+                    .withColumnRenamed('TIMESTAMP', 'QUEUE_TIME')
 
-    execution_start = jobData\
-                .filter(jobData.OPERATION == 'INIT')\
-                .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_124')\
-                .drop('OPERATION')\
-                .drop('CLASS_METHOD_LINE')\
-                .drop('ACTIONS')\
-                .drop('NODE_NAME')\
-                .withColumnRenamed('TIMESTAMP', 'START_TIME')
+        execution_start = jobData\
+                    .filter(jobData.OPERATION == 'INIT')\
+                    .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_124')\
+                    .drop('OPERATION')\
+                    .drop('CLASS_METHOD_LINE')\
+                    .drop('ACTIONS')\
+                    .drop('NODE_NAME')\
+                    .withColumnRenamed('TIMESTAMP', 'START_TIME')
 
-    image_read_end = jobData\
-                .filter(jobData.OPERATION == 'START')\
-                .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_129')\
-                .drop('OPERATION')\
-                .drop('CLASS_METHOD_LINE')\
-                .drop('ACTIONS')\
-                .drop('NODE_NAME')\
-                .withColumnRenamed('TIMESTAMP', 'END_TIME')
+        image_read_end = jobData\
+                    .filter(jobData.OPERATION == 'START')\
+                    .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_129')\
+                    .drop('OPERATION')\
+                    .drop('CLASS_METHOD_LINE')\
+                    .drop('ACTIONS')\
+                    .drop('NODE_NAME')\
+                    .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
-    execution_end = jobData\
-                .filter(jobData.OPERATION == 'END')\
-                .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_131')\
-                .drop('OPERATION')\
-                .drop('CLASS_METHOD_LINE')\
-                .drop('ACTIONS')\
-                .drop('NODE_NAME')\
-                .withColumnRenamed('TIMESTAMP', 'EXECUTION_END_TIME')
+        execution_end = jobData\
+                    .filter(jobData.OPERATION == 'END')\
+                    .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_131')\
+                    .drop('OPERATION')\
+                    .drop('CLASS_METHOD_LINE')\
+                    .drop('ACTIONS')\
+                    .drop('NODE_NAME')\
+                    .withColumnRenamed('TIMESTAMP', 'EXECUTION_END_TIME')
+    if cloud:
+        cloud_queue_job = jobData\
+                  .filter(jobData.OPERATION == 'INIT')\
+                  .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCServer$grpcImpl$1_executeJob_22')\
+                  .drop('OPERATION')\
+                  .drop('CLASS_METHOD_LINE')\
+                  .drop('ACTIONS')\
+                  .withColumnRenamed('NODE_NAME', 'DESTINATION_NODE')\
+                  .withColumnRenamed('TIMESTAMP', 'QUEUE_TIME')
 
-    cloud_queue_job = jobData\
-              .filter(jobData.OPERATION == 'INIT')\
-              .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCServer$grpcImpl$1_executeJob_22')\
-              .drop('OPERATION')\
-              .drop('CLASS_METHOD_LINE')\
-              .drop('ACTIONS')\
-              .withColumnRenamed('NODE_NAME', 'DESTINATION_NODE')\
-              .withColumnRenamed('TIMESTAMP', 'QUEUE_TIME')
+        cloud_execution_start = jobData\
+                  .filter(jobData.OPERATION == 'INIT')\
+                  .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+                  .drop('OPERATION')\
+                  .drop('CLASS_METHOD_LINE')\
+                  .drop('ACTIONS')\
+                  .drop('NODE_NAME')\
+                  .withColumnRenamed('TIMESTAMP', 'START_TIME')
 
-    cloud_execution_start = jobData\
-              .filter(jobData.OPERATION == 'INIT')\
-              .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
-              .drop('OPERATION')\
-              .drop('CLASS_METHOD_LINE')\
-              .drop('ACTIONS')\
-              .drop('NODE_NAME')\
-              .withColumnRenamed('TIMESTAMP', 'START_TIME')
+        cloud_image_read_end = jobData\
+                  .filter(jobData.OPERATION == 'START')\
+                  .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+                  .drop('OPERATION')\
+                  .drop('CLASS_METHOD_LINE')\
+                  .drop('ACTIONS')\
+                  .drop('NODE_NAME')\
+                  .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
-    cloud_image_read_end = jobData\
-              .filter(jobData.OPERATION == 'START')\
-              .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
-              .drop('OPERATION')\
-              .drop('CLASS_METHOD_LINE')\
-              .drop('ACTIONS')\
-              .drop('NODE_NAME')\
-              .withColumnRenamed('TIMESTAMP', 'END_TIME')
-
-    cloud_execution_end = jobData\
-              .filter(jobData.OPERATION == 'END')\
-              .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
-              .drop('OPERATION')\
-              .drop('CLASS_METHOD_LINE')\
-              .drop('ACTIONS')\
-              .drop('NODE_NAME')\
-              .withColumnRenamed('TIMESTAMP', 'EXECUTION_END_TIME')
+        cloud_execution_end = jobData\
+                  .filter(jobData.OPERATION == 'END')\
+                  .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+                  .drop('OPERATION')\
+                  .drop('CLASS_METHOD_LINE')\
+                  .drop('ACTIONS')\
+                  .drop('NODE_NAME')\
+                  .withColumnRenamed('TIMESTAMP', 'EXECUTION_END_TIME')
 
     # Total Duration: end - start
 
@@ -164,8 +166,6 @@ def processDir(dir, avg):
     # Read Image Data: cloud_image_read_end - cloud_execution_start
     # Queue Duration: cloud_execution_start - cloud_queue_job
 
-
-
     # Everything is times
     # TOTAL_DURATION, SCHEDULER_DECISION, DATA_TRANSFER, JOB_COMPLETION {QUEUE, EXECUTION_COMPLETION {IMAGE_LOAD, DETECTION}}
 
@@ -180,20 +180,44 @@ def processDir(dir, avg):
     data_transfer = job_scheduled.join(data_reached_server, 'JOB_ID').withColumn('DATA_TRANSFER', data_reached_server.END_TIME - job_scheduled.SCHEDULED_TIME).drop('START_TIME').drop('SCHEDULED_TIME')
 
     # QUEUE
-    queue_local = queue_job.join(execution_start, 'JOB_ID').withColumn('QUEUE', execution_start.START_TIME - queue_job.QUEUE_TIME).drop('START_TIME').drop('QUEUE_TIME')
-    queue_cloud = cloud_queue_job.join(cloud_execution_start, 'JOB_ID').withColumn('QUEUE', cloud_execution_start.START_TIME - cloud_queue_job.QUEUE_TIME).drop('START_TIME').drop('QUEUE_TIME')
-    queue = queue_local.union(queue_cloud)
+    if local or remote:
+        queue = queue_job.join(execution_start, 'JOB_ID').withColumn('QUEUE', execution_start.START_TIME - queue_job.QUEUE_TIME).drop('START_TIME').drop('QUEUE_TIME')
+        if not (local and remote):
+            cond = [start.JOB_ID == queue_job.JOB_ID, start.ORIGIN_NODE == queue_job.DESTINATION_NODE]
+            origin_queue = queue_job.join(start, cond).drop(start.START_TIME).drop('ORIGIN_NODE').drop('QUEUE_TIME').drop('DESTINATION_NODE').drop(start.JOB_ID)
+            local_queue = queue.join(origin_queue, 'JOB_ID')
+        if local and not remote:
+            queue = local_queue
+        elif remote and not local:
+            queue = queue.subtract(local_queue)
+
+    if cloud:
+        queue_cloud = cloud_queue_job.join(cloud_execution_start, 'JOB_ID').withColumn('QUEUE', cloud_execution_start.START_TIME - cloud_queue_job.QUEUE_TIME).drop('START_TIME').drop('QUEUE_TIME')
+        if not local and not remote:
+            queue = queue_cloud
+        else:
+            #queue_cloud = queue_cloud.drop('DESTINATION_NODE')
+            queue = queue.union(queue_cloud)
 
     # IMAGE_LOAD
-    image_load_local = execution_start.join(image_read_end, 'JOB_ID').withColumn('IMAGE_LOAD', image_read_end.END_TIME - execution_start.START_TIME).drop('START_TIME').drop('END_TIME')
-    image_load_cloud = cloud_execution_start.join(cloud_image_read_end, 'JOB_ID').withColumn('IMAGE_LOAD', cloud_image_read_end.END_TIME - cloud_execution_start.START_TIME).drop('START_TIME').drop('END_TIME')
-    image_load = image_load_local.union(image_load_cloud)
+    if local or remote:
+        image_load = execution_start.join(image_read_end, 'JOB_ID').withColumn('IMAGE_LOAD', image_read_end.END_TIME - execution_start.START_TIME).drop('START_TIME').drop('END_TIME')
+    if cloud:
+        image_load_cloud = cloud_execution_start.join(cloud_image_read_end, 'JOB_ID').withColumn('IMAGE_LOAD', cloud_image_read_end.END_TIME - cloud_execution_start.START_TIME).drop('START_TIME').drop('END_TIME')
+        if not local and not remote:
+            image_load = image_load_cloud
+        else:
+            image_load = image_load.union(image_load_cloud)
 
     # DETECTION
-    detection_local = image_read_end.join(execution_end, 'JOB_ID').withColumn('DETECTION', execution_end.EXECUTION_END_TIME - image_read_end.END_TIME).drop('START_TIME').drop('EXECUTION_END_TIME')
-    detection_cloud = cloud_image_read_end.join(cloud_execution_end, 'JOB_ID').withColumn('DETECTION', cloud_execution_end.EXECUTION_END_TIME - cloud_image_read_end.END_TIME).drop('START_TIME').drop('EXECUTION_END_TIME')
-    detection = detection_local.union(detection_cloud)
-
+    if local or remote:
+        detection = image_read_end.join(execution_end, 'JOB_ID').withColumn('DETECTION', execution_end.EXECUTION_END_TIME - image_read_end.END_TIME).drop('START_TIME').drop('EXECUTION_END_TIME')
+    if cloud:
+        detection_cloud = cloud_image_read_end.join(cloud_execution_end, 'JOB_ID').withColumn('DETECTION', cloud_execution_end.EXECUTION_END_TIME - cloud_image_read_end.END_TIME).drop('START_TIME').drop('EXECUTION_END_TIME')
+        if not local and not remote:
+            detection = detection_cloud
+        else:
+            detection = detection.union(detection_cloud)
 
     data = jobs.join(schedules, 'JOB_ID').join(data_transfer, 'JOB_ID').join(queue, 'JOB_ID').join(image_load, 'JOB_ID').join(detection, 'JOB_ID').drop('END_TIME').withColumn('RESULT_TRANSFER', jobs.TOTAL_DURATION - (data_transfer.DATA_TRANSFER + queue.QUEUE + image_load.IMAGE_LOAD + detection.DETECTION)).orderBy('START_TIME')
 
@@ -216,13 +240,31 @@ if __name__ == '__main__':
     if argv[1] == "no-header" and len(argv) < 3:
         exit()
     init = 2
-    if (argv[1] not in  ["avg", "no-header"]):
+    local = True
+    remote = True
+    cloud = True
+    if (argv[1] not in  ["avg", "no-header", "cloud-only-no-header", "remote-only-no-header", "local-only-no-header", "local-remote-only-no-header", "local-cloud-only-no-header", "remote-cloud-only-no-header"]):
         init = 1
         print('ORIGIN,DESTINATION,', end='')
-    if argv[1] != "no-header":
+    if argv[1] not in ["no-header", "cloud-only-no-header", "remote-only-no-header", "local-only-no-header", "local-remote-only-no-header", "local-cloud-only-no-header", "remote-cloud-only-no-header"]:
         print('TOTAL_DURATION,SCHEDULER_DECISION,DATA_TRANSFER,QUEUE,IMAGE_LOAD,DETECTION')#,RESULT_TRANSFER')
+    if argv[1] in ["local-only", "local-only-no-header"]:
+        remote = False
+        cloud = False
+    elif argv[1] in ["remote-only", "remote-only-no-header"]:
+        local = False
+        cloud = False
+    elif argv[1] in ["cloud-only", "cloud-only-no-header"]:
+        local = False
+        remote = False
+    elif argv[1] in ["local-remote-only", "local-remote-only-no-header"]:
+        cloud = False
+    elif argv[1] in ["local-cloud-only", "local-cloud-only-no-header"]:
+        remote = False
+    elif argv[1] in ["remote-cloud-only", "remote-cloud-only-no-header"]:
+        local = False
     for dir in argv[init:]:
-        for row in processDir(dir, argv[1] == "avg"):
+        for row in processDir(dir, argv[1] == "avg", local, remote, cloud):
             if (argv[1] != "avg"):
                 print('{},{},'.format(row.ORIGIN_NODE, row.DESTINATION_NODE), end=''),
             print('{},{},{},{},{},{}'.format(row.TOTAL_DURATION, row.SCHEDULER_DECISION, row.DATA_TRANSFER, row.QUEUE, row.IMAGE_LOAD, row.DETECTION))#, row.RESULT_TRANSFER))
