@@ -202,6 +202,18 @@ class cloudClient:
         sleep(5)
         return self.setModel(model, retries-1)
 
+    def setSettings(self, settings_map, mcast_interface = None):
+        if (self.brokerStubReady()):
+            try:
+                settings_proto = ODProto_pb2.Settings()
+                if mcast_interface:
+                    settings_proto.setting["MCAST_INTERFACE"] = mcast_interface
+                for key in settings_map:
+                    settings_proto.setting[key] = settings_map[key]
+                return self.brokerStub.setSettings(settings_proto)
+            except:
+                return False
+
     def setLogName(self, log_name, retries=5):
         if retries <= 0:
             if DEBUG:

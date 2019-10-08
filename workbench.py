@@ -513,6 +513,8 @@ def startCloudletThread(cloudlet, experiment, repetition, seed_repeat, cloudlet_
 
     cloudlet_instance.connectLauncherService()
     cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    if experiment.settings or experiment.mcast_interface:
+        cloudlet_instance.setSettings(experiment.settings, experiment.mcast_interface)
     cloudlet_instance.startWorker()
     sleep(1)
     cloudlet_instance.connectBrokerService()
@@ -619,6 +621,7 @@ class Experiment:
     calibration = False
     asset_quality = "SD"
     settings = {}
+    mcast_interface = None
 
     _running_status = True
 
@@ -694,6 +697,8 @@ def readConfig(confName):
                 for entry in config[section][option].split(';'):
                     setting = entry.split(':')
                     experiment.settings[setting[0].strip()] = setting[1].strip()
+            elif option == "multicastinterface":
+                experiment.mcast_interface = config[section][option]
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -728,6 +733,7 @@ def help():
                     Calibration             = Run ODLib calibration before begin [BOOL] (Default False)
                     Settings                = Set ODLib settings (setting: value;...) [LIST]
                     AssetQuality            = Inform about asset quality (SD/HD/UHD) [STR] (Default SD)
+                    MultiCastInterface      = MCAST_INTERFACE: interface to use in cloudlet [STR]
 
         Models:
                     ssd_mobilenet_v1_fpn_coco
@@ -773,7 +779,7 @@ def help():
                     RTTDelayMillisFailRetry
                     RTTDelayMillisFailAttempts
                     DEVICE_ID
-                    BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE]
+                    BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
         ================================================ HELP ================================================''')
 
 def printExperiment(conf, experiment):

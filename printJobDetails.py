@@ -213,11 +213,14 @@ if __name__ == '__main__':
         exit()
     if argv[1] == "avg" and len(argv) < 3:
         exit()
-    init = 1
-    if (argv[1] != "avg"):
+    if argv[1] == "no-header" and len(argv) < 3:
+        exit()
+    init = 2
+    if (argv[1] not in  ["avg", "no-header"]):
         init = 1
         print('ORIGIN,DESTINATION,', end='')
-    print('TOTAL_DURATION,SCHEDULER_DECISION,DATA_TRANSFER,QUEUE,IMAGE_LOAD,DETECTION')#,RESULT_TRANSFER')
+    if argv[1] != "no-header":
+        print('TOTAL_DURATION,SCHEDULER_DECISION,DATA_TRANSFER,QUEUE,IMAGE_LOAD,DETECTION')#,RESULT_TRANSFER')
     for dir in argv[init:]:
         for row in processDir(dir, argv[1] == "avg"):
             if (argv[1] != "avg"):
