@@ -765,6 +765,8 @@ def help():
 
                     EstimatedTimeScheduler
 
+                    ComputationEstimateScheduler            (Same as estimate but witout Bandwidth Estimate)
+
             Settings:
                     CLOUD_IP
                     GRPC_MAX_MESSAGE_SIZE

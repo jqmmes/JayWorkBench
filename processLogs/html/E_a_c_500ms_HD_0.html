@@ -1,0 +1,33 @@
+<html>
+    <head>
+      <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+      <script type="text/javascript">
+        google.charts.load('current', {'packages':['timeline']});
+        google.charts.setOnLoadCallback(drawChart);
+        function drawChart() {
+          var container = document.getElementById('element');
+          var chart = new google.visualization.Timeline(container);
+          var dataTable = new google.visualization.DataTable();
+
+          dataTable.addColumn({ type: 'string', id: 'Job' });
+          dataTable.addColumn({ type: 'string', id: 'Name' });
+          dataTable.addColumn({ type: 'number', id: 'Start' });
+          dataTable.addColumn({ type: 'number', id: 'End' });
+          dataTable.addRows([
+['joaquim-MS-7996', 'SCHEDULER_DECISION',1569946593620, 1569946593677],
+['joaquim-MS-7996', 'DATA_TRANSFER', 1569946593677, 1569946594254],
+
+          ]);
+          var options = {
+          timeline: { showRowLabels: true, showBarLabels: false },
+            avoidOverlappingGridLines: false
+          };
+
+          chart.draw(dataTable, options);
+          }
+        </script>
+    </head>
+    <body>
+        <div id="element" style="height: 100%;"></div>
+    </body>
+</html>
