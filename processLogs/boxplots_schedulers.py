@@ -83,7 +83,7 @@ for scheduler in schedulers:
                     if use_5s:
                         checking_5s = "_5s"
                     checking_500ms = ""
-                    if use_500ms and schedulers_translate[scheduler] == "EstimatedTimeScheduler":
+                    if use_500ms:# and schedulers_translate[scheduler] == "EstimatedTimeScheduler":
                         checking_500ms = "_500ms_WorkerUpdate"
                     calibrated = ""
                     if use_calibrated:

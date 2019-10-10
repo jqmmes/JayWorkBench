@@ -17,27 +17,27 @@ fig_0 = go.Figure()
 fig_1 = go.Figure()
 fig_2 = go.Figure()
 i = 0
-# for scheduler in schedulers:
-#     for device in devices[1:]:
-#         first = True
-#         for entry in os.listdir(base_dir):
-#             #if (entry in processed_experiments) or (not os.path.isdir("{}/{}".format(base_dir, entry))):
-#             #    continue
-#         #     conf = ""
-#         #     try:
-#         #         conf = open("{}/{}/conf.cfg".format(base_dir, entry), "r").read()
-#         #     except:
-#         #         continue
-#             if entry.find("_{}".format(scheduler)) != -1:
-#                 print("PROCESSING\t{}".format(device))
-#                 processed_experiments.append(entry)
-#                 if first:
-#                     os.system("python3 printJobDetails.py {}-only {}/{}/0/* > data_transfer_boxplot_{}_{}.csv".format(device, base_dir, entry, device, i))
-#                 else:
-#                     os.system("python3 printJobDetails.py {}-only-no-header {}/{}/0/* >> data_transfer_boxplot_{}_{}.csv".format(device, base_dir, entry, device, i))
-#                 #scheduler_map[scheduler] = entry
-#                 first = False
-#     i += 1
+for scheduler in schedulers:
+    for device in devices[1:]:
+        first = True
+        for entry in os.listdir(base_dir):
+            #if (entry in processed_experiments) or (not os.path.isdir("{}/{}".format(base_dir, entry))):
+            #    continue
+        #     conf = ""
+        #     try:
+        #         conf = open("{}/{}/conf.cfg".format(base_dir, entry), "r").read()
+        #     except:
+        #         continue
+            if entry.find("_{}".format(scheduler)) != -1:
+                print("PROCESSING\t{}".format(device))
+                processed_experiments.append(entry)
+                if first:
+                    os.system("python3 printJobDetails.py {}-only {}/{}/0/* > data_transfer_boxplot_{}_{}.csv".format(device, base_dir, entry, device, i))
+                else:
+                    os.system("python3 printJobDetails.py {}-only-no-header {}/{}/0/* >> data_transfer_boxplot_{}_{}.csv".format(device, base_dir, entry, device, i))
+                #scheduler_map[scheduler] = entry
+                first = False
+    i += 1
 
 #try:
 for device in devices:
