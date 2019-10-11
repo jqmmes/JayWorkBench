@@ -828,7 +828,7 @@ def main():
         print("===================================")
         for i in range(1, len(argv)):
             readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=True)
+        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
         for e in EXPERIMENTS:
             runExperiment(e)
 
