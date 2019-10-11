@@ -13,17 +13,27 @@ SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
 DEBUG = False
 
+# TODO: Listar todos os dispositivos disponiveis.
+#       1º availar todos os dispositivos ligados por USB
+#       2º tentar ligar o ADB Wifi em Todos estes
+#       3º discoverWifiADBDevices (pode-se evitar os que já se conhece)
+#       4º criar novos Device que só existam por ADB Wifi
+#       5º tentar ler o nome do dispositivo por ADB para identificar o dispositivo
+
+
 class Device:
     name = ""
     ip = ""
     status = False
     connected_wifi = False
+    connected_usb = True
 
-    def __init__(self, name, ip = "", status = False, wifi = False):
+    def __init__(self, name, ip = "", status = False, wifi = False, usb=True):
         self.name = name
         self.ip = ip
         self.status = status
         self.connected_wifi = wifi
+        self.connected_usb = usb
 
 FNULL = open(os.devnull, "w")
 
@@ -32,13 +42,23 @@ def adb(cmd, device=None, force_usb=False):
     if(device != None):
         if (device.connected_wifi and not force_usb):
             selected_device = ['-s', "%s:5555" % device.ip]
-        else:
+        elif (device.connected_usb):
             selected_device = ['-s', device.name]
     if (DEBUG):
         if device is not None:
-            debug = "[%s]\tadb" % device.name
+            if (device.connected_wifi and not force_usb):
+                debug = "[{}/{}:5555]\twifi_adb".format(device.name, device.ip)
+            elif (device.connected_usb):
+                debug = "[%s]\tadb" % device.name
+            else:
+                debug = "[%s]\terror_adb" % device.name
         else:
-            debug = "adb"
+            if (device.connected_wifi and not force_usb):
+                debug = "wifi_adb"
+            elif (device.connected_usb):
+                debug = "adb"
+            else:
+                debug = "error_adb"
         for i in selected_device:
             debug += " " + i
         for i in cmd:
@@ -97,6 +117,14 @@ def listDevices(minBattery = 15):
                         new_device.connected_wifi = True
                         break
                 devices.append(new_device)
+    return devices
+
+def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256):
+    devices = []
+    for n in range(range_min, range_max):
+        status = adb(['connect', "{}:5555".format(ip_mask.format(n))])
+        if (status == "connected to {}:5555\n".format(ip_mask.format(n))) or (status == "already connected to {}:5555\n".format(ip_mask.format(n))):
+            devices.append(ip_mask.format(n))
     return devices
 
 def mkdir(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):

@@ -190,6 +190,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                 if retries > 3:
                     print("FAILED_SWITCHING_TO_WIFI_ADB\t%s\t%s" % (device.name, device.ip))
                     skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                    experiment.deviceFail(device.name)
                     return
                 adb.enableWifiADB(device)
                 sleep(1)
@@ -213,12 +214,14 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if not adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True):
         print("FAILED_LAUNCH_SERVICE\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+        experiment.deviceFail(device.name)
         return
     try:
         worker_ip = getDeviceIp(device)
-        if (worker_ip is None):
+        if (worker_ip is None and retries < 5):
             print("FAILED_OBTAIN_IP\t%s" % device.name)
             skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+            experiment.deviceFail(device.name)
             adb.rebootAndWait(device)
             return
         print("STARTING_SERVICES\t%s" % device.name)
@@ -231,9 +234,9 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         worker.connectBrokerService()
         sleep(2)
     except Exception:
-        print(Exception)
         print("Error Starting Worker %s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+        experiment.deviceFail(device.name)
         return
     if experiment.settings:
         worker.setSettings(experiment.settings)
@@ -243,12 +246,14 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if (schedulers is None):# or models is None):
         print("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+        experiment.deviceFail(device.name)
         return
     for scheduler in schedulers.scheduler:
         if scheduler.name == experiment.scheduler and experiment.isOK():
             if (worker.setScheduler(scheduler) is None):
                 print("Failed to setScheduler on %s" % device.name)
                 skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                experiment.deviceFail(device.name)
                 return
             break
     if is_worker:
@@ -257,6 +262,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                 if (worker.setModel(model) is None):
                     print("Failed to setModel on %s" % device.name)
                     skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                    experiment.deviceFail(device.name)
                     return
                 break
     print("WAIT_ON_BARRIER\tBOOT_BARRIER\t%s" % device.name)
@@ -295,6 +301,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     except:
         print("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
         experiment.setFail()
+        experiment.deviceFail(device.name)
     try:
         print("PULLING_LOG\t%s\tSYS_LOG" % device.name)
         system_log_path = "sys_logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
@@ -303,7 +310,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         print("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
     except:
         print("PULLING_LOG\t%s\tSYS_LOG\tERROR" % device.name)
-        None
+        experiment.deviceFail(device.name)
     print("CHECKING_LOG\t%s" % device.name)
     log_available = False
     for entry in os.listdir('logs/%s/%d/%d/' % (experiment.name, repetition, seed_repeat)):
@@ -314,6 +321,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if not log_available:
         print("CHECKING_LOG\t%s\tFAILED" % device.name)
         experiment.setFail()
+        experiment.deviceFail(device.name)
     print("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
     finish_barrier.wait()
     adb.screenOff(device)
@@ -362,9 +370,12 @@ def runExperiment(experiment):
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.repeat_seed):
-            repeat = 0
+            repeat_tries = 0
             while (True):
-                print("=========================\tSEED_REPEAT {}|{}\t========================".format(seed_repeat, repeat))
+                if repeat_tries > 10:
+                    os.system("touch logs/%s/too_many_repeat_retries_CANCELED"  % experiment.name)
+                    return
+                print("=========================\tSEED_REPEAT {} | ATTEMPT {}\t========================".format(seed_repeat, repeat_tries))
                 timeout = False
                 experiment.setOK()
 
@@ -373,8 +384,18 @@ def runExperiment(experiment):
                 #    return
                 experiment_devices = getNeededDevicesAvailable(experiment, devices)
                 if experiment_devices == []:
+                    os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
                     print("=========================\tEXPERIMET_FAILED_NOT_ENOUGHT_DEVICES{}\t========================".format(experiment.name))
                     return
+
+                # Descartar os dispositivos que mais falharam durante esta experiencia, sempre que possivel.
+                failed_devices = []
+                failed_devices_map = experiment.getFailedDevices()
+                for key in failed_devices_map:
+                    failed_devices.append(key)
+                failed_devices.sort(key=lambda e: failed_devices_map[e], reverse=True)
+                for failed_device in failed_devices[:max(len(experiment_devices)-experiment.devices, 0)]:
+                    experiment_devices.remove(failed_device)
 
                 os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = threading.Barrier(experiment.devices + 1)
@@ -430,7 +451,7 @@ def runExperiment(experiment):
 
                 if (experiment.isOK()):
                     break
-                repeat += 1
+                repeat_tries += 1
 
 
         if (repetition != experiment.repetitions - 1):
@@ -593,7 +614,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
     for cloud in experiment.clouds:
-        os.system("scp joaquim@%s:~/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[0], cloud[1]))
+        os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[0], cloud[1]))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
             os.system("cp /home/joaquim/ODCloud/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (log_name, experiment.name, repetition, seed_repeat, cloudlet))
@@ -674,6 +695,7 @@ class Experiment:
     mcast_interface = None
     min_battery = 20
 
+    _failed_devices = {}
     _running_status = True
 
     def __init__(self, name):
@@ -687,6 +709,15 @@ class Experiment:
 
     def isOK(self):
         return self._running_status
+
+    def deviceFail(self, device):
+        if device in failed_devices:
+            self._failed_devices[device] += 1
+        else:
+            self._failed_devices[device] = 0
+
+    def getFailedDevices(self):
+        return self._failed_devices
 
 
 def readConfig(confName):
