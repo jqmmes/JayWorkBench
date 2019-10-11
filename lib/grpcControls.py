@@ -337,8 +337,6 @@ class remoteClient:
         return self.__checkChannelStatus(self.brokerChannel, self.brokerStubStatus, self.brokerStubStatusCallback)
 
     def startWorker(self, retries=5):
-        print(self.brokerStubStatus)
-        print(self.launcherStubStatus)
         if retries <= 0:
             if DEBUG:
                 print("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
