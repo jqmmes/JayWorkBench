@@ -4,8 +4,8 @@ import pandas as pd
 import os
 import sys
 # TODO: Separar ACTIVE de PASSIVE   [_ACTIVE_BW_ESTIMATE | _PASSIVE_BW_ESTIMATE]
-schedulers = ["MultiDeviceScheduler [Random] [LOCAL, REMOTE]", "SingleDeviceScheduler [LOCAL]", "SingleDeviceScheduler [REMOTE]", "EstimatedTimeScheduler"]
-schedulers_translate = {"MultiDeviceScheduler [Random] [LOCAL, REMOTE]": "MultiDevice_Local_Remote", "SingleDeviceScheduler [LOCAL]": "SingleDevice_Local", "SingleDeviceScheduler [REMOTE]": "SingleDevice_Remote", "EstimatedTimeScheduler" : "EstimatedTimeScheduler"}
+schedulers = ["MultiDeviceScheduler [Random] [LOCAL, REMOTE]", "SingleDeviceScheduler [LOCAL]", "SingleDeviceScheduler [REMOTE]", "EstimatedTimeScheduler", "ComputationEstimateScheduler"]
+schedulers_translate = {"MultiDeviceScheduler [Random] [LOCAL, REMOTE]": "MultiDevice_Local_Remote", "SingleDeviceScheduler [LOCAL]": "SingleDevice_Local", "SingleDeviceScheduler [REMOTE]": "SingleDevice_Remote", "EstimatedTimeScheduler" : "EstimatedTimeScheduler", "ComputationEstimateScheduler": "ComputationEstimateScheduler"}
 asset_types = ["SD", "HD", "UHD"]
 should_use_cloudlet = [False, True]
 base_dir = sys.argv[1]
@@ -32,8 +32,8 @@ for asset_type in asset_types:
                                 continue
                             cloudlet_pass = (entry.lower().find("_cloudlet") != -1 and use_cloudlet) or (entry.lower().find("_cloudlet") == -1 and not use_cloudlet)
                             use_5s_pass = (entry.lower().find("_5s") != -1 and use_5s) or (entry.lower().find("_5s") == -1 and not use_5s)
-                            use_500ms_pass = (entry.lower().find("_500ms_workerupdate") != -1 and use_500ms) or (entry.lower().find("_500ms_workerupdate") == -1 and not use_500ms) or schedulers_translate[scheduler] != "EstimatedTimeScheduler"
-                            calibrated_pass = (entry.upper().find("_CALIBRATED") != -1 and use_calibrated) or (entry.upper().find("_CALIBRATED") == -1 and not use_calibrated) or schedulers_translate[scheduler] != "EstimatedTimeScheduler"
+                            use_500ms_pass = (entry.lower().find("_500ms_workerupdate") != -1 and use_500ms) or (entry.lower().find("_500ms_workerupdate") == -1 and not use_500ms) or schedulers_translate[scheduler] not in ["EstimatedTimeScheduler", "ComputationEstimateScheduler"]
+                            calibrated_pass = (entry.upper().find("_CALIBRATED") != -1 and use_calibrated) or (entry.upper().find("_CALIBRATED") == -1 and not use_calibrated) or schedulers_translate[scheduler] not in ["EstimatedTimeScheduler", "ComputationEstimateScheduler"]
                             if entry.find("_{}".format(asset_type)) != -1 and conf.find(scheduler) != -1 and cloudlet_pass and use_5s_pass and use_500ms_pass and calibrated_pass:
                                 processed_experiments.append(entry)
                                 cloudlet = ""
@@ -43,7 +43,7 @@ for asset_type in asset_types:
                                 if use_5s:
                                     checking_5s = "_5s"
                                 checking_500ms = ""
-                                if use_500ms and schedulers_translate[scheduler] == "EstimatedTimeScheduler":
+                                if use_500ms and (schedulers_translate[scheduler] == "EstimatedTimeScheduler" or  schedulers_translate[scheduler] == "ComputationEstimateScheduler"):
                                     checking_500ms = "_500ms_WorkerUpdate"
                                 calibrated = ""
                                 if use_calibrated:
