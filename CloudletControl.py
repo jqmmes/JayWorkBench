@@ -16,9 +16,7 @@ class CloudletControl(CloudletControl_pb2_grpc.CloudletControlServicer):
         if not os.path.exists(path):
             if os.path.exists("/Library/Java/JavaVirtualMachines/openjdk-12.0.1.jdk/Contents/Home/bin/java"):
                 path = "/Library/Java/JavaVirtualMachines/openjdk-12.0.1.jdk/Contents/Home/bin/java"
-        od_path = "/home/joaquim"
-        if not os.path.exists(od_path):
-            od_path = "/Users/joaquim"
+        od_path = os.environ['HOME']
         os.system("%s -jar %s/ODCloud/ODCloud.jar&" % (path, od_path))
         return CloudletControl_pb2.Empty()
 
@@ -33,7 +31,7 @@ def serve():
   server = grpc.server(concurrent.futures.ThreadPoolExecutor(max_workers=10))
   CloudletControl_pb2_grpc.add_CloudletControlServicer_to_server(
       CloudletControl(), server)
-  server.add_insecure_port('localhost:50049')
+  server.add_insecure_port('[::]:50049')
   server.start()
   while True:
       sleep(1)

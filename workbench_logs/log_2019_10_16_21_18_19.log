@@ -1,0 +1,55 @@
+==============	DEVICES	==============
+HT4AVJT02309 (192.168.42.13)
+===================================
+Experiment: SingleDeviceSchedulerCloud01
+==============	CONFIG	==============
+Scheduler: SingleDeviceScheduler [CLOUD]
+TF Model: ssd_mobilenet_v1_fpn_coco
+Devices: 1
+Reboot: False
+Rate: 1
+Rate Time: 2s
+Duration: 240s
+Clouds: [(compute-us-crentral-1, us-central1-a, od-compute-01.duckdns.org)]
+Cloudlets: []
+Seed: SingleDeviceSchedulerCloud01
+Repetitions: 1
+Producers: 1
+RepeatSeed: 3
+Timeout: 1500
+======================================
+=========================	REPETITION 0	========================
+=========================	SEED_REPEAT 0 | ATTEMPT 0	========================
+START_CLOUD_INSTANCE	compute-us-crentral-1	(od-compute-01.duckdns.org)
+START_DEVICE	HT4AVJT02309
+GENERATING_JOBS	RATE: 0.5	HT4AVJT02309
+SELECTED_ASSET	118 ASSETS	HT4AVJT02309
+LISTING_FILES_ON_DEVICE	HT4AVJT02309
+PUSHING_ASSETS	HT4AVJT02309
+WAITING_FOR_CLOUD_DNS_UPDATE	compute-us-crentral-1	(od-compute-01.duckdns.org)
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) __init__
+STOP_ALL_SERVICE	HT4AVJT02309
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) connectLauncherService
+STARTING_LAUNCH_SERVICE	HT4AVJT02309
+STARTING_SERVICES	HT4AVJT02309
+GRPC HT4AVJT02309 (192.168.42.13) __init__
+GRPC HT4AVJT02309 (192.168.42.13) connectLauncherService
+GRPC HT4AVJT02309 (192.168.42.13) setLog('SingleDeviceSchedulerCloud01') True
+GRPC HT4AVJT02309 (192.168.42.13) startWorker True
+GRPC HT4AVJT02309 (192.168.42.13) startScheduler True
+GRPC HT4AVJT02309 (192.168.42.13) connectBrokerService
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+GRPC HT4AVJT02309 (192.168.42.13) setScheduler
+GRPC HT4AVJT02309 (192.168.42.13) setScheduler DONE
+GRPC HT4AVJT02309 (192.168.42.13) setModel
+GRPC HT4AVJT02309 (192.168.42.13) setModel DONE
+WAIT_ON_BARRIER	BOOT_BARRIER	HT4AVJT02309
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) setLogName FAIL
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) startWorker FAIL
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) connectBrokerService
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels

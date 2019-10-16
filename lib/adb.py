@@ -63,7 +63,7 @@ def adb(cmd, device=None, force_usb=False):
             debug += " " + i
         for i in cmd:
             debug += " " + i
-        print(debug)
+        #print(debug)
     result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 

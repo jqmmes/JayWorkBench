@@ -8,6 +8,7 @@ import configparser
 from sys import argv, stdout
 import sys
 import subprocess
+from datetime import datetime
 
 
 EXPERIMENTS = []
@@ -21,6 +22,7 @@ LOG_FILE = stdout
 def log(str, end="\n"):
     global LOG_FILE
     LOG_FILE.write(str+end)
+    LOG_FILE.flush()
 
 def brokenBarrierExceptionHook(exception_type, exception, traceback):
     if (exception_type is threading.BrokenBarrierError):
@@ -41,10 +43,10 @@ def ping(hostname):
 
 def pingWait(hostname):
     while(not ping(hostname)):
-        log(".", end='')
-        stdout.flush()
+        #log(".", end='')
+        #stdout.flush()
         sleep(2)
-    log("")
+    #log("")
 
 '''def runJob(worker, device_random, assets_dir="assets"):
     global PENDING_JOBS
@@ -136,7 +138,7 @@ def getDeviceIp(device):
         return worker_ip if worker_ip is not None else sleep(5)
     return None
 
-def rebootDevice(device, device_random, max_sleep_random=10, retries=3):
+def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3):
     global LAST_REBOOT_TIME
     while True:
         sleep_duration = device_random.randint(0,10*max_sleep_random)
@@ -151,7 +153,7 @@ def rebootDevice(device, device_random, max_sleep_random=10, retries=3):
             else:
                 if (retries > 0):
                     log("REBOOT_WORKER_RETRY\t%s" % device.name)
-                    return rebootDevice(device, device_random, 10, retries - 1)
+                    return experimentRebootDevice(device, device_random, 10, retries - 1)
                 else:
                     log("REBOOT_WORKER_FAIL\t%s" % device.name)
                     return False
@@ -182,7 +184,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         asset_list.append(asset)
     log('SELECTED_ASSET\t{} ASSETS\t{}'.format(len(asset_list), device.name))
     if experiment.reboot:
-        if not rebootDevice(device, device_random, experiment.devices):
+        if not experimentRebootDevice(device, device_random, experiment.devices):
             sleep(10)
             retries = 0
             while True:
@@ -228,7 +230,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             adb.rebootAndWait(device)
             return
         log("STARTING_SERVICES\t%s" % device.name)
-        worker = grpcControls.remoteClient(worker_ip, device.name)
+        worker = grpcControls.remoteClient(worker_ip, device.name, LOG_FILE)
         worker.connectLauncherService()
         worker.setLogName(experiment.name)
         if is_worker:
@@ -342,7 +344,7 @@ def cleanLogs(path):
 
 def runExperiment(experiment):
     global PENDING_JOBS, ALL_DEVICES, ASSETS
-    logExperiment(stdout, experiment)
+    logExperiment(LOG_FILE, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
     cleanLogs("logs/%s/" % experiment.name)
@@ -359,11 +361,11 @@ def runExperiment(experiment):
     conf.close()
 
     killLocalCloudlet()
-    stopClouds(experiment)
+    #stopClouds(experiment)
 
-    for device in devices:
-        rebootDevice(device)
-        sleep(2)
+    #for device in devices:
+    #    rebootDevice(device)
+    #    sleep(2)
 
     for repetition in range(experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
@@ -388,7 +390,7 @@ def runExperiment(experiment):
                 experiment_devices = getNeededDevicesAvailable(experiment, devices)
                 if experiment_devices == []:
                     os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
-                    log("=========================\tEXPERIMET_FAILED_NOT_ENOUGHT_DEVICES{}\t========================".format(experiment.name))
+                    log("=========================\tEXPERIMET_FAILED_NOT_ENOUGHT_DEVICES\t{}\t========================".format(experiment.name))
                     return
 
                 # Descartar os dispositivos que mais falharam durante esta experiencia, sempre que possivel.
@@ -408,7 +410,6 @@ def runExperiment(experiment):
                 finish_barrier = threading.Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
                 servers_finish_barrier = threading.Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
-                startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
                 if (len(experiment.clouds) == 0):
@@ -422,6 +423,9 @@ def runExperiment(experiment):
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
+                # TODO: Validar que os devices encontram bem as clouds por elas arrancarem depois dos devices
+                startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
+
                 log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
                 if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, "MAIN"): # 15m
                     log("BROKEN_BARRIER\tBOOT_BARRIER\tMAIN")
@@ -448,9 +452,9 @@ def runExperiment(experiment):
                     pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
 
                 log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(servers_finish_barrier, 60, experiment, True, "MAIN")
+                barrierWithTimeout(servers_finish_barrier, 60, experiment, True, "MAIN", servers_finish_barrier, finish_barrier)
                 log("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(finish_barrier, 240, experiment, True, "MAIN")
+                barrierWithTimeout(finish_barrier, 240, experiment, True, "MAIN", finish_barrier)
 
                 if (experiment.isOK()):
                     break
@@ -581,12 +585,12 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     log("Starting %s Cloudlet Instance" % cloudlet)
     device_random = random.Random()
     device_random.seed(experiment.seed+cloudlet_seed+str(repetition))
-    cloudlet_control = grpcControls.cloudletControl(cloudlet, "%s_cloudlet" % cloudlet)
+    cloudlet_control = grpcControls.cloudControl(cloudlet, "%s_cloudlet" % cloudlet, LOG_FILE)
     cloudlet_control.connect()
     cloudlet_control.stop()
     cloudlet_control.start()
     sleep(1)
-    cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet)
+    cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet, LOG_FILE)
     #cloudlet_instance.stop()
     cloudlet_instance.connectLauncherService()
     cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
@@ -617,7 +621,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
     for cloud in experiment.clouds:
-        os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud[2], log_name, experiment.name, repetition, seed_repeat, cloud[0], cloud[1]))
+        os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
             os.system("cp /home/joaquim/ODCloud/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (log_name, experiment.name, repetition, seed_repeat, cloudlet))
@@ -625,14 +629,21 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
             os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
-    log("Starting %s Cloud Instance" % cloud[0])
+    log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     stdout.flush()
-    adb.cloudInstanceStart(cloud[0], cloud[1])
-    while (not adb.cloudInstanceRunning(cloud[0])):
+    adb.cloudInstanceStart(cloud.instance, cloud.zone)
+    while (not adb.cloudInstanceRunning(cloud.instance)):
         sleep(5)
-    log("\nWaiting %s Cloud DNS (%s) update" % (cloud[0], cloud[2]), end='')
-    pingWait(cloud[2])
-    cloud_instance = grpcControls.cloudClient(cloud[2], cloud[0])
+    log("WAITING_FOR_CLOUD_DNS_UPDATE\t%s\t(%s)" % (cloud.instance, cloud.address))
+    pingWait(cloud.address)
+
+    #cloud_control = grpcControls.cloudControl(cloud.address, "{}_{}_cloud".format(cloud.instance, cloud.zone), LOG_FILE)
+    #cloud_control.connect()
+    #cloud_control.stop()
+    #cloud_control.start()
+    #sleep(1)
+
+    cloud_instance = grpcControls.cloudClient(cloud.address, cloud.instance, LOG_FILE)
     cloud_instance.connectLauncherService()
     cloud_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
     cloud_instance.startWorker()
@@ -646,17 +657,19 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
         for model in models.models:
             if model.name == experiment.model:
                 if (cloud_instance.setModel(model) is None):
-                    log("Failed to setScheduler on %s" % cloud[0])
+                    log("Failed to setScheduler on %s" % cloud.instance)
                     experiment.setFail()
                 break
-    log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud[0])
+    log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud.instance)
     cloud_boot_barrier.wait()
-    log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud[0])
+    log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud.instance)
     servers_finish_barrier.wait()
-    log("Stopping %s Cloud Instance" % cloud[0])
-    stdout.flush()
-    adb.cloudInstanceStop(cloud[0], cloud[1])
-    log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud[0])
+    log("Stopping %s Cloud Instance" % cloud.instance)
+    cloud_instance.stop()
+    cloud_control.stop()
+    log("STOPPING_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
+    adb.cloudInstanceStop(cloud.instance, cloud.zone)
+    log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud.instance)
     finish_barrier.wait()
 
 
@@ -665,12 +678,14 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
     for cloud in experiment.clouds:
         threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
     cloud_boot_barrier.wait()
+    log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
+    sleep(5)
 
 def stopClouds(experiment):
     for cloud in experiment.clouds:
-        log("Stopping %s Cloud Instance" % cloud[0])
+        log("Stopping %s Cloud Instance" % cloud.instance)
         stdout.flush()
-        adb.cloudInstanceStop(cloud[0], cloud[1])
+        adb.cloudInstanceStop(cloud.instance, cloud.zone)
 
 class Experiment:
     name = ""
@@ -748,7 +763,7 @@ def readConfig(confName):
                 clouds = []
                 for entry in config[section][option].split(','):
                     cloud_zone_address = entry.split("/")
-                    clouds += [(cloud_zone_address[0], cloud_zone_address[1], cloud_zone_address[2])]
+                    clouds.append(grpcControls.Cloud(cloud_zone_address[0], cloud_zone_address[1], cloud_zone_address[2]))
                     experiment.clouds = clouds
             elif option == "cloudlets":
                 cloudlets = []
@@ -882,16 +897,22 @@ def logExperiment(conf, experiment):
     conf.write("Rate: %s\n" % str(experiment.request_rate))
     conf.write("Rate Time: %s" % str(experiment.request_time) + "s\n")
     conf.write("Duration: %s" % str(experiment.duration) + "s\n")
-    conf.write("Clouds: %s\n" % str(experiment.clouds))
+    conf.write("Clouds: [")
+    for cloud in experiment.clouds:
+        conf.write("({}, {}, {})".format(cloud.instance, cloud.zone, cloud.address))
+    conf.write("]\n")
     conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
     conf.write("Seed: %s\n" % experiment.seed)
     conf.write("Repetitions: %s\n" % str(experiment.repetitions))
     conf.write("Producers: %s\n" % experiment.producers)
     conf.write("RepeatSeed: %s\n" % experiment.repeat_seed)
     conf.write("Timeout: %s\n" % experiment.timeout)
+    conf.write("======================================\n")
 
 def main():
-    global ALL_DEVICES
+    global ALL_DEVICES, LOG_FILE
+    now = datetime.now()
+    LOG_FILE = open("workbench_logs/log_{}_{}_{}_{}_{}_{}.log".format(now.year, now.month, now.day, now.hour, now.minute, now.second), "w")
     if (len(argv) < 2):
         log("\tPlease provide config file!")
         help()
@@ -907,8 +928,8 @@ def main():
             grpcControls.DEBUG = True
         if "DEBUG_ADB" in os.environ and int(os.environ["DEBUG_ADB"]) == 1:
             adb.DEBUG = True
-        ALL_DEVICES = adb.listDevices(0)
         log("==============\tDEVICES\t==============")
+        ALL_DEVICES = adb.listDevices(0)
         for device in ALL_DEVICES:
             log("{} ({})".format(device.name, device.ip))
             adb.screenOff(device)

@@ -1,0 +1,82 @@
+==============	DEVICES	==============
+HT4AVJT02309 (192.168.42.13)
+===================================
+Experiment: SingleDeviceSchedulerCloud01
+==============	CONFIG	==============
+Scheduler: SingleDeviceScheduler [CLOUD]
+TF Model: ssd_mobilenet_v1_fpn_coco
+Devices: 1
+Reboot: False
+Rate: 1
+Rate Time: 2s
+Duration: 240s
+Clouds: [(compute-us-crentral-1, us-central1-a, od-compute-01.duckdns.org)]
+Cloudlets: []
+Seed: SingleDeviceSchedulerCloud01
+Repetitions: 1
+Producers: 1
+RepeatSeed: 3
+Timeout: 1500
+======================================
+=========================	REPETITION 0	========================
+=========================	SEED_REPEAT 0 | ATTEMPT 0	========================
+START_CLOUD_INSTANCE	compute-us-crentral-1	(od-compute-01.duckdns.org)
+WAITING_FOR_CLOUD_DNS_UPDATE	compute-us-crentral-1	(od-compute-01.duckdns.org)
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) __init__
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) connectLauncherService
+START_DEVICE	HT4AVJT02309
+GENERATING_JOBS	RATE: 0.5	HT4AVJT02309
+SELECTED_ASSET	118 ASSETS	HT4AVJT02309
+LISTING_FILES_ON_DEVICE	HT4AVJT02309
+PUSHING_ASSETS	HT4AVJT02309
+STOP_ALL_SERVICE	HT4AVJT02309
+STARTING_LAUNCH_SERVICE	HT4AVJT02309
+STARTING_SERVICES	HT4AVJT02309
+GRPC HT4AVJT02309 (192.168.42.13) __init__
+GRPC HT4AVJT02309 (192.168.42.13) connectLauncherService
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) setLogName FAIL
+GRPC HT4AVJT02309 (192.168.42.13) setLogName FAIL
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) startWorker FAIL
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) connectBrokerService
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC HT4AVJT02309 (192.168.42.13) startWorker FAIL
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) listModels
+WAIT_ON_BARRIER	CLOUD_BOOT_BARRIER	compute-us-crentral-1
+WAIT_ON_BARRIER	SERVER_FINISH_BARRIER	compute-us-crentral-1
+CLOUDS_BOOTED	WAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE
+WAIT_ON_BARRIER	BOOT_BARRIER	MAIN_LOOP
+ERROR	SKIP_BARRIERS	MAIN
+BROKEN_BARRIER	BOOT_BARRIER	MAIN
+WAIT_ON_BARRIER	START_BARRIER	MAIN_LOOP
+ERROR	SKIP_BARRIERS	MAIN
+BROKEN_BARRIER	START_BARRIER	MAIN
+GRPC HT4AVJT02309 (192.168.42.13) startScheduler FAIL
+GRPC HT4AVJT02309 (192.168.42.13) connectBrokerService
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listSchedulers
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+GRPC HT4AVJT02309 (192.168.42.13) listModels
+ERROR_GETTING_MODELS_OR_SCHEDULERS	HT4AVJT02309
+ERROR	SKIP_BARRIERS	HT4AVJT02309
+WAIT_ON_BARRIER	COMPLETE_BARRIER	MAIN_LOOP
+ERROR	SKIP_BARRIERS	MAIN
+BROKEN_BARRIER	COMPLETE_BARRIER	MAIN
+WAIT_ON_BARRIER	LOG_PULL_BARRIER	MAIN_LOOP
+ERROR	SKIP_BARRIERS	MAIN
+WAIT_ON_BARRIER	SERVER_FINISH_BARRIER	MAIN_LOOP
+ERROR	SKIP_BARRIERS	MAIN
+Stopping compute-us-crentral-1 Cloud Instance
+GRPC compute-us-crentral-1 (od-compute-01.duckdns.org) stop FAIL
+KeyboardInterrupt: 

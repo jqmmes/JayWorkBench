@@ -16,9 +16,10 @@ from grpc import ChannelConnectivity
 
 from time import sleep, time
 import uuid
-from sys import excepthook
+from sys import excepthook, stdout
+
 def exceptionHook(exception_type, exception, traceback):
-    print("%s: %s" % (exception_type.__name__, exception))
+    print(self,"%s: %s" % (exception_type.__name__, exception))
 
 excepthook = exceptionHook
 
@@ -29,16 +30,22 @@ def getProtoString(str):
     string.str = str
     return string
 
-class cloudletControl:
+class cloudControl:
     protoChannel = None
     channelStatus = ChannelConnectivity.SHUTDOWN
     protoStub = None
     port = 50049
     name = ""
+    log_file = stdout
 
-    def __init__(self, ip, name):
+    def __init__(self, ip, name, log_file):
         self.ip = ip
         self.name = name
+        self.log_file = log_file
+
+    def log(self, str, end="\n"):
+        self.log_file.write(str+end)
+        self.log_file.flush()
 
     def connect(self, retries=5):
         try:
@@ -47,14 +54,14 @@ class cloudletControl:
             sleep(1)
             self.__checkChannelStatus()
             if DEBUG:
-                print("GRPC %s connect" % (self.ip))
+                self.log("GRPC %s connect" % (self.ip))
         except:
             sleep(5)
             if (retries-1 > 0):
                 self.connect(retries-1)
             else:
                 if DEBUG:
-                    print("GRPC %s connect FAIL" % (self.ip))
+                    self.log("GRPC %s connect FAIL" % (self.ip))
 
     def channelCallback(self, status):
         self.channelStatus = status
@@ -72,11 +79,11 @@ class cloudletControl:
     def start(self, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s start FAIL" % (self.ip))
+                self.log("GRPC %s start FAIL" % (self.ip))
             return
         if (self.__checkChannelStatus()):
             if DEBUG:
-                print("GRPC %s start %s" % (self.ip, self.protoStub.startODLauncher(CloudletControl_pb2.Empty())))
+                self.log("GRPC %s start %s" % (self.ip, self.protoStub.startODLauncher(CloudletControl_pb2.Empty())))
         else:
             sleep(5)
             self.start(retries-1)
@@ -84,11 +91,11 @@ class cloudletControl:
     def stop(self, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s stop FAIL" % (self.ip))
+                self.log("GRPC %s stop FAIL" % (self.ip))
             return
         if (self.__checkChannelStatus()):
             if DEBUG:
-                print("GRPC %s stop %s" % (self.ip, self.protoStub.stopODLauncher(CloudletControl_pb2.Empty())))
+                self.log("GRPC %s stop %s" % (self.ip, self.protoStub.stopODLauncher(CloudletControl_pb2.Empty())))
         else:
             sleep(5)
             self.stop(retries-1)
@@ -102,12 +109,18 @@ class cloudClient:
     ip = None
     name = ""
     models = None
+    log_file = stdout
 
-    def __init__(self, ip, adbName):
+    def __init__(self, ip, adbName, log_file):
         self.ip = ip
         self.name = adbName
+        self.log_file = log_file
         if DEBUG:
-            print("GRPC %s (%s) __init__" % (self.name, self.ip))
+            self.log("GRPC %s (%s) __init__" % (self.name, self.ip))
+
+    def log(self, str, end="\n"):
+        self.log_file.write(str+end)
+        self.log_file.flush()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
@@ -122,14 +135,14 @@ class cloudClient:
             sleep(1)
             self.launcherStubReady()
             if DEBUG:
-                print("GRPC %s (%s) connectLauncherService" % (self.name, self.ip))
+                self.log("GRPC %s (%s) connectLauncherService" % (self.name, self.ip))
         except:
             sleep(5)
             if (retries-1 > 0):
                 self.connectLauncherService(retries-1)
             else:
                 if DEBUG:
-                    print("GRPC %s (%s) connectLauncherService FAIL" % (self.name, self.ip))
+                    self.log("GRPC %s (%s) connectLauncherService FAIL" % (self.name, self.ip))
 
     def connectBrokerService(self, retries=5):
         try:
@@ -138,14 +151,14 @@ class cloudClient:
             sleep(1)
             self.brokerStubReady()
             if DEBUG:
-                print("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
+                self.log("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
         except:
             sleep(5)
             if (retries-1 > 0):
                 self.connectBrokerService(retries-1)
             else:
                 if DEBUG:
-                    print("GRPC %s (%s) connectBrokerService FAIL" % (self.name, self.ip))
+                    self.log("GRPC %s (%s) connectBrokerService FAIL" % (self.name, self.ip))
 
     def __checkChannelStatus(self, channel, channelStatus, callback):
         if (channelStatus == ChannelConnectivity.READY):
@@ -166,18 +179,18 @@ class cloudClient:
     def startWorker(self, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             if DEBUG:
-                print("GRPC %s (%s) startWorker %s" % (self.name, self.ip, self.launcherStub.StartWorker(Cloud_pb2.Empty()).value))
+                self.log("GRPC %s (%s) startWorker %s" % (self.name, self.ip, self.launcherStub.StartWorker(Cloud_pb2.Empty()).value))
         else:
             sleep(5)
             self.startWorker(retries-1)
 
     def listModels(self, retries=5):
         if DEBUG:
-            print("GRPC %s (%s) listModels" % (self.name, self.ip))
+            self.log("GRPC %s (%s) listModels" % (self.name, self.ip))
         if retries <= 0:
             return self.models
         if (self.brokerStubReady()):
@@ -189,15 +202,15 @@ class cloudClient:
 
     def setModel(self, model, retries=5):
         if DEBUG:
-            print("GRPC %s (%s) setModel" % (self.name, self.ip))
+            self.log("GRPC %s (%s) setModel" % (self.name, self.ip))
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
             return None
         if (self.brokerStubReady()):
             status = self.brokerStub.setModel(model)
             if DEBUG:
-                print("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
             return status
         sleep(5)
         return self.setModel(model, retries-1)
@@ -217,13 +230,13 @@ class cloudClient:
     def setLogName(self, log_name, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) setLogName FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setLogName FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             name = Cloud_pb2.String()
             name.str = log_name
             if DEBUG:
-                print("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, self.launcherStub.SetLogName(name).value))
+                self.log("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, self.launcherStub.SetLogName(name).value))
         else:
             sleep(5)
             self.setLogName(log_name, retries-1)
@@ -238,11 +251,11 @@ class cloudClient:
     def stop(self, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) stop FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) stop FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             if DEBUG:
-                print("GRPC %s (%s) stop %s" % (self.name, self.ip, self.launcherStub.Stop(Cloud_pb2.Empty()).value))
+                self.log("GRPC %s (%s) stop %s" % (self.name, self.ip, self.launcherStub.Stop(Cloud_pb2.Empty()).value))
         else:
             sleep(5)
             self.stop(retries-1)
@@ -275,12 +288,18 @@ class remoteClient:
     name = ""
     schedulers = None
     models = None
+    log_file = stdout
 
-    def __init__(self, ip, adbName):
+    def __init__(self, ip, adbName, log_file):
         self.ip = ip
         self.name = adbName
+        self.log_file = log_file
         if DEBUG:
-            print("GRPC %s (%s) __init__" % (self.name, self.ip))
+            self.log("GRPC %s (%s) __init__" % (self.name, self.ip))
+
+    def log(self, str, end="\n"):
+        self.log_file.write(str+end)
+        self.log_file.flush()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
@@ -295,14 +314,14 @@ class remoteClient:
             sleep(1)
             self.launcherStubReady()
             if DEBUG:
-                print("GRPC %s (%s) connectLauncherService" % (self.name, self.ip))
+                self.log("GRPC %s (%s) connectLauncherService" % (self.name, self.ip))
         except:
             sleep(5)
             if (retries-1 > 0):
                 self.connectLauncherService(retries-1)
             else:
                 if DEBUG:
-                    print("GRPC %s (%s) connectLauncherService FAIL" % (self.name, self.ip))
+                    self.log("GRPC %s (%s) connectLauncherService FAIL" % (self.name, self.ip))
 
     def connectBrokerService(self, retries=5):
         try:
@@ -311,14 +330,14 @@ class remoteClient:
             sleep(1)
             self.brokerStubReady()
             if DEBUG:
-                print("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
+                self.log("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
         except:
             sleep(5)
             if (retries-1 > 0):
                 self.connectBrokerService(retries-1)
             else:
                 if DEBUG:
-                    print("GRPC %s (%s) connectBrokerService FAIL" % (self.name, self.ip))
+                    self.log("GRPC %s (%s) connectBrokerService FAIL" % (self.name, self.ip))
 
     def __checkChannelStatus(self, channel, channelStatus, callback):
         if (channelStatus == ChannelConnectivity.READY):
@@ -339,7 +358,7 @@ class remoteClient:
     def startWorker(self, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             try:
@@ -347,7 +366,7 @@ class remoteClient:
             except:
                 start_worker = False
             if DEBUG:
-                print("GRPC %s (%s) startWorker %s" % (self.name, self.ip, start_worker))
+                self.log("GRPC %s (%s) startWorker %s" % (self.name, self.ip, start_worker))
         else:
             sleep(5)
             self.startWorker(retries-1)
@@ -355,7 +374,7 @@ class remoteClient:
     def startScheduler(self, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) startScheduler FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) startScheduler FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             try:
@@ -363,14 +382,14 @@ class remoteClient:
             except:
                 start_scheduler = False
             if DEBUG:
-                print("GRPC %s (%s) startScheduler %s" % (self.name, self.ip, start_scheduler))
+                self.log("GRPC %s (%s) startScheduler %s" % (self.name, self.ip, start_scheduler))
         else:
             sleep(5)
             self.startScheduler(retries-1)
 
     def listSchedulers(self, retries=5):
         if DEBUG:
-            print("GRPC %s (%s) listSchedulers" % (self.name, self.ip))
+            self.log("GRPC %s (%s) listSchedulers" % (self.name, self.ip))
         if retries <= 0:
             return self.schedulers
         if (self.brokerStubReady()):
@@ -385,7 +404,7 @@ class remoteClient:
 
     def listModels(self, retries=5):
         if DEBUG:
-            print("GRPC %s (%s) listModels" % (self.name, self.ip))
+            self.log("GRPC %s (%s) listModels" % (self.name, self.ip))
         if retries <= 0:
             return self.models
         if (self.brokerStubReady()):
@@ -400,14 +419,14 @@ class remoteClient:
 
     def setScheduler(self, scheduler, retries=5):
         if DEBUG:
-            print("GRPC %s (%s) setScheduler" % (self.name, self.ip))
+            self.log("GRPC %s (%s) setScheduler" % (self.name, self.ip))
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) setScheduler FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setScheduler FAIL" % (self.name, self.ip))
             return None
         if (self.brokerStubReady()):
             if DEBUG:
-                print("GRPC %s (%s) setScheduler DONE" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setScheduler DONE" % (self.name, self.ip))
             try:
                 return self.brokerStub.setScheduler(scheduler)
             except:
@@ -417,14 +436,14 @@ class remoteClient:
 
     def setModel(self, model, retries=5):
         if DEBUG:
-            print("GRPC %s (%s) setModel" % (self.name, self.ip))
+            self.log("GRPC %s (%s) setModel" % (self.name, self.ip))
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
             return None
         if (self.brokerStubReady()):
             if DEBUG:
-                print("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
             try:
                 return self.brokerStub.setModel(model)
             except:
@@ -466,7 +485,7 @@ class remoteClient:
     def setLogName(self, log_name, retries=5):
         if retries <= 0:
             if DEBUG:
-                print("GRPC %s (%s) setLogName FAIL" % (self.name, self.ip))
+                self.log("GRPC %s (%s) setLogName FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             name = Launcher_pb2.String()
@@ -474,11 +493,11 @@ class remoteClient:
             try:
                 log_status = self.launcherStub.SetLogName(name).value
             except Exception:
-                print(Exception)
+                self.log(Exception)
                 log_status = False
             if log_status:
                 if DEBUG:
-                    print("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, log_status))
+                    self.log("GRPC %s (%s) setLog('%s') %s" % (self.name, self.ip, log_name, log_status))
                 return
         sleep(5)
         self.setLogName(log_name, retries-1)
@@ -519,3 +538,13 @@ class Job:
         job.id = self.id
         job.data = self.data
         return job
+
+class Cloud:
+    instance = ""
+    zone = ""
+    address = ""
+
+    def __init__(self, instance, zone, address):
+        self.instance = instance
+        self.zone = zone
+        self.address = address
