@@ -72,7 +72,7 @@ def setBrightness(device=None, brightness=0):
     adb(['shell', 'settings', 'put', 'system', 'screen_brightness', str(brightness)], device)
 
 def gcloud(cmd):
-  result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE)
+  result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE, stderr=FNULL)
   return result.stdout.decode('UTF-8')
 
 def getBatteryLevel(device=None):

@@ -637,11 +637,11 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     log("WAITING_FOR_CLOUD_DNS_UPDATE\t%s\t(%s)" % (cloud.instance, cloud.address))
     pingWait(cloud.address)
 
-    #cloud_control = grpcControls.cloudControl(cloud.address, "{}_{}_cloud".format(cloud.instance, cloud.zone), LOG_FILE)
-    #cloud_control.connect()
-    #cloud_control.stop()
-    #cloud_control.start()
-    #sleep(1)
+    cloud_control = grpcControls.cloudControl(cloud.address, "{}_{}_cloud".format(cloud.instance, cloud.zone), LOG_FILE)
+    cloud_control.connect()
+    cloud_control.stop()
+    cloud_control.start()
+    sleep(1)
 
     cloud_instance = grpcControls.cloudClient(cloud.address, cloud.instance, LOG_FILE)
     cloud_instance.connectLauncherService()
@@ -940,6 +940,12 @@ def main():
         EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
         for e in EXPERIMENTS:
             runExperiment(e)
+            # TODO: Ler um ficheiro com as novas experiencias caso seja necessario. OU uma folder de configs novas que são consumidas.
+            # TODO: Mover o ficheiro de configurações executados para uma pasta
+            # TODO: Escrever num log especial as experiencias completas
+            # TODO: Escrever num log a experiencia currente
+            # TODO: Organizar melhor os logs. Só ter um directorio de logs, e dentro o sys, o workbench etc...
+
 
 if __name__ == '__main__':
     main()
