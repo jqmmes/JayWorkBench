@@ -4,6 +4,8 @@ import subprocess
 from time import sleep, time
 from re import match
 import os
+import threading
+import concurrent.futures
 
 PACKAGE = 'pt.up.fc.dcc.hyrax.odlib'
 LAUNCHER_PACKAGE = 'pt.up.fc.dcc.hyrax.od_launcher'
@@ -44,6 +46,8 @@ def adb(cmd, device=None, force_usb=False):
             selected_device = ['-s', "%s:5555" % device.ip]
         elif (device.connected_usb):
             selected_device = ['-s', device.name]
+        else:
+            return None
     if (DEBUG):
         if device is not None:
             if (device.connected_wifi and not force_usb):
@@ -53,17 +57,12 @@ def adb(cmd, device=None, force_usb=False):
             else:
                 debug = "[%s]\terror_adb" % device.name
         else:
-            if (device.connected_wifi and not force_usb):
-                debug = "wifi_adb"
-            elif (device.connected_usb):
-                debug = "adb"
-            else:
-                debug = "error_adb"
+            debug = "adb"
         for i in selected_device:
             debug += " " + i
         for i in cmd:
             debug += " " + i
-        #print(debug)
+        print(debug)
     result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 
@@ -100,31 +99,99 @@ def disconnectWifiADB(device):
     adb(['disconnect', "%s:5555" % device.ip])
     device.connected_wifi = False
 
-def listDevices(minBattery = 15):
+def getWifiDeviceNameByIp(device_ip, retries=5):
+    if retries <= 0:
+        return "unknown_device_{}".format(device_ip)
+    result = subprocess.run(["adb", "-s", "{}:5555".format(device_ip), "shell", "getprop ro.serialno"], stdout=subprocess.PIPE, stderr=FNULL)
+    if result.returncode == 0:
+        return result.stdout.decode('UTF-8').rstrip("\n")
+    else:
+        sleep(1)
+        return getWifiDeviceNameByIp(device_ip, retries-1)
+
+def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", range_min=0, range_max=256):
     devices_raw = adb(['devices']).split('\n')[1:]
     devices = []
     for dev in devices_raw:
         splitted = dev.split('\t')
         if (len(splitted) > 1 and splitted[1] == 'device'):
-            new_device = Device(splitted[0], status = (splitted[1] == 'device' ))
+            # Test if its an ip address
+            is_ip = False
+            name = splitted[0]
+            if (match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}",splitted[0])):
+                ip = splitted[0][:splitted[0].find(":")]
+                is_ip = True
+                new_device = Device(getWifiDeviceNameByIp(ip), ip = ip, status = (splitted[1] == 'device' ), wifi=True, usb=False)
+            else:
+                new_device = Device(splitted[0], status = (splitted[1] == 'device' ))
             if (getBatteryLevel(new_device) >= minBattery):
-                new_device.ip = getDeviceIp(new_device)
-                if (len(new_device.name) > 5 and new_device.name[:-5] == new_device.ip):
-                    continue
-                device_wifi_adb = False
-                for sub_dev in devices_raw:
-                    if "%s:5555" % new_device.ip in sub_dev.split('\t')[0]:
-                        new_device.connected_wifi = True
+
+                if not is_ip:
+                    new_device.ip = getDeviceIp(new_device)
+                is_new_device = True
+                for dev in devices:
+                    if dev.name == new_device.name:
+                        if not dev.connected_usb and new_device.connected_usb:
+                            dev.connected_usb = True
+                        if not dev.connected_wifi and new_device.connected_wifi:
+                            dev.connected_wifi = True
+                            dev.ip = new_device.ip
+                        is_new_device = False
                         break
+                    if dev.ip == new_device.ip:
+                        dev.name = new_device.name
+                        if not dev.connected_wifi and new_device.connected_wifi:
+                            dev.connected_wifi = True
+                            dev.ip = new_device.ip
+                        is_new_device = False
+                        break
+                if not is_new_device:
+                    continue
+                if not new_device.connected_wifi and new_device.ip is not None:
+                    new_device, status = connectWifiADB(new_device)
+                devices.append(new_device)
+
+    if discover_wifi:
+        network_devices = discoverWifiADBDevices(ip_mask, range_min, range_max, devices)
+        devices_raw = adb(['devices']).split('\n')[1:]
+        for ip in network_devices:
+            new_device = Device(getWifiDeviceNameByIp(ip), ip=ip, status=True, wifi=True, usb=False)
+            if (getBatteryLevel(new_device) >= minBattery):
                 devices.append(new_device)
     return devices
 
-def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256):
+COUNTER = 0
+
+def ping_thread(hostname, network_devices=[], lock=None):
+    global COUNTER
+    response = subprocess.run(['ping', '-t 1', '-c 5', hostname], stdout=FNULL, stderr=FNULL)
+    #and then check the response..
+    if response.returncode == 0:
+        lock.acquire()
+        network_devices.append(hostname)
+        lock.release()
+    lock.acquire()
+    COUNTER -= 1
+    lock.release()
+
+def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, ignore_list=[]):
+    global COUNTER
     devices = []
-    for n in range(range_min, range_max):
-        status = adb(['connect', "{}:5555".format(ip_mask.format(n))])
-        if (status == "connected to {}:5555\n".format(ip_mask.format(n))) or (status == "already connected to {}:5555\n".format(ip_mask.format(n))):
-            devices.append(ip_mask.format(n))
+    COUNTER = range_max - range_min
+    network_devices = []
+    ping_lock = threading.Lock()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=40) as executor:
+        for n in range(range_min, range_max):
+            executor.submit(ping_thread, ip_mask.format(n), network_devices, ping_lock)
+        while COUNTER > 0:
+            sleep(1)
+    for host in network_devices:
+        for ignore in ignore_list:
+            if host == ignore.ip:
+                continue
+        status = adb(['connect', "{}:5555".format(host)])
+        if (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
+            devices.append(host)
     return devices
 
 def mkdir(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
@@ -286,7 +353,6 @@ def rebootAndWait(device, timeout=300):
             return False
         sleep(5)
     return True
-
 
 def isServiceRunning(device, service):
     service_info = adb(['shell', 'dumpsys', 'activity', 'services', service], device)

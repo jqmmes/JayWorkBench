@@ -1,15 +1,18 @@
 import lib.grpcControls as grpcControls
 import lib.adb as adb
+from lib.curse import draw_curses
 from time import sleep, time
 import random
 import threading
 import os
+import shutil
 import configparser
 from sys import argv, stdout
 import sys
 import subprocess
 from datetime import datetime
-
+import argparse
+from collections import deque
 
 EXPERIMENTS = []
 PENDING_JOBS = 0
@@ -18,11 +21,29 @@ LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
 FNULL = open(os.devnull, "w")
 LOG_FILE = stdout
+CURSES = None
+CURSES_LOGS = None
+LOGS_LOCK = threading.Lock()
 
 def log(str, end="\n"):
-    global LOG_FILE
+    global LOG_FILE, CURSES_LOGS
     LOG_FILE.write(str+end)
     LOG_FILE.flush()
+    if CURSES:
+        CURSES_LOGS.append(str)
+        write_curses_logs()
+    elif LOG_FILE.name != "<stdout>":
+        print(str, end=end)
+
+def write_curses_logs():
+    global CURSES_LOGS, LOGS_LOCK
+    if not CURSES_LOGS:
+        return
+    LOGS_LOCK.acquire()
+    for i in range(min(len(CURSES_LOGS), CURSES.maxHeight()-5)):
+        CURSES.add_text(1,CURSES.maxWidth(),6+i,text="#\t{}".format(CURSES_LOGS[i]))
+    LOGS_LOCK.release()
+
 
 def brokenBarrierExceptionHook(exception_type, exception, traceback):
     if (exception_type is threading.BrokenBarrierError):
@@ -301,7 +322,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     try:
         if (experiment.isOK()):
             log("PULLING_LOG\t%s\tLOG" % device.name)
-            adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+            adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
             log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
     except:
         log("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
@@ -309,7 +330,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         experiment.deviceFail(device.name)
     try:
         log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
-        system_log_path = "sys_logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
+        system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
         os.makedirs(system_log_path, exist_ok=True)
         adb.pullSystemLog(device, system_log_path)
         log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
@@ -318,7 +339,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         experiment.deviceFail(device.name)
     log("CHECKING_LOG\t%s" % device.name)
     log_available = False
-    for entry in os.listdir('logs/%s/%d/%d/' % (experiment.name, repetition, seed_repeat)):
+    for entry in os.listdir('logs/experiment/%s/%d/%d/' % (experiment.name, repetition, seed_repeat)):
         if entry == '%s.csv' % device.name:
             log("CHECKING_LOG\t%s\tOK" % device.name)
             log_available = True
@@ -343,42 +364,51 @@ def cleanLogs(path):
         os.makedirs(path, exist_ok=True)
 
 def runExperiment(experiment):
-    global PENDING_JOBS, ALL_DEVICES, ASSETS
+    global PENDING_JOBS, ALL_DEVICES, ASSETS, CURSES
+
+    if CURSES:
+        CURSES.add_text(1,200,3,text="EXPERIMENT: {}".format(experiment.name))
+        CURSES.add_text(1,200,4,text="PROGRESS:")
+        progressBar_0 = CURSES.add_progress_bar(1,60,4,10)
+        progressBar_0.updateProgress(0)
+
     logExperiment(LOG_FILE, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
-    cleanLogs("logs/%s/" % experiment.name)
-    cleanLogs("sys_logs/%s/" % experiment.name)
+    cleanLogs("logs/experiment/%s/" % experiment.name)
+    cleanLogs("logs/sys/%s/" % experiment.name)
     ASSETS=os.listdir(experiment.assets)
 
     devices = ALL_DEVICES #adb.listDevices(0)
     if (len(devices) < experiment.devices):
-        os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
+        os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
 
-    conf = open("logs/%s/conf.cfg" % experiment.name, "w+")
+    conf = open("logs/experiment/%s/conf.cfg" % experiment.name, "w+")
     logExperiment(conf, experiment)
     conf.close()
 
     killLocalCloudlet()
-    #stopClouds(experiment)
+    stopClouds(experiment)
 
     #for device in devices:
     #    rebootDevice(device)
-    #    sleep(2)
+    sleep(2)
+
 
     for repetition in range(experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
-
-        os.makedirs("logs/%s/%d/" % (experiment.name, repetition), exist_ok=True)
+        os.makedirs("logs/experiment/%s/%d/" % (experiment.name, repetition), exist_ok=True)
         devices.sort(key=lambda e: e.name, reverse=False)
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.repeat_seed):
+            if CURSES:
+                progressBar_0.updateProgress(int(100*(seed_repeat/experiment.repeat_seed)))
             repeat_tries = 0
             while (True):
                 if repeat_tries > 10:
-                    os.system("touch logs/%s/too_many_repeat_retries_CANCELED"  % experiment.name)
+                    os.system("touch logs/experiment/%s/too_many_repeat_retries_CANCELED"  % experiment.name)
                     return
                 log("=========================\tSEED_REPEAT {} | ATTEMPT {}\t========================".format(seed_repeat, repeat_tries))
                 timeout = False
@@ -389,7 +419,7 @@ def runExperiment(experiment):
                 #    return
                 experiment_devices = getNeededDevicesAvailable(experiment, devices)
                 if experiment_devices == []:
-                    os.system("touch logs/%s/not_enough_devices_CANCELED"  % experiment.name)
+                    os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
                     log("=========================\tEXPERIMET_FAILED_NOT_ENOUGHT_DEVICES\t{}\t========================".format(experiment.name))
                     return
 
@@ -402,7 +432,7 @@ def runExperiment(experiment):
                 for failed_device in failed_devices[:max(len(experiment_devices)-experiment.devices, 0)]:
                     experiment_devices.remove(failed_device)
 
-                os.makedirs("logs/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
+                os.makedirs("logs/experiment/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = threading.Barrier(experiment.devices + 1)
                 start_barrier = threading.Barrier(experiment.devices + 1)
                 complete_barrier = threading.Barrier(experiment.devices + 1)
@@ -439,7 +469,7 @@ def runExperiment(experiment):
                     sleep(2)
                     if (time()-completetion_timeout_start > experiment.duration+experiment.timeout):
                         log("COMPLETION_TIMEOUT_EXCEDED")
-                        os.system("touch logs/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
+                        os.system("touch logs/experiment/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
                         break
                 sleep(2)
                 log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
@@ -459,6 +489,8 @@ def runExperiment(experiment):
                 if (experiment.isOK()):
                     break
                 repeat_tries += 1
+            if CURSES:
+                progressBar_0.updateProgress(int(100*((seed_repeat+1)/experiment.repeat_seed)))
 
 
         if (repetition != experiment.repetitions - 1):
@@ -468,7 +500,7 @@ def runExperiment(experiment):
 '''def neededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
         experiment.setFail()
-        os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
+        os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
         return False
     if not checkBattery(20, *devices[:experiment.devices]):
         sleep(5)
@@ -507,7 +539,7 @@ def checkBatteryDevice(min_battery, device, battery_barrier):
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
         experiment.setFail()
-        os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
+        os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
         return []
     to_charge = []
     good_to_use = []
@@ -522,15 +554,16 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
         discoverable_devices = adb.listDevices(0)
         good_to_charge = []
         for device in to_charge:
-            if device in discoverable_devices:
-                good_to_charge.append(device)
+            for disc_device in discoverable_devices:
+                if disc_device.name == device.name or disc_device.ip == device.ip:
+                    good_to_charge.append(device)
         if len(good_to_use) + len(good_to_charge) < experiment.devices:
             experiment.setFail()
-            os.system("touch logs/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
+            os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
             return []
         battery_barrier = threading.Barrier(experiment.devices - len(good_to_use) + 1)
         for device in good_to_charge:
-            threading.Thread(target = chargeDevice, args = (min_battery, device, battery_barrier)).start()
+            threading.Thread(target = chargeDevice, args = (experiment.min_battery, device, battery_barrier)).start()
         barrierWithTimeout(battery_barrier, 3600, show_error=False)
         return getNeededDevicesAvailable(experiment, devices, retries-1)
 
@@ -561,10 +594,12 @@ def getBatteryLevel(device, retries=5):
 
 def chargeDevice(min_battery, device, battery_barrier):
     counter = 0
-    while (not battery_barrier.broken and (getBatteryLevel(device) < max(0, min(100, min_battery)))):
+    battery_level = getBatteryLevel(device)
+    while (not battery_barrier.broken and (battery_level < max(0, min(100, min_battery)))):
         if (counter % 5 == 0):
             log("CHARGING_DEVICE {} ({}%)".format(device.name, battery_level))
         sleep(120)
+        battery_level = getBatteryLevel(device)
         counter += 1
     barrierWithTimeout(battery_barrier, 3600, show_error=False)
 
@@ -621,12 +656,12 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
     for cloud in experiment.clouds:
-        os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
+        os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
-            os.system("cp /home/joaquim/ODCloud/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("cp /home/joaquim/ODCloud/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (log_name, experiment.name, repetition, seed_repeat, cloudlet))
         else:
-            os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
@@ -678,8 +713,9 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
     for cloud in experiment.clouds:
         threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
     cloud_boot_barrier.wait()
-    log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
-    sleep(5)
+    if len(experiment.clouds) > 0:
+        log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
+        sleep(5)
 
 def stopClouds(experiment):
     for cloud in experiment.clouds:
@@ -705,7 +741,7 @@ class Experiment:
     timeout = 1500 # 25 Mins
     start_worker = True
     workers = -1
-    assets = "assets"
+    assets = "assets/sd/"
     asset_type = "image"
     calibration = False
     asset_quality = "SD"
@@ -739,6 +775,7 @@ class Experiment:
 
 
 def readConfig(confName):
+    global EXPERIMENTS
     config = configparser.ConfigParser()
     config.read(confName)
     for section in config.sections():
@@ -910,41 +947,95 @@ def logExperiment(conf, experiment):
     conf.write("======================================\n")
 
 def main():
-    global ALL_DEVICES, LOG_FILE
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, CURSES, DEBUG, CURSES_LOGS
+
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
+    argparser.add_argument('--show-help', default=False, action='store_true', required=False)
+    argparser.add_argument('-i', '--install', default=False, action='store_true', required=False)
+    argparser.add_argument('-da', '--debug-adb', default=False, action='store_true', required=False)
+    argparser.add_argument('-dg', '--debug-grpc', default=False, action='store_true', required=False)
+    argparser.add_argument('-p', '--use-stdout', default=False, action='store_true', required=False)
+    argparser.add_argument('-nc', '--use-curses', default=False, action='store_true', required=False)
+    argparser.add_argument('-ip', '--ip-mask', action='store', required=False)
+    argparser.add_argument('-r', '--reboot-devices', default=False, action='store_true', required=False)
+
+    args = argparser.parse_args()
+
     now = datetime.now()
-    LOG_FILE = open("workbench_logs/log_{}_{}_{}_{}_{}_{}.log".format(now.year, now.month, now.day, now.hour, now.minute, now.second), "w")
-    if (len(argv) < 2):
-        log("\tPlease provide config file!")
+    experiment_name = "exp_{}{:02d}{:02d}_{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
+    os.makedirs("logs/workbench/{}".format(experiment_name))
+    completed_experiments = open("logs/workbench/{}/completed".format(experiment_name), "w")
+    in_progress_experiments = open("logs/workbench/{}/in_progress".format(experiment_name), "w")
+    missing_experiments = open("logs/workbench/{}/missing".format(experiment_name), "w")
+    new_experiments = "logs/workbench/{}/new_experiments/".format(experiment_name)
+    loaded_experiments = "logs/workbench/{}/loaded_experiments/".format(experiment_name)
+    os.makedirs(new_experiments)
+    os.makedirs(loaded_experiments)
+    if not args.use_stdout:
+        LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
+    if args.show_help:
         help()
         return
-    if argv[1].lower() == "help":
-        help()
-    elif argv[1].lower() == "install":
-        for device in adb.listDevices(0):
+    elif args.install:
+        for device in adb.listDevices(0, True):
             adb.removePackage(device)
             adb.installPackage('apps/ODLauncher-release.apk', device)
+    elif args.debug_grpc:
+        grpcControls.DEBUG = True
+    elif args.debug_adb:
+        adb.DEBUG = True
+    log("==============\tDEVICES\t==============")
+    #ALL_DEVICES = adb.listDevices(0, True, ip_mask="192.168.42.{}")
+
+    if args.ip_mask:
+        ALL_DEVICES = adb.listDevices(0, True, ip_mask=args.ip_mask)
     else:
-        if "DEBUG_GRPC" in os.environ and int(os.environ["DEBUG_GRPC"]) == 1:
-            grpcControls.DEBUG = True
-        if "DEBUG_ADB" in os.environ and int(os.environ["DEBUG_ADB"]) == 1:
-            adb.DEBUG = True
-        log("==============\tDEVICES\t==============")
-        ALL_DEVICES = adb.listDevices(0)
-        for device in ALL_DEVICES:
-            log("{} ({})".format(device.name, device.ip))
-            adb.screenOff(device)
-            #adb.rebootAndWait(device)
-        log("===================================")
-        for i in range(1, len(argv)):
-            readConfig(argv[i])
-        EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
-        for e in EXPERIMENTS:
-            runExperiment(e)
-            # TODO: Ler um ficheiro com as novas experiencias caso seja necessario. OU uma folder de configs novas que são consumidas.
-            # TODO: Mover o ficheiro de configurações executados para uma pasta
-            # TODO: Escrever num log especial as experiencias completas
-            # TODO: Escrever num log a experiencia currente
-            # TODO: Organizar melhor os logs. Só ter um directorio de logs, e dentro o sys, o workbench etc...
+        ALL_DEVICES = adb.listDevices(0, True)
+    for device in ALL_DEVICES:
+        log("{} ({})".format(device.name, device.ip))
+        adb.screenOff(device)
+        if args.reboot_devices:
+            adb.rebootAndWait(device)
+    log("===================================")
+    for cfg in args.configs:
+        readConfig(cfg)
+        shutil.copy(cfg, "{}/{}.loaded".format(loaded_experiments,cfg.split("/")[-1]))
+    EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
+
+    if args.use_curses and not args.use_stdout:
+        CURSES = draw_curses()
+        complete_progress = CURSES.add_text(1,60,0,text="LOGS: {}".format(experiment_name))
+        CURSES_LOGS = deque(maxlen=max(0, CURSES.maxHeight()-5))
+        CURSES.add_text(1,10,2,text="PROGRESS:")
+        progressBar_0 = CURSES.add_progress_bar(1,60,2,10)
+        progressBar_0.updateProgress(0)
+        complete_progress = CURSES.add_text(1,15,1)
+
+
+    i = 0
+    while i < len(EXPERIMENTS):
+        in_progress_experiments.write(EXPERIMENTS[i].name+"\n")
+        in_progress_experiments.flush()
+        missing_experiments.truncate(0)
+        for e in EXPERIMENTS[i+1:]:
+            missing_experiments.write(e.name+"\n")
+            missing_experiments.flush()
+        if args.use_curses:
+            progressBar_0.updateProgress(100*(i/len(EXPERIMENTS)))
+            complete_progress.updateText("COMPLETE {}/{}".format(i,len(EXPERIMENTS)))
+        sleep(2)
+        runExperiment(EXPERIMENTS[i])
+        in_progress_experiments.truncate(0)
+        completed_experiments.write(EXPERIMENTS[i].name+"\n")
+        for file in os.listdir(new_experiments):
+            if os.path.isfile("{}/{}".format(new_experiments,file)):
+                readConfig("{}/{}".format(new_experiments,file))
+                shutil.move("{}/{}".format(new_experiments,file), "{}/{}.loaded".format(loaded_experiments,file))
+        i += 1
+    if args.use_curses:
+        progressBar_0.updateProgress(100)
+        complete_progress.updateText("")
 
 
 if __name__ == '__main__':

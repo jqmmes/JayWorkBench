@@ -23,7 +23,7 @@ def exceptionHook(exception_type, exception, traceback):
 
 excepthook = exceptionHook
 
-DEBUG = True
+DEBUG = False
 
 def getProtoString(str):
     string = ODProto_pb2.String()
