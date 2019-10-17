@@ -15,14 +15,6 @@ SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
 DEBUG = False
 
-# TODO: Listar todos os dispositivos disponiveis.
-#       1º availar todos os dispositivos ligados por USB
-#       2º tentar ligar o ADB Wifi em Todos estes
-#       3º discoverWifiADBDevices (pode-se evitar os que já se conhece)
-#       4º criar novos Device que só existam por ADB Wifi
-#       5º tentar ler o nome do dispositivo por ADB para identificar o dispositivo
-
-
 class Device:
     name = ""
     ip = ""
@@ -125,7 +117,6 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
             else:
                 new_device = Device(splitted[0], status = (splitted[1] == 'device' ))
             if (getBatteryLevel(new_device) >= minBattery):
-
                 if not is_ip:
                     new_device.ip = getDeviceIp(new_device)
                 is_new_device = True

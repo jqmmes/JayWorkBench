@@ -972,26 +972,31 @@ def main():
     loaded_experiments = "logs/workbench/{}/loaded_experiments/".format(experiment_name)
     os.makedirs(new_experiments)
     os.makedirs(loaded_experiments)
+
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
-    if args.show_help:
-        help()
-        return
-    elif args.install:
-        for device in adb.listDevices(0, True):
-            adb.removePackage(device)
-            adb.installPackage('apps/ODLauncher-release.apk', device)
-    elif args.debug_grpc:
-        grpcControls.DEBUG = True
-    elif args.debug_adb:
-        adb.DEBUG = True
-    log("==============\tDEVICES\t==============")
-    #ALL_DEVICES = adb.listDevices(0, True, ip_mask="192.168.42.{}")
 
     if args.ip_mask:
         ALL_DEVICES = adb.listDevices(0, True, ip_mask=args.ip_mask)
     else:
         ALL_DEVICES = adb.listDevices(0, True)
+    if args.show_help:
+        help()
+        return
+    elif args.install:
+        log('INSTALLING_APKS')
+        for device in ALL_DEVICES:
+            adb.uninstallPackage(device)
+            log('PACKAGE_UNINSTALLED\t%s' % device.name)
+            adb.pushFile('apps', 'ODLauncher-release.apk', path='', device=device)
+            log('PACKAGE_PUSHED\t%s' % device.name)
+            adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
+            log('PACKAGE_INSTALLED\t%s' % device.name)
+    elif args.debug_grpc:
+        grpcControls.DEBUG = True
+    elif args.debug_adb:
+        adb.DEBUG = True
+    log("==============\tDEVICES\t==============")
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))
         adb.screenOff(device)
