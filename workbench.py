@@ -448,6 +448,7 @@ def runExperiment(experiment):
                 producers = experiment.producers
                 workers = experiment.workers
                 i = 0
+
                 for device in experiment_devices[:experiment.devices]:
                     threading.Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
@@ -656,10 +657,13 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
     for cloud in experiment.clouds:
-        os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
+        if (cloud.zone == 'localhost'):
+            os.system("cp %s/ODCloud/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloud.address))
+        else:
+            os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
-            os.system("cp /home/joaquim/ODCloud/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("cp %s/ODCloud/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloudlet))
         else:
             os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
@@ -697,6 +701,8 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
                 break
     log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud.instance)
     cloud_boot_barrier.wait()
+    if (experiment.calibration):
+        calibrateWorkerThread(cloud_instance, "cloud_{}".format(cloud.address), asset_id="%s.jpg" % experiment.asset_quality)
     log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud.instance)
     servers_finish_barrier.wait()
     log("Stopping %s Cloud Instance" % cloud.instance)
@@ -711,7 +717,10 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
 def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
     cloud_boot_barrier = threading.Barrier(len(experiment.clouds) + 1)
     for cloud in experiment.clouds:
-        threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+        if (cloud.zone == "localhost"):
+            threading.Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+        else:
+            threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
     cloud_boot_barrier.wait()
     if len(experiment.clouds) > 0:
         log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
@@ -719,6 +728,8 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
 
 def stopClouds(experiment):
     for cloud in experiment.clouds:
+        if (cloud.zone == "localhost"):
+            continue
         log("Stopping %s Cloud Instance" % cloud.instance)
         stdout.flush()
         adb.cloudInstanceStop(cloud.instance, cloud.zone)
@@ -798,10 +809,14 @@ def readConfig(confName):
                 experiment.duration = int(config[section][option])
             elif option == "clouds":
                 clouds = []
+                cloud_settings = ""
                 for entry in config[section][option].split(','):
                     cloud_zone_address = entry.split("/")
                     clouds.append(grpcControls.Cloud(cloud_zone_address[0], cloud_zone_address[1], cloud_zone_address[2]))
                     experiment.clouds = clouds
+                    cloud_settings += "{}/".format(cloud_zone_address[2])
+                if (cloud_settings != ""):
+                    experiment.settings["CLOUD_IP"] = cloud_settings.rstrip("/")
             elif option == "cloudlets":
                 cloudlets = []
                 for entry in config[section][option].split(','):
@@ -922,6 +937,7 @@ def help():
                     RTTDelayMillisFailAttempts
                     DEVICE_ID
                     BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
+                    MCAST_INTERFACE
         ================================================ HELP ================================================''')
 
 def logExperiment(conf, experiment):
@@ -973,9 +989,12 @@ def main():
     os.makedirs(new_experiments)
     os.makedirs(loaded_experiments)
 
+    log("Starting... Please wait")
+
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
 
+    log("Searching for devices...")
     if args.ip_mask:
         ALL_DEVICES = adb.listDevices(0, True, ip_mask=args.ip_mask)
     else:
@@ -996,13 +1015,23 @@ def main():
         grpcControls.DEBUG = True
     elif args.debug_adb:
         adb.DEBUG = True
-    log("==============\tDEVICES\t==============")
+    log("============\tDEVICES\t============")
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))
+    log("===================================")
+    for device in ALL_DEVICES:
         adb.screenOff(device)
+        if not adb.checkPackageInstalled(device):
+            log('PACKAGE_MISSING\t%s' % device.name)
+            log('CLEANING_SYSTEM\t%s' % device.name)
+            adb.uninstallPackage(device)
+            log('PUSHING_PACKAGE\t%s' % device.name)
+            adb.pushFile('apps', 'ODLauncher-release.apk', path='', device=device)
+            log('INSTALLING_PACKAGE\t%s' % device.name)
+            adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
+            log('PACKAGE_INSTALLED\t%s' % device.name)
         if args.reboot_devices:
             adb.rebootAndWait(device)
-    log("===================================")
     for cfg in args.configs:
         readConfig(cfg)
         shutil.copy(cfg, "{}/{}.loaded".format(loaded_experiments,cfg.split("/")[-1]))

@@ -66,15 +66,22 @@ def gcloud(cmd):
   result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE, stderr=FNULL)
   return result.stdout.decode('UTF-8')
 
-def getBatteryLevel(device=None):
+def getBatteryLevel(device=None, retries=5):
+    if (retries <= 0):
+        return -1
     battery_details = adb(['shell', 'dumpsys', 'battery'], device)
     level_start = battery_details.find('level:')
     if (level_start == -1):
-        return -1
+        print(device.connected_wifi)
+        print(battery_details)
+        sleep(0.5)
+        return getBatteryLevel(device, retries-1)
     battery_details = battery_details[level_start + 7:]
     level_end = battery_details.find('\n')
     if (level_end == -1):
-        return -1
+        print(battery_details)
+        sleep(0.5)
+        return getBatteryLevel(device, retries-1)
     return int(battery_details[:level_end])
 
 def enableWifiADB(device):
@@ -177,9 +184,13 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
         while COUNTER > 0:
             sleep(1)
     for host in network_devices:
+        add_host = True
         for ignore in ignore_list:
             if host == ignore.ip:
+                add_host = False
                 continue
+        if not add_host:
+            continue
         status = adb(['connect', "{}:5555".format(host)])
         if (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
             devices.append(host)
@@ -273,7 +284,7 @@ def close():
     adb(['kill-server'])
 
 def checkPackageInstalled(device=None):
-    return (PACKAGE in adb(['shell', 'pm', 'list', 'packages'], device))
+    return (LAUNCHER_PACKAGE in adb(['shell', 'pm', 'list', 'packages'], device))
 
 def installPackage(package, device=None):
     adb(['install', package], device)
