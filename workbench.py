@@ -162,9 +162,9 @@ def getDeviceIp(device):
 def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3):
     global LAST_REBOOT_TIME
     while True:
-        sleep_duration = device_random.randint(0,10*max_sleep_random)
+        sleep_duration = device_random.randint(0,2*max_sleep_random)
         sleep(sleep_duration)
-        if (time()-LAST_REBOOT_TIME > 30):
+        if (time()-LAST_REBOOT_TIME > 5):
             LAST_REBOOT_TIME = time()
             log("REBOOT_WORKER\t%s" % device.name)
             pre_reboot_worker_ip = getDeviceIp(device)
@@ -311,7 +311,9 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         return
     adb.screenOff(device)
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
-    log_pull_barrier.wait()
+    if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
+        log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
+        return
     try:
         log("STOP_WORKER\tSTART\t%s" % device.name)
         worker.destroy()
@@ -393,7 +395,7 @@ def runExperiment(experiment):
 
     #for device in devices:
     #    rebootDevice(device)
-    sleep(2)
+    #sleep(2)
 
 
     for repetition in range(experiment.repetitions):
@@ -448,7 +450,6 @@ def runExperiment(experiment):
                 producers = experiment.producers
                 workers = experiment.workers
                 i = 0
-
                 for device in experiment_devices[:experiment.devices]:
                     threading.Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
@@ -799,7 +800,7 @@ def readConfig(confName):
             elif option == "devices":
                 experiment.devices = int(config[section][option])
             elif option == "rebootdevices":
-                experiment.reboot = config[section][option] == "True"
+                experiment.reboot = config[section][option].lower() == "true"
             elif option == "generationraterequests":
                 experiment.request_rate = int(config[section][option])
             elif option == "generationrateseconds":
@@ -833,7 +834,7 @@ def readConfig(confName):
             elif option == "timeout":
                 experiment.timeout = int(config[section][option])
             elif option == "startworkers":
-                experiment.start_worker = config[section][option] == "True"
+                experiment.start_worker = config[section][option].lower() == "true"
             elif option == "workers":
                 experiment.workers = int(config[section][option])
             elif option == "assets":
@@ -841,7 +842,7 @@ def readConfig(confName):
             elif option == "assettype":
                 experiment.asset_type = config[section][option]
             elif option == "calibration":
-                experiment.calibration = config[section][option] == "True"
+                experiment.calibration = config[section][option].lower() == "true"
             elif option == "Assetquality":
                 if (config[section][option] in ["SD", "HD", "UHD"]):
                     experiment.asset_quality = config[section][option]

@@ -87,12 +87,65 @@ def getBatteryLevel(device=None, retries=5):
 def enableWifiADB(device):
     adb(['tcpip', '5555'], device)
 
-def connectWifiADB(device):
+def getADBStatus(device):
+    devices_raw = adb(['devices']).split('\n')[1:]
+    connected_usb = False
+    connected_wifi = False
+    for raw_device in devices_raw:
+        splitted = raw_device.split('\t')
+        if len(splitted) > 1:
+            if splitted[0] == "%s:5555" % device.ip and splitted[1] == 'device':
+                connected_wifi = True
+            elif splitted[0] == device.name and splitted[1] == 'device':
+                connected_usb = True
+    print(device.name)
+    print((connected_usb, connected_wifi))
+    return (connected_usb, connected_wifi)
+
+def connectWifiADB(device, retries=3, force_connection=True):
+    if retries <= 0:
+        return (device, False)
     status = adb(['connect', "%s:5555" % device.ip])
-    if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
-        device.connected_wifi = True
-        return (device, True)
+    if not force_connection:
+        if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
+            device.connected_wifi = True
+            return (device, True)
+        return (device, False)
+    device.connected_wifi = True
+    if force_connection:
+        sleep(5)
+        force_usb, connected = getADBStatus(device)
+        if connected:
+            return (device, True)
+        elif force_usb:
+            print("rebooting with usb")
+            if rebootAndWait(device, connectWifi=True, force_usb=True):
+                return (device, True)
+            return connectWifiADB(device, retries-1)
+        else:
+            return (device, False)
     return (device, False)
+
+    '''if not
+            print("not_ok")
+            if rebootAndWait(device, connectWifi=True):
+                return (device, True)
+            return connectWifiADB(device, retries-1)
+
+        devices_raw = adb(['devices']).split('\n')[1:]
+        for raw_device in devices_raw:
+            splitted = raw_device.split('\t')
+            print(splitted)
+            if len(splitted) > 1 and splitted[0] == "%s:5555" % device.ip:
+                print("ok", end="\t")
+                print(splitted)
+                if splitted[1] != 'device':
+                    print("not_ok")
+                    if rebootAndWait(device, connectWifi=True):
+                        return (device, True)
+                    return connectWifiADB(device, retries-1)'''
+
+    #return (device, False)
 
 def disconnectWifiADB(device):
     adb(['disconnect', "%s:5555" % device.ip])
@@ -123,11 +176,15 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                 new_device = Device(getWifiDeviceNameByIp(ip), ip = ip, status = (splitted[1] == 'device' ), wifi=True, usb=False)
             else:
                 new_device = Device(splitted[0], status = (splitted[1] == 'device' ))
+            print("DEV: %s" % splitted[0])
             if (getBatteryLevel(new_device) >= minBattery):
+                print("DEV: %s > minBattery" % splitted[0])
                 if not is_ip:
                     new_device.ip = getDeviceIp(new_device)
+                print("DEV: %s ip %s" % (splitted[0], new_device.ip))
                 is_new_device = True
                 for dev in devices:
+                    print("#")
                     if dev.name == new_device.name:
                         if not dev.connected_usb and new_device.connected_usb:
                             dev.connected_usb = True
@@ -136,6 +193,7 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                             dev.ip = new_device.ip
                         is_new_device = False
                         break
+                    print("##")
                     if dev.ip == new_device.ip:
                         dev.name = new_device.name
                         if not dev.connected_wifi and new_device.connected_wifi:
@@ -143,11 +201,15 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                             dev.ip = new_device.ip
                         is_new_device = False
                         break
+                    print("###")
                 if not is_new_device:
                     continue
+                print("#####")
                 if not new_device.connected_wifi and new_device.ip is not None:
                     new_device, status = connectWifiADB(new_device)
+                print("#####$")
                 devices.append(new_device)
+
 
     if discover_wifi:
         network_devices = discoverWifiADBDevices(ip_mask, range_min, range_max, devices)
@@ -236,9 +298,12 @@ def pullSystemLog(device=None, path=""):
     if path != "" and path[-1] != "/":
         path += "/"
     if device is not None:
+        print("pullSystemLog 1\t%s" % device.name)
         destinationFile = device.name + "_" + destinationFile
     with open("%s%s" % (path, destinationFile), "w+") as log:
+        print("pullSystemLog WRITE\t%s" % device.name)
         log.write(adb(['logcat', '-d'], device))
+        print("pullSystemLog COMPLETE\t%s" % device.name)
         log.close()
 
 def screenOn(device = None):
@@ -337,20 +402,21 @@ def getDeviceIp(device, timeout=120):
         sleep(2)
     return None
 
-def rebootAndWait(device, timeout=300):
+def rebootAndWait(device, timeout=300, connectWifi=False, force_usb=False):
     start_time = time()
-    #adb(['reboot'], device, True)
-    #sleep(2)
-    adb(['reboot'], device)
-    if (device.connected_wifi):
+    adb(['reboot'], device, force_usb)
+    if (device.connected_wifi or connectWifi):
         device.connected_wifi = False
-        while (not connectWifiADB(device)[1]):
+        while (not connectWifiADB(device, force_connection=False)[1]):
+            print("trying %s" % device.name)
             if (time()-start_time > timeout):
                 return False
             sleep(5)
     else:
         adb(['wait-for-device'], device)
+    print("rebooted. waiting for dev.bootcomplete %s" % device.name)
     while (adb(['shell', 'getprop', 'dev.bootcomplete'], device).find('1') == -1):
+        print("rebooted. waiting for dev.bootcomplete %s" % device.name)
         if (time()-start_time > timeout):
             return False
         sleep(5)
