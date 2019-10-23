@@ -24,6 +24,7 @@ def exceptionHook(exception_type, exception, traceback):
 excepthook = exceptionHook
 
 DEBUG = False
+GRPC_DEBUG_FILE = None
 
 def getProtoString(str):
     string = ODProto_pb2.String()
@@ -45,8 +46,12 @@ class cloudControl:
 
     def log(self, str, end="\n"):
         if DEBUG:
-            self.log_file.write(str+end)
-            self.log_file.flush()
+            if GRPC_DEBUG_FILE is None:
+                self.log_file.write(str+end)
+                self.log_file.flush()
+            else:
+                GRPC_DEBUG_FILE.write(str+end)
+                GRPC_DEBUG_FILE.flush()
 
     def connect(self, retries=5):
         try:
@@ -114,8 +119,12 @@ class cloudClient:
 
     def log(self, str, end="\n"):
         if DEBUG:
-            self.log_file.write(str+end)
-            self.log_file.flush()
+            if GRPC_DEBUG_FILE is None:
+                self.log_file.write(str+end)
+                self.log_file.flush()
+            else:
+                GRPC_DEBUG_FILE.write(str+end)
+                GRPC_DEBUG_FILE.flush()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
@@ -279,8 +288,12 @@ class remoteClient:
 
     def log(self, str, end="\n"):
         if DEBUG:
-            self.log_file.write(str+end)
-            self.log_file.flush()
+            if GRPC_DEBUG_FILE is None:
+                self.log_file.write(str+end)
+                self.log_file.flush()
+            else:
+                GRPC_DEBUG_FILE.write(str+end)
+                GRPC_DEBUG_FILE.flush()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status

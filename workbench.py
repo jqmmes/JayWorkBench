@@ -265,6 +265,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         experiment.deviceFail(device.name)
         return
     if experiment.settings:
+        print("---> SETTINGS")
         worker.setSettings(experiment.settings)
     schedulers = worker.listSchedulers()
     if is_worker:
@@ -393,9 +394,10 @@ def runExperiment(experiment):
     killLocalCloudlet()
     stopClouds(experiment)
 
-    #for device in devices:
-    #    rebootDevice(device)
-    #sleep(2)
+    for device in devices:
+        rebootDevice(device)
+        adb.screenOff(device)
+    sleep(2)
 
 
     for repetition in range(experiment.repetitions):
@@ -628,7 +630,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     cloudlet_control.start()
     sleep(1)
     cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet, LOG_FILE)
-    #cloudlet_instance.stop()
+    cloudlet_instance.stop()
     cloudlet_instance.connectLauncherService()
     cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
     if experiment.settings or experiment.mcast_interface:
@@ -964,13 +966,14 @@ def logExperiment(conf, experiment):
     conf.write("======================================\n")
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, CURSES, DEBUG, CURSES_LOGS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, CURSES_LOGS
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
     argparser.add_argument('--show-help', default=False, action='store_true', required=False)
     argparser.add_argument('-i', '--install', default=False, action='store_true', required=False)
     argparser.add_argument('-da', '--debug-adb', default=False, action='store_true', required=False)
+    argparser.add_argument('-al', '--adb-log-level', action='store', required=False, help="ALL / ACTION / COMMAND")
     argparser.add_argument('-dg', '--debug-grpc', default=False, action='store_true', required=False)
     argparser.add_argument('-p', '--use-stdout', default=False, action='store_true', required=False)
     argparser.add_argument('-nc', '--use-curses', default=False, action='store_true', required=False)
@@ -996,14 +999,24 @@ def main():
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
 
     log("Searching for devices...")
+    if args.debug_adb:
+        adb.DEBUG = True
+        adb.ADB_DEBUG_FILE = LOG_FILE
+        if args.adb_log_level in ["ALL", "ACTION", "COMMAND"]:
+            adb.LOG_LEVEL = args.adb_log_level
+        else:
+            if args.adb_log_level is not None:
+                print("# WARNING: Invalid log level ({}). Logging ALL".format(args.adb_log_level))
+                adb.LOG_LEVEL = "ALL"
     if args.ip_mask:
         ALL_DEVICES = adb.listDevices(0, True, ip_mask=args.ip_mask)
     else:
         ALL_DEVICES = adb.listDevices(0, True)
+    #ALL_DEVICES = adb.listDevices(0)
     if args.show_help:
         help()
         return
-    elif args.install:
+    if args.install:
         log('INSTALLING_APKS')
         for device in ALL_DEVICES:
             adb.uninstallPackage(device)
@@ -1012,10 +1025,9 @@ def main():
             log('PACKAGE_PUSHED\t%s' % device.name)
             adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
             log('PACKAGE_INSTALLED\t%s' % device.name)
-    elif args.debug_grpc:
+    if args.debug_grpc:
         grpcControls.DEBUG = True
-    elif args.debug_adb:
-        adb.DEBUG = True
+        grpcControls.GRPC_DEBUG_FILE = LOG_FILE
     log("============\tDEVICES\t============")
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))
