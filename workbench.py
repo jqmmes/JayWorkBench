@@ -130,28 +130,34 @@ def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
     except Exception as job_exception:
         log("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
 
-def barrierWithTimeout(barrier, timeout, experiment=None, show_error=True, device=None, *skip_barriers):
+def barrierWithTimeout(barrier, timeout=None, experiment=None, show_error=True, device=None, *skip_barriers):
     if experiment is not None:
         if not experiment.isOK():
             skipBarriers(experiment, show_error, device, *skip_barriers)
             return False
-    try:
-        barrier.wait(timeout=timeout)
-    except Exception as barrier_exception:
+    if (barrier.broken):
         skipBarriers(experiment, show_error, device, *skip_barriers)
         return False
-    if (barrier.broken):
+    try:
+        if timeout is not None:
+            barrier.wait(timeout=timeout)
+        else:
+            barrier.wait()
+    except Exception as barrier_exception:
         skipBarriers(experiment, show_error, device, *skip_barriers)
         return False
     return True
 
 def skipBarriers(experiment, show_error=True, device=None, *skip_barriers):
-    if show_error:
-        log("ERROR\tSKIP_BARRIERS\t{}".format(device))
     if experiment:
         experiment.setFail()
     for barrier in skip_barriers:
-        barrier.wait()
+        try:
+            barrier.abort()
+        except:
+            None
+        if show_error:
+            log("INFO\tSKIP_BARRIER\t{}".format(device))
 
 def getDeviceIp(device):
     for n in range(5):
@@ -299,7 +305,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if is_worker and experiment.calibration:
         calibrateWorkerThread(worker, worker_seed, device)
     log("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
-    start_barrier.wait()
+    barrierWithTimeout(start_barrier)
     i = 0
     while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
         log("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
@@ -352,7 +358,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         experiment.setFail()
         experiment.deviceFail(device.name)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
-    finish_barrier.wait()
+    barrierWithTimeout(finish_barrier)
     adb.screenOff(device)
 
 def cleanLogs(path):
@@ -417,6 +423,7 @@ def runExperiment(experiment):
                 log("=========================\tSEED_REPEAT {} | ATTEMPT {}\t========================".format(seed_repeat, repeat_tries))
                 timeout = False
                 experiment.setOK()
+                stopClouds(experiment)
 
                 # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
                 #if not neededDevicesAvailable(experiment, devices):
@@ -446,9 +453,6 @@ def runExperiment(experiment):
 
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
-                if (len(experiment.clouds) == 0):
-                    stopClouds(experiment)
-
                 producers = experiment.producers
                 workers = experiment.workers
                 i = 0
@@ -457,7 +461,6 @@ def runExperiment(experiment):
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
-                # TODO: Validar que os devices encontram bem as clouds por elas arrancarem depois dos devices
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
                 log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
@@ -613,7 +616,7 @@ def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, 
     for cloudlet in experiment.cloudlets:
         threading.Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         i += 1
-    cloudlet_boot_barrier.wait()
+    barrierWithTimeout(cloudlet_boot_barrier)
 
 def killLocalCloudlet():
     pid = os.popen("jps -lV | grep ODCloud.jar | cut -d' ' -f1").read()[:-1]
@@ -649,13 +652,13 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
                     log("Failed to setScheduler on %s" % cloudlet)
                     experiment.setFail()
                 break
-    cloudlet_boot_barrier.wait() #inform startCloudlets that you have booted
+    barrierWithTimeout(cloudlet_boot_barrier) #inform startCloudlets that you have booted
     if (experiment.calibration):
         calibrateWorkerThread(cloudlet_instance, cloudlet_seed, asset_id="%s.jpg" % experiment.asset_quality)
-    servers_finish_barrier.wait() #wait experiment completion to init shutdown
+    barrierWithTimeout(servers_finish_barrier) #wait experiment completion to init shutdown
     cloudlet_instance.stop()
     cloudlet_control.stop()
-    finish_barrier.wait()
+    barrierWithTimeout(finish_barrier)
 
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
@@ -703,18 +706,19 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
                     experiment.setFail()
                 break
     log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud.instance)
-    cloud_boot_barrier.wait()
+    barrierWithTimeout(cloud_boot_barrier)
     if (experiment.calibration):
         calibrateWorkerThread(cloud_instance, "cloud_{}".format(cloud.address), asset_id="%s.jpg" % experiment.asset_quality)
     log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud.instance)
-    servers_finish_barrier.wait()
+    barrierWithTimeout(servers_finish_barrier)
     log("Stopping %s Cloud Instance" % cloud.instance)
     cloud_instance.stop()
     cloud_control.stop()
     log("STOPPING_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     adb.cloudInstanceStop(cloud.instance, cloud.zone)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud.instance)
-    finish_barrier.wait()
+    barrierWithTimeout(finish_barrier)
+    log("CLOUD_FINISHED\t%s" % cloud.instance)
 
 
 def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
@@ -724,7 +728,7 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
             threading.Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         else:
             threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
-    cloud_boot_barrier.wait()
+    barrierWithTimeout(cloud_boot_barrier)
     if len(experiment.clouds) > 0:
         log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
         sleep(5)
