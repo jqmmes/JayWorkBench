@@ -24,6 +24,7 @@ class Device:
     status = False
     connected_wifi = False
     connected_usb = True
+    already_rebooted = False
 
     def __init__(self, name, ip = "", status = False, wifi = False, usb=True):
         self.name = name
@@ -57,7 +58,7 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
         elif (device.connected_usb and usb_connection_active):
             selected_device = ['-s', device.name]
         else:
-            return None
+            return ""
     if (DEBUG and log_command):
         if device is not None:
             if (device.connected_wifi and not force_usb):
@@ -116,7 +117,7 @@ def getADBStatus(device, log_command=True):
     return (connected_usb, connected_wifi)
 
 def connectWifiADB(device, retries=3, force_connection=True):
-    if retries <= 0:
+    if retries <= 0 or not match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", device.ip):
         return (device, False)
     log("ADB_CONNECT_WIFI_ADB\t{} ({})".format(device.name, device.ip), "ACTION")
     status = adb(['connect', "%s:5555" % device.ip])
@@ -381,13 +382,16 @@ def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination
 def getDeviceIp(device, timeout=120):
     start_time = time()
     while time()-start_time < timeout:
-        info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
-        info = info[info.find('inet ')+5:]
-        ip = info[:info.find('/')]
+        try:
+            info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
+            info = info[info.find('inet ')+5:]
+            ip = info[:info.find('/')]
+        except:
+            ip = ""
         if (match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip)):
             return ip
         sleep(2)
-    return None
+    return ""
 
 def rebootAndWait(device, timeout=300, connectWifi=False, force_usb=False):
     start_time = time()
@@ -405,6 +409,7 @@ def rebootAndWait(device, timeout=300, connectWifi=False, force_usb=False):
         if (time()-start_time > timeout):
             return False
         sleep(5)
+    device.already_rebooted = True
     return True
 
 def isServiceRunning(device, service):

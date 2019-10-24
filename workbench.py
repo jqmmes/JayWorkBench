@@ -69,33 +69,6 @@ def pingWait(hostname):
         sleep(2)
     #log("")
 
-'''def runJob(worker, device_random, assets_dir="assets"):
-    global PENDING_JOBS
-    PENDING_JOBS += 1
-    # Criar o job no python
-    job = grpcControls.Job()
-    asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
-
-    while (asset[-4:] not in ['.png', '.jpg']):
-        asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
-
-    with open("%s/%s" % (assets_dir, asset), "rb") as image:
-        f = image.read()
-        b = bytes(f)
-        job.addBytes(b)
-
-
-    log("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), job.id, asset, worker.name))
-    # Fazer schedule no python. Maneira antiga
-    try:
-        if not worker.scheduleJob(job):
-            log("{}\t{}\tJOB_FAILED\tFAILED_SCHEDULE\t{}".format(time(), job.id, worker.name))
-        else:
-            log("{}\t{}\tJOB_COMPLETE\t{}".format(time(), job.id, worker.name))
-    except Exception as job_exception:
-        log("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), job.id, worker.name))
-    PENDING_JOBS -= 1'''
-
 def createJob(worker, asset_id):
     global PENDING_JOBS
     PENDING_JOBS += 1
@@ -210,7 +183,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
         asset_list.append(asset)
     log('SELECTED_ASSET\t{} ASSETS\t{}'.format(len(asset_list), device.name))
-    if experiment.reboot:
+    if experiment.reboot and not device.already_rebooted:
         if not experimentRebootDevice(device, device_random, experiment.devices):
             sleep(10)
             retries = 0
@@ -228,6 +201,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                 sleep(1)
                 retries += 1
         adb.connectWifiADB(device)
+    device.already_rebooted = False
     sleep(2)
     log("LISTING_FILES_ON_DEVICE\t%s" % device.name)
     files_on_device = adb.listFiles(device=device)
@@ -401,10 +375,9 @@ def runExperiment(experiment):
     stopClouds(experiment)
 
     for device in devices:
-        rebootDevice(device)
+        if not device.already_rebooted:
+            rebootDevice(device)
         adb.screenOff(device)
-    sleep(2)
-
 
     for repetition in range(experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
@@ -504,45 +477,6 @@ def runExperiment(experiment):
             log("Waiting 5s for next repetition")
             sleep(5)
 
-'''def neededDevicesAvailable(experiment, devices, retries=5):
-    if retries < 0:
-        experiment.setFail()
-        os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
-        return False
-    if not checkBattery(20, *devices[:experiment.devices]):
-        sleep(5)
-        return neededDevicesAvailable(experiment, devices, retries-1)
-    else:
-        return True
-
-def checkBattery(min_battery, *devices):
-    battery_barrier = threading.Barrier(len(devices) + 1)
-    for device in devices:
-        threading.Thread(target = checkBatteryDevice, args = (min_battery, device, battery_barrier)).start()
-    if not barrierWithTimeout(battery_barrier, 3600):
-        all_devices = adb.listDevices(0)
-        for device in all_devices:
-            if device not in devices:
-                return False
-    return True
-
-def checkBatteryDevice(min_battery, device, battery_barrier):
-    adb.screenOff(device)
-    battery_level = adb.getBatteryLevel(device)
-    if (battery_level < 0):
-        log("INVALID_BATTERY_CONTINUING ON {}".format(device.name))
-        barrierWithTimeout(battery_barrier, 3600)
-        return
-    if (battery_level < min_battery):
-        counter = 0
-        while (not battery_barrier.broken and (battery_level < max(0, min(100, min_battery + 10)))):
-            if (counter % 5 == 0):
-                log("NOT_ENOUGH_BATTERY ON {} ({}%)".format(device.name, battery_level))
-            sleep(120)
-            battery_level = adb.getBatteryLevel(device)
-            counter += 1
-    barrierWithTimeout(battery_barrier, 3600)'''
-
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
         experiment.setFail()
@@ -616,7 +550,7 @@ def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, 
     for cloudlet in experiment.cloudlets:
         threading.Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         i += 1
-    barrierWithTimeout(cloudlet_boot_barrier)
+    barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, "START_CLOUDLETS", servers_finish_barrier, finish_barrier)
 
 def killLocalCloudlet():
     pid = os.popen("jps -lV | grep ODCloud.jar | cut -d' ' -f1").read()[:-1]
@@ -652,7 +586,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
                     log("Failed to setScheduler on %s" % cloudlet)
                     experiment.setFail()
                 break
-    barrierWithTimeout(cloudlet_boot_barrier) #inform startCloudlets that you have booted
+    barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, cloudlet, servers_finish_barrier, finish_barrier) #inform startCloudlets that you have booted
     if (experiment.calibration):
         calibrateWorkerThread(cloudlet_instance, cloudlet_seed, asset_id="%s.jpg" % experiment.asset_quality)
     barrierWithTimeout(servers_finish_barrier) #wait experiment completion to init shutdown
@@ -676,6 +610,9 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     stdout.flush()
+    if (not experiment.isOK()):
+        skipBarriers(experiment, True, cloud_instance, cloud_boot_barrier, servers_finish_barrier, finish_barrier)
+        return
     adb.cloudInstanceStart(cloud.instance, cloud.zone)
     while (not adb.cloudInstanceRunning(cloud.instance)):
         sleep(5)
@@ -706,7 +643,7 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
                     experiment.setFail()
                 break
     log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud.instance)
-    barrierWithTimeout(cloud_boot_barrier)
+    barrierWithTimeout(cloud_boot_barrier, 600, experiment, True, cloud.instance, servers_finish_barrier, finish_barrier)
     if (experiment.calibration):
         calibrateWorkerThread(cloud_instance, "cloud_{}".format(cloud.address), asset_id="%s.jpg" % experiment.asset_quality)
     log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud.instance)
@@ -715,6 +652,9 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     cloud_instance.stop()
     cloud_control.stop()
     log("STOPPING_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
+    if (not experiment.isOK()):
+        skipBarriers(experiment, True, cloud_instance, finish_barrier)
+        return
     adb.cloudInstanceStop(cloud.instance, cloud.zone)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud.instance)
     barrierWithTimeout(finish_barrier)
@@ -728,7 +668,7 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
             threading.Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         else:
             threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
-    barrierWithTimeout(cloud_boot_barrier)
+    barrierWithTimeout(cloud_boot_barrier, 600, experiment, True, "START_CLOUDS", servers_finish_barrier, finish_barrier)
     if len(experiment.clouds) > 0:
         log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
         sleep(5)
@@ -1063,7 +1003,6 @@ def main():
         progressBar_0.updateProgress(0)
         complete_progress = CURSES.add_text(1,15,1)
 
-
     i = 0
     while i < len(EXPERIMENTS):
         in_progress_experiments.write(EXPERIMENTS[i].name+"\n")
@@ -1079,6 +1018,7 @@ def main():
         runExperiment(EXPERIMENTS[i])
         in_progress_experiments.truncate(0)
         completed_experiments.write(EXPERIMENTS[i].name+"\n")
+        completed_experiments.flush()
         for file in os.listdir(new_experiments):
             if os.path.isfile("{}/{}".format(new_experiments,file)):
                 readConfig("{}/{}".format(new_experiments,file))
