@@ -141,7 +141,7 @@ def connectWifiADB(device, retries=3, force_connection=True):
         elif force_usb:
             if rebootAndWait(device, connectWifi=True, force_usb=True):
                 return (device, True)
-            return connectWifiADB(device, retries-1)
+            return connectWifiADB(device, retries-1, force_connection)
         else:
             return (device, False)
     return (device, False)
