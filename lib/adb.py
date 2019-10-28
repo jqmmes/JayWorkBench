@@ -16,6 +16,7 @@ SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
 DEBUG = False
 ADB_DEBUG_FILE = stdout
+ADB_LOGS_LOCK = None
 LOG_LEVEL = "ACTION" # "ALL", "ACTION", "COMMAND"
 
 class Device:
@@ -36,7 +37,10 @@ class Device:
 FNULL = open(os.devnull, "w")
 
 def log(str, level, end="\n"):
+    global ADB_LOGS_LOCK
     if DEBUG and ADB_DEBUG_FILE is not None and (level == LOG_LEVEL or LOG_LEVEL == "ALL"):
+        if ADB_LOGS_LOCK is not None:
+            ADB_LOGS_LOCK.acquire()
         try:
             ADB_DEBUG_FILE.write(str)
         except:
@@ -46,6 +50,8 @@ def log(str, level, end="\n"):
         except:
             None
         ADB_DEBUG_FILE.flush()
+        if ADB_LOGS_LOCK is not None:
+            ADB_LOGS_LOCK.release()
 
 def adb(cmd, device=None, force_usb=False, log_command=True):
     selected_device = []

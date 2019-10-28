@@ -23,12 +23,15 @@ FNULL = open(os.devnull, "w")
 LOG_FILE = stdout
 CURSES = None
 CURSES_LOGS = None
+CURSES_LOGS_LOCK = threading.Lock()
 LOGS_LOCK = threading.Lock()
 
 def log(str, end="\n"):
-    global LOG_FILE, CURSES_LOGS
+    global LOG_FILE, CURSES_LOGS, LOGS_LOCK
+    LOGS_LOCK.acquire()
     LOG_FILE.write(str+end)
     LOG_FILE.flush()
+    LOGS_LOCK.release()
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
@@ -36,13 +39,13 @@ def log(str, end="\n"):
         print(str, end=end)
 
 def write_curses_logs():
-    global CURSES_LOGS, LOGS_LOCK
+    global CURSES_LOGS, CURSES_LOGS_LOCK
     if not CURSES_LOGS:
         return
-    LOGS_LOCK.acquire()
+    CURSES_LOGS_LOCK.acquire()
     for i in range(min(len(CURSES_LOGS), CURSES.maxHeight()-5)):
         CURSES.add_text(1,CURSES.maxWidth(),6+i,text="#\t{}".format(CURSES_LOGS[i]))
-    LOGS_LOCK.release()
+    CURSES_LOGS_LOCK.release()
 
 
 def brokenBarrierExceptionHook(exception_type, exception, traceback):
@@ -398,9 +401,6 @@ def runExperiment(experiment):
                 experiment.setOK()
                 stopClouds(experiment)
 
-                # Verifica as baterias e garante que os dispositivos continuam sempre disponiveis. retorna falso se algum device se perdeu
-                #if not neededDevicesAvailable(experiment, devices):
-                #    return
                 experiment_devices = getNeededDevicesAvailable(experiment, devices)
                 if experiment_devices == []:
                     os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
@@ -910,7 +910,7 @@ def logExperiment(conf, experiment):
     conf.write("======================================\n")
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, CURSES_LOGS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -946,6 +946,7 @@ def main():
     if args.debug_adb:
         adb.DEBUG = True
         adb.ADB_DEBUG_FILE = LOG_FILE
+        adb.ADB_LOGS_LOCK = LOGS_LOCK
         if args.adb_log_level in ["ALL", "ACTION", "COMMAND"]:
             adb.LOG_LEVEL = args.adb_log_level
         else:
@@ -956,7 +957,6 @@ def main():
         ALL_DEVICES = adb.listDevices(0, True, ip_mask=args.ip_mask)
     else:
         ALL_DEVICES = adb.listDevices(0, True)
-    #ALL_DEVICES = adb.listDevices(0)
     if args.show_help:
         help()
         return
@@ -972,6 +972,7 @@ def main():
     if args.debug_grpc:
         grpcControls.DEBUG = True
         grpcControls.GRPC_DEBUG_FILE = LOG_FILE
+        grpcControls.GRPC_LOGS_LOCK = LOGS_LOCK
     log("============\tDEVICES\t============")
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))

@@ -25,6 +25,7 @@ excepthook = exceptionHook
 
 DEBUG = False
 GRPC_DEBUG_FILE = None
+GRPC_LOGS_LOCK = None
 
 def getProtoString(str):
     string = ODProto_pb2.String()
@@ -45,13 +46,22 @@ class cloudControl:
         self.log_file = log_file
 
     def log(self, str, end="\n"):
+        global GRPC_LOGS_LOCK
         if DEBUG:
             if GRPC_DEBUG_FILE is None:
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.acquire()
                 self.log_file.write(str+end)
                 self.log_file.flush()
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.release()
             else:
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.acquire()
                 GRPC_DEBUG_FILE.write(str+end)
                 GRPC_DEBUG_FILE.flush()
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.release()
 
     def connect(self, retries=5):
         try:
@@ -118,13 +128,22 @@ class cloudClient:
         self.log("GRPC %s (%s) __init__" % (self.name, self.ip))
 
     def log(self, str, end="\n"):
+        global GRPC_LOGS_LOCK
         if DEBUG:
             if GRPC_DEBUG_FILE is None:
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.acquire()
                 self.log_file.write(str+end)
                 self.log_file.flush()
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.release()
             else:
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.acquire()
                 GRPC_DEBUG_FILE.write(str+end)
                 GRPC_DEBUG_FILE.flush()
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.release()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
@@ -287,13 +306,22 @@ class remoteClient:
         self.log("GRPC %s (%s) __init__" % (self.name, self.ip))
 
     def log(self, str, end="\n"):
+        global GRPC_LOGS_LOCK
         if DEBUG:
             if GRPC_DEBUG_FILE is None:
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.acquire()
                 self.log_file.write(str+end)
                 self.log_file.flush()
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.release()
             else:
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.acquire()
                 GRPC_DEBUG_FILE.write(str+end)
                 GRPC_DEBUG_FILE.flush()
+                if GRPC_LOGS_LOCK is not None:
+                    GRPC_LOGS_LOCK.release()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
