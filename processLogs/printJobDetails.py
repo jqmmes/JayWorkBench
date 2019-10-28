@@ -42,109 +42,123 @@ def processDir(dir, avg, local=True, remote=True, cloud=True):
                       .filter(data.JOB_ID.isNotNull())\
                       .filter(data.JOB_ID != 'WORKER_CALIBRATION')\
                       .select('NODE_NAME','JOB_ID','TIMESTAMP','CLASS_METHOD_LINE','OPERATION', 'ACTIONS'))
+
+    #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_scheduleJob$ODLib_Common_95')\
     start = jobData\
               .filter(jobData.OPERATION == 'INIT')\
-              .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_scheduleJob$ODLib_Common_95')\
+              .filter(jobData.CLASS_METHOD_LINE.contains('services.broker.BrokerService_scheduleJob'))\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .drop('ACTIONS')\
               .withColumnRenamed('NODE_NAME', 'ORIGIN_NODE')\
               .withColumnRenamed('TIMESTAMP', 'START_TIME')
 
+    #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService$scheduleJob$1_invoke_98')\
     job_scheduled = jobData\
               .filter(jobData.OPERATION == 'SCHEDULED')\
-              .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService$scheduleJob$1_invoke_98')\
+              .filter(jobData.CLASS_METHOD_LINE.contains('services.broker.BrokerService$scheduleJob'))\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .drop('ACTIONS')\
               .drop('NODE_NAME')\
               .withColumnRenamed('TIMESTAMP', 'SCHEDULED_TIME')
 
+    #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCClient$executeJob$1$1_onCompleted_77')\
     end = jobData\
               .filter(jobData.OPERATION == 'COMPLETE')\
-              .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCClient$executeJob$1$1_onCompleted_77')\
+              .filter(jobData.CLASS_METHOD_LINE.contains('services.broker.grpc.BrokerGRPCClient$executeJob'))\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .drop('NODE_NAME')\
               .drop('ACTIONS')\
               .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
+    #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCClient$executeJob$1$1_onCompleted_77')\
     data_reached_server = jobData\
               .filter(jobData.OPERATION == 'DATA_REACHED_SERVER')\
-              .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCClient$executeJob$1$1_onNext_59')\
+              .filter(jobData.CLASS_METHOD_LINE.contains('services.broker.grpc.BrokerGRPCClient$executeJob'))\
               .drop('OPERATION')\
               .drop('CLASS_METHOD_LINE')\
               .drop('NODE_NAME')\
               .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
+
+    #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_executeJob$ODLib_Common_86')\
     if local or remote:
         # 'DESTINATION_NODE','JOB_ID', 'TIMESTAMP'
         queue_job = jobData\
                     .filter(jobData.OPERATION == 'INIT')\
-                    .filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_executeJob$ODLib_Common_86')\
+                    .filter(jobData.CLASS_METHOD_LINE.contains('services.broker.BrokerService_executeJob'))\
                     .drop('OPERATION')\
                     .drop('CLASS_METHOD_LINE')\
                     .drop('ACTIONS')\
                     .withColumnRenamed('NODE_NAME', 'DESTINATION_NODE')\
                     .withColumnRenamed('TIMESTAMP', 'QUEUE_TIME')
 
+        #.filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_124')\
         execution_start = jobData\
                     .filter(jobData.OPERATION == 'INIT')\
-                    .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_124')\
+                    .filter(jobData.CLASS_METHOD_LINE.contains('services.worker.WorkerService$RunnableJobObjects'))\
                     .drop('OPERATION')\
                     .drop('CLASS_METHOD_LINE')\
                     .drop('ACTIONS')\
                     .drop('NODE_NAME')\
                     .withColumnRenamed('TIMESTAMP', 'START_TIME')
 
+        #.filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_129')\
         image_read_end = jobData\
                     .filter(jobData.OPERATION == 'START')\
-                    .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_129')\
+                    .filter(jobData.CLASS_METHOD_LINE.contains('services.worker.WorkerService$RunnableJobObjects'))\
                     .drop('OPERATION')\
                     .drop('CLASS_METHOD_LINE')\
                     .drop('ACTIONS')\
                     .drop('NODE_NAME')\
                     .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
+        #.filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_129')\
         execution_end = jobData\
                     .filter(jobData.OPERATION == 'END')\
-                    .filter(jobData.CLASS_METHOD_LINE == 'services.worker.WorkerService$RunnableJobObjects_run_131')\
+                    .filter(jobData.CLASS_METHOD_LINE.contains('services.worker.WorkerService$RunnableJobObjects'))\
                     .drop('OPERATION')\
                     .drop('CLASS_METHOD_LINE')\
                     .drop('ACTIONS')\
                     .drop('NODE_NAME')\
                     .withColumnRenamed('TIMESTAMP', 'EXECUTION_END_TIME')
     if cloud:
+        #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCServer$grpcImpl$1_executeJob_22')\
         cloud_queue_job = jobData\
                   .filter(jobData.OPERATION == 'INIT')\
-                  .filter(jobData.CLASS_METHOD_LINE == 'services.broker.grpc.BrokerGRPCServer$grpcImpl$1_executeJob_22')\
+                  .filter(jobData.CLASS_METHOD_LINE.contains('services.broker.grpc.BrokerGRPCServer$grpcImpl$1_executeJob'))\
                   .drop('OPERATION')\
                   .drop('CLASS_METHOD_LINE')\
                   .drop('ACTIONS')\
                   .withColumnRenamed('NODE_NAME', 'DESTINATION_NODE')\
                   .withColumnRenamed('TIMESTAMP', 'QUEUE_TIME')
 
+        #.filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
         cloud_execution_start = jobData\
                   .filter(jobData.OPERATION == 'INIT')\
-                  .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+                  .filter(jobData.CLASS_METHOD_LINE.contains('java.util.concurrent.ThreadPoolExecutor_runWorker'))\
                   .drop('OPERATION')\
                   .drop('CLASS_METHOD_LINE')\
                   .drop('ACTIONS')\
                   .drop('NODE_NAME')\
                   .withColumnRenamed('TIMESTAMP', 'START_TIME')
 
+        #.filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
         cloud_image_read_end = jobData\
                   .filter(jobData.OPERATION == 'START')\
-                  .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+                  .filter(jobData.CLASS_METHOD_LINE.contains('java.util.concurrent.ThreadPoolExecutor_runWorker'))\
                   .drop('OPERATION')\
                   .drop('CLASS_METHOD_LINE')\
                   .drop('ACTIONS')\
                   .drop('NODE_NAME')\
                   .withColumnRenamed('TIMESTAMP', 'END_TIME')
 
+        #.filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
         cloud_execution_end = jobData\
                   .filter(jobData.OPERATION == 'END')\
-                  .filter(jobData.CLASS_METHOD_LINE == 'java.util.concurrent.ThreadPoolExecutor_runWorker_1128')\
+                  .filter(jobData.CLASS_METHOD_LINE.contains('java.util.concurrent.ThreadPoolExecutor_runWorker'))\
                   .drop('OPERATION')\
                   .drop('CLASS_METHOD_LINE')\
                   .drop('ACTIONS')\
