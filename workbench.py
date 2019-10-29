@@ -394,7 +394,7 @@ def runExperiment(experiment):
                 progressBar_0.updateProgress(int(100*(seed_repeat/experiment.repeat_seed)))
             repeat_tries = 0
             while (True):
-                if repeat_tries > 10:
+                if repeat_tries > 3:
                     os.system("touch logs/experiment/%s/too_many_repeat_retries_CANCELED"  % experiment.name)
                     return
                 log("=========================\tSEED_REPEAT {} | ATTEMPT {}\t========================".format(seed_repeat, repeat_tries))
@@ -1027,7 +1027,7 @@ def main():
         run_scheduled = False
         next_experiment = None
         for e,t in SCHEDULED_EXPERIMENTS.items():
-            if t[0] <= gmtime().tm_hour or t[1] >= gmtime().tm_hour:
+            if (t[0] <= gmtime().tm_hour and t[1] >= gmtime().tm_hour and t[1] >= t[0]) or (t[1] < t[0] and (t[0] <= gmtime().tm_hour or t[1] >= gmtime().tm_hour)):
                 run_scheduled = True
                 next_experiment = e
                 SCHEDULED_EXPERIMENTS.pop(e, None)
@@ -1037,8 +1037,11 @@ def main():
             next_experiment = EXPERIMENTS[i]
             for e in EXPERIMENTS[i+1:]:
                 missing_experiments.write(e.name+"\n")
+        else:
+            for e in EXPERIMENTS[i:]:
+                missing_experiments.write(e.name+"\n")
         for e,t in SCHEDULED_EXPERIMENTS.items():
-            missing_experiments.write(e.name+"\t({} - {})".format(t[0], t[1]))
+            missing_experiments.write(e.name+"\t({} - {})\n".format(t[0], t[1]))
         missing_experiments.flush()
         in_progress_experiments.write(next_experiment.name+"\n")
         in_progress_experiments.flush()
