@@ -1,7 +1,7 @@
 import lib.grpcControls as grpcControls
 import lib.adb as adb
 from lib.curse import draw_curses
-from time import sleep, time
+from time import sleep, time, gmtime, ctime
 import random
 import threading
 import os
@@ -15,6 +15,7 @@ import argparse
 from collections import deque
 
 EXPERIMENTS = []
+SCHEDULED_EXPERIMENTS = {}
 PENDING_JOBS = 0
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
@@ -29,14 +30,14 @@ LOGS_LOCK = threading.Lock()
 def log(str, end="\n"):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
     LOGS_LOCK.acquire()
-    LOG_FILE.write(str+end)
+    LOG_FILE.write(ctime()+"\t"+str+end)
     LOG_FILE.flush()
     LOGS_LOCK.release()
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
     elif LOG_FILE.name != "<stdout>":
-        print(str, end=end)
+        print(ctime()+"\t"+str, end=end)
 
 def write_curses_logs():
     global CURSES_LOGS, CURSES_LOGS_LOCK
@@ -414,7 +415,9 @@ def runExperiment(experiment):
                     failed_devices.append(key)
                 failed_devices.sort(key=lambda e: failed_devices_map[e], reverse=True)
                 for failed_device in failed_devices[:max(len(experiment_devices)-experiment.devices, 0)]:
-                    experiment_devices.remove(failed_device)
+                    for dev in experiment_devices:
+                        if dev.name == failed_device:
+                            experiment_devices.remove(dev)
 
                 os.makedirs("logs/experiment/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = threading.Barrier(experiment.devices + 1)
@@ -723,7 +726,7 @@ class Experiment:
         return self._running_status
 
     def deviceFail(self, device):
-        if device in failed_devices:
+        if device in self._failed_devices:
             self._failed_devices[device] += 1
         else:
             self._failed_devices[device] = 0
@@ -733,10 +736,12 @@ class Experiment:
 
 
 def readConfig(confName):
-    global EXPERIMENTS
+    global EXPERIMENTS, SCHEDULED_EXPERIMENTS
     config = configparser.ConfigParser()
     config.read(confName)
     for section in config.sections():
+        startTime = None
+        endTime = None
         experiment = Experiment(section)
         for option in config.options(section):
             if option == "strategy":
@@ -800,11 +805,23 @@ def readConfig(confName):
                 experiment.mcast_interface = config[section][option]
             elif option == "minbattery":
                 experiment.min_battery = int(config[section][option])
+            elif option == "runbetween":
+                try:
+                    times = config[section][option].split("-")
+                    startTime = int(times[0])
+                    endTime = int(times[1])
+                except:
+                    None
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
             experiment.workers = experiment.devices
-        EXPERIMENTS.append(experiment)
+        if startTime is None or endTime is None:
+            log("ADDED_EXPERIMENT\t{}".format(experiment.name))
+            EXPERIMENTS.append(experiment)
+        else:
+            log("ADDED_SCHEDULED_EXPERIMENT\t{}".format(experiment.name))
+            SCHEDULED_EXPERIMENTS[experiment] = (startTime, endTime)
 
 def help():
     print('''        ================================================ HELP ================================================
@@ -836,6 +853,7 @@ def help():
                     AssetQuality            = Inform about asset quality (SD/HD/UHD) [STR] (Default SD)
                     MultiCastInterface      = MCAST_INTERFACE: interface to use in cloudlet [STR]
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
+                    RunBetween              = Define the experiment run interval (hour - hour)
 
         Models:
                     ssd_mobilenet_v1_fpn_coco
@@ -910,7 +928,7 @@ def logExperiment(conf, experiment):
     conf.write("======================================\n")
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -1005,26 +1023,39 @@ def main():
         complete_progress = CURSES.add_text(1,15,1)
 
     i = 0
-    while i < len(EXPERIMENTS):
-        in_progress_experiments.write(EXPERIMENTS[i].name+"\n")
-        in_progress_experiments.flush()
+    while i < len(EXPERIMENTS) and len(SCHEDULED_EXPERIMENTS) > 0:
+        run_scheduled = False
+        next_experiment = None
+        for e,t in SCHEDULED_EXPERIMENTS.items():
+            if t[0] <= gmtime().tm_hour or t[1] >= gmtime().tm_hour:
+                run_scheduled = True
+                next_experiment = e
+                SCHEDULED_EXPERIMENTS.pop(e, None)
+                break
         missing_experiments.truncate(0)
-        for e in EXPERIMENTS[i+1:]:
-            missing_experiments.write(e.name+"\n")
-            missing_experiments.flush()
+        if not run_scheduled:
+            next_experiment = EXPERIMENTS[i]
+            for e in EXPERIMENTS[i+1:]:
+                missing_experiments.write(e.name+"\n")
+        for e,t in SCHEDULED_EXPERIMENTS.items():
+            missing_experiments.write(e.name+"\t({} - {})".format(t[0], t[1]))
+        missing_experiments.flush()
+        in_progress_experiments.write(next_experiment.name+"\n")
+        in_progress_experiments.flush()
         if args.use_curses:
-            progressBar_0.updateProgress(100*(i/len(EXPERIMENTS)))
+            progressBar_0.updateProgress(100*(i/max(len(EXPERIMENTS), 1)))
             complete_progress.updateText("COMPLETE {}/{}".format(i,len(EXPERIMENTS)))
-        sleep(2)
-        runExperiment(EXPERIMENTS[i])
+            sleep(2)
+        runExperiment(next_experiment)
         in_progress_experiments.truncate(0)
-        completed_experiments.write(EXPERIMENTS[i].name+"\n")
+        completed_experiments.write(next_experiment.name+"\n")
         completed_experiments.flush()
         for file in os.listdir(new_experiments):
             if os.path.isfile("{}/{}".format(new_experiments,file)):
                 readConfig("{}/{}".format(new_experiments,file))
                 shutil.move("{}/{}".format(new_experiments,file), "{}/{}.loaded".format(loaded_experiments,file))
-        i += 1
+        if not run_scheduled:
+            i += 1
     if args.use_curses:
         progressBar_0.updateProgress(100)
         complete_progress.updateText("")

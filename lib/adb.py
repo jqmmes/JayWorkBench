@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #!/usr/bin/python3
 import subprocess
-from time import sleep, time
+from time import sleep, time, ctime
 from re import match
 import os
 import threading
@@ -42,7 +42,7 @@ def log(str, level, end="\n"):
         if ADB_LOGS_LOCK is not None:
             ADB_LOGS_LOCK.acquire()
         try:
-            ADB_DEBUG_FILE.write(str)
+            ADB_DEBUG_FILE.write(ctime()+"\t"+str)
         except:
             None
         try:
@@ -127,18 +127,21 @@ def connectWifiADB(device, retries=3, force_connection=True):
         return (device, False)
     log("ADB_CONNECT_WIFI_ADB\t{} ({})".format(device.name, device.ip), "ACTION")
     status = adb(['connect', "%s:5555" % device.ip])
+    if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
+        device.connected_wifi = True
     if not force_connection:
-        if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
-            device.connected_wifi = True
+        if device.connected_wifi:
             return (device, True)
         return (device, False)
-    device.connected_wifi = True
-    if force_connection:
-        sleep(5)
-        force_usb, connected = getADBStatus(device)
-        if connected:
-            return (device, True)
-        elif force_usb:
+    else:
+        if device.connected_wifi:
+            for x in range(3):
+                sleep(5)
+                force_usb, connected = getADBStatus(device)
+                if connected:
+                    return (device, True)
+        force_usb, _ = getADBStatus(device)
+        if force_usb:
             if rebootAndWait(device, connectWifi=True, force_usb=True):
                 return (device, True)
             return connectWifiADB(device, retries-1, force_connection)
@@ -197,7 +200,7 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                         break
                 if not is_new_device:
                     continue
-                if not new_device.connected_wifi and new_device.ip is not None:
+                if not new_device.connected_wifi and new_device.ip != "":
                     new_device, status = connectWifiADB(new_device)
                 if not new_device.connected_usb:
                     new_device.connected_usb = getADBStatus(new_device)[0]
@@ -385,7 +388,7 @@ def forceStopApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', device=No
 def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination=".", device=None):
     adb(['pull', "/sdcard/Android/data/%s/%s.%s" % (applicationName, path, format), destination], device)
 
-def getDeviceIp(device, timeout=120):
+def getDeviceIp(device, timeout=10):
     start_time = time()
     while time()-start_time < timeout:
         try:

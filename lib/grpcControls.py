@@ -14,7 +14,7 @@ from google.protobuf.wrappers_pb2 import BoolValue as google_bool
 import grpc
 from grpc import ChannelConnectivity
 
-from time import sleep, time
+from time import sleep, time, ctime
 import uuid
 from sys import excepthook, stdout
 
@@ -51,14 +51,14 @@ class cloudControl:
             if GRPC_DEBUG_FILE is None:
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.acquire()
-                self.log_file.write(str+end)
+                self.log_file.write(ctime()+"\t"+str+end)
                 self.log_file.flush()
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.release()
             else:
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.acquire()
-                GRPC_DEBUG_FILE.write(str+end)
+                GRPC_DEBUG_FILE.write(ctime()+"\t"+str+end)
                 GRPC_DEBUG_FILE.flush()
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.release()
@@ -133,14 +133,14 @@ class cloudClient:
             if GRPC_DEBUG_FILE is None:
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.acquire()
-                self.log_file.write(str+end)
+                self.log_file.write(ctime()+"\t"+str+end)
                 self.log_file.flush()
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.release()
             else:
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.acquire()
-                GRPC_DEBUG_FILE.write(str+end)
+                GRPC_DEBUG_FILE.write(ctime()+"\t"+str+end)
                 GRPC_DEBUG_FILE.flush()
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.release()
@@ -311,14 +311,14 @@ class remoteClient:
             if GRPC_DEBUG_FILE is None:
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.acquire()
-                self.log_file.write(str+end)
+                self.log_file.write(ctime()+"\t"+str+end)
                 self.log_file.flush()
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.release()
             else:
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.acquire()
-                GRPC_DEBUG_FILE.write(str+end)
+                GRPC_DEBUG_FILE.write(ctime()+"\t"+str+end)
                 GRPC_DEBUG_FILE.flush()
                 if GRPC_LOGS_LOCK is not None:
                     GRPC_LOGS_LOCK.release()
