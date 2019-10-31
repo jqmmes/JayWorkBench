@@ -384,10 +384,18 @@ def runExperiment(experiment):
     killLocalCloudlet()
     stopClouds(experiment)
 
+    reboot_barrier_size = 1
     for device in devices:
         if not device.already_rebooted:
-            rebootDevice(device)
+            reboot_barrier_size += 1
+    reboot_barrier = threading.Barrier(reboot_barrier_size)
+    for device in devices:
+        if not device.already_rebooted:
+            threading.Thread(target=rebootDevice, args=(device, None, reboot_barrier)).start()
+            rebootDevice(device, reboot_barrier=reboot_barrier)
+            sleep(5)
         adb.screenOff(device)
+    barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
 
     for repetition in range(experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
@@ -518,14 +526,18 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
         barrierWithTimeout(battery_barrier, 3600, show_error=False)
         return getNeededDevicesAvailable(experiment, devices, retries-1)
 
-def rebootDevice(device, retries=3):
+def rebootDevice(device, retries=3, reboot_barrier=None):
     if retries < 0:
         log("REBOOT_DEVICE_FAIL\t%s" % device.name)
+        if reboot_barrier is not None:
+            skipBarriers(None, True, device.name, reboot_barrier)
         return False
     log("REBOOT_DEVICE\t%s" % device.name)
     pre_reboot_worker_ip = getDeviceIp(device)
     if adb.rebootAndWait(device, timeout=180):
         log("REBOOT_DEVICE_COMPLETE\t%s" % device.name)
+        if reboot_barrier is not None:
+            barrierWithTimeout(reboot_barrier, show_error=True, device=device.name)
         return True
     else:
         log("REBOOT_DEVICE_RETRY\t%s" % device.name)
@@ -704,8 +716,10 @@ class Experiment:
     cloudlets = []
     seed = 0
     repetitions = 1
+    current_repetition = 0
     producers = 0
     repeat_seed = 1
+    current_seed_repeat = 0
     timeout = 1500 # 25 Mins
     start_worker = True
     workers = -1
