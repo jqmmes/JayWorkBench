@@ -18,6 +18,8 @@ from time import sleep, time, ctime
 import uuid
 from sys import excepthook, stdout
 
+from func_timeout import func_set_timeout
+
 def exceptionHook(exception_type, exception, traceback):
     print(self,"%s: %s" % (exception_type.__name__, exception))
 
@@ -305,6 +307,7 @@ class remoteClient:
         self.log_file = log_file
         self.log("GRPC %s (%s) __init__" % (self.name, self.ip))
 
+    @func_set_timeout(15)
     def log(self, str, end="\n"):
         global GRPC_LOGS_LOCK
         if DEBUG:
@@ -329,6 +332,7 @@ class remoteClient:
     def brokerStubStatusCallback(self, status):
         self.brokerStubStatus = status
 
+    @func_set_timeout(15)
     def connectLauncherService(self, retries=5):
         try:
             self.launcherChannel = grpc.insecure_channel('%s:50000' % self.ip)
@@ -342,7 +346,7 @@ class remoteClient:
                 self.connectLauncherService(retries-1)
             else:
                 self.log("GRPC %s (%s) connectLauncherService FAIL" % (self.name, self.ip))
-
+    @func_set_timeout(15)
     def connectBrokerService(self, retries=5):
         try:
             self.brokerChannel = grpc.insecure_channel('%s:50051' % self.ip)
@@ -373,6 +377,7 @@ class remoteClient:
     def brokerStubReady(self):
         return self.__checkChannelStatus(self.brokerChannel, self.brokerStubStatus, self.brokerStubStatusCallback)
 
+    @func_set_timeout(15)
     def startWorker(self, retries=5):
         if retries <= 0:
             self.log("GRPC %s (%s) startWorker FAIL" % (self.name, self.ip))
@@ -387,6 +392,7 @@ class remoteClient:
             sleep(5)
             self.startWorker(retries-1)
 
+    @func_set_timeout(15)
     def startScheduler(self, retries=5):
         if retries <= 0:
             self.log("GRPC %s (%s) startScheduler FAIL" % (self.name, self.ip))
@@ -401,6 +407,7 @@ class remoteClient:
             sleep(5)
             self.startScheduler(retries-1)
 
+    @func_set_timeout(35)
     def listSchedulers(self, retries=5):
         self.log("GRPC %s (%s) listSchedulers" % (self.name, self.ip))
         if retries <= 0:
@@ -415,6 +422,7 @@ class remoteClient:
         sleep(5)
         return self.listSchedulers(retries-1)
 
+    @func_set_timeout(35)
     def listModels(self, retries=5):
         self.log("GRPC %s (%s) listModels" % (self.name, self.ip))
         if retries <= 0:
@@ -429,6 +437,7 @@ class remoteClient:
         sleep(5)
         return self.listModels(retries-1)
 
+    @func_set_timeout(35)
     def setScheduler(self, scheduler, retries=5):
         self.log("GRPC %s (%s) setScheduler" % (self.name, self.ip))
         if retries <= 0:
@@ -443,6 +452,7 @@ class remoteClient:
         sleep(5)
         return self.setModel(scheduler, retries-1)
 
+    @func_set_timeout(300)
     def setModel(self, model, retries=5):
         self.log("GRPC %s (%s) setModel" % (self.name, self.ip))
         if retries <= 0:

@@ -13,7 +13,6 @@ import subprocess
 from datetime import datetime
 import argparse
 from collections import deque
-from func_timeout import func_set_timeout
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
@@ -146,9 +145,9 @@ def getDeviceIp(device):
 def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3):
     global LAST_REBOOT_TIME
     while True:
-        sleep_duration = device_random.randint(0,2*max_sleep_random)
+        sleep_duration = device_random.randint(0,max_sleep_random)
         sleep(sleep_duration)
-        if (time()-LAST_REBOOT_TIME > 5):
+        if (time()-LAST_REBOOT_TIME > 2):
             LAST_REBOOT_TIME = time()
             log("REBOOT_WORKER\t%s" % device.name)
             pre_reboot_worker_ip = getDeviceIp(device)
@@ -237,16 +236,15 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             return
         log("STARTING_SERVICES\t%s" % device.name)
         worker = grpcControls.remoteClient(worker_ip, device.name, LOG_FILE)
-        @func_set_timeout(15)
+        #@func_set_timeout(15)
         worker.connectLauncherService()
-        @func_set_timeout(15)
+        #@func_set_timeout(15)
         worker.setLogName(experiment.name)
         if is_worker:
-            @func_set_timeout(15)
             worker.startWorker()
-        @func_set_timeout(15)
+        #@func_set_timeout(15)
         worker.startScheduler()
-        @func_set_timeout(15)
+        #@func_set_timeout(15)
         worker.connectBrokerService()
         sleep(2)
     except Exception:
@@ -391,10 +389,8 @@ def runExperiment(experiment):
     reboot_barrier = threading.Barrier(reboot_barrier_size)
     for device in devices:
         if not device.already_rebooted:
-            threading.Thread(target=rebootDevice, args=(device, None, reboot_barrier)).start()
-            rebootDevice(device, reboot_barrier=reboot_barrier)
-            sleep(5)
-        adb.screenOff(device)
+            threading.Thread(target=rebootDevice, args=(device,), kwargs={'reboot_barrier':reboot_barrier, 'screenOff':True}).start()
+            sleep(2)
     barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
 
     for repetition in range(experiment.repetitions):
@@ -462,13 +458,16 @@ def runExperiment(experiment):
                     log("BROKEN_BARRIER\tSTART_BARRIER\tMAIN")
 
                 completetion_timeout_start = time()
+                i=0
                 while (PENDING_JOBS > 0 and experiment.isOK()) or experiment.duration > time()-completetion_timeout_start:
                     sleep(2)
-                    log("CURRENT_EXPERIMENT_DURATION\t{}ms".format(time()-completetion_timeout_start))
+                    if (i % 20) == 0:
+                        log("CURRENT_EXPERIMENT_DURATION\t{}s".format(time()-completetion_timeout_start))
                     if (time()-completetion_timeout_start > experiment.duration+experiment.timeout):
                         log("COMPLETION_TIMEOUT_EXCEDED")
                         os.system("touch logs/experiment/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
                         break
+                    i+=1
                 sleep(2)
                 log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
                 if not barrierWithTimeout(complete_barrier, 240, experiment, True, "MAIN"):
@@ -526,7 +525,7 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
         barrierWithTimeout(battery_barrier, 3600, show_error=False)
         return getNeededDevicesAvailable(experiment, devices, retries-1)
 
-def rebootDevice(device, retries=3, reboot_barrier=None):
+def rebootDevice(device, retries=3, reboot_barrier=None, screenOff=False):
     if retries < 0:
         log("REBOOT_DEVICE_FAIL\t%s" % device.name)
         if reboot_barrier is not None:
@@ -536,6 +535,8 @@ def rebootDevice(device, retries=3, reboot_barrier=None):
     pre_reboot_worker_ip = getDeviceIp(device)
     if adb.rebootAndWait(device, timeout=180):
         log("REBOOT_DEVICE_COMPLETE\t%s" % device.name)
+        if screenOff:
+            adb.screenOff(device)
         if reboot_barrier is not None:
             barrierWithTimeout(reboot_barrier, show_error=True, device=device.name)
         return True
@@ -1044,7 +1045,7 @@ def main():
         complete_progress = CURSES.add_text(1,15,1)
 
     i = 0
-    while i < len(EXPERIMENTS) and len(SCHEDULED_EXPERIMENTS) > 0:
+    while i < len(EXPERIMENTS) or len(SCHEDULED_EXPERIMENTS) > 0:
         run_scheduled = False
         next_experiment = None
         for e,t in SCHEDULED_EXPERIMENTS.items():

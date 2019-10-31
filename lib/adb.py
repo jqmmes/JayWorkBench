@@ -55,16 +55,6 @@ def log(str, level, end="\n"):
 
 def adb(cmd, device=None, force_usb=False, log_command=True):
     selected_device = []
-    if(device != None):
-        usb_connection_active, wifi_connection_active = getADBStatus(device, log_command=False)
-        if (not wifi_connection_active and device.connected_wifi):
-            wifi_connection_active = connectWifiADB(device, force_connection=True)[1]
-        if (device.connected_wifi and wifi_connection_active and not force_usb):
-            selected_device = ['-s', "%s:5555" % device.ip]
-        elif (device.connected_usb and usb_connection_active):
-            selected_device = ['-s', device.name]
-        else:
-            return ""
     if (DEBUG and log_command):
         if device is not None:
             if (device.connected_wifi and not force_usb):
@@ -80,6 +70,16 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
         for i in cmd:
             debug += " " + i
         log(debug, "COMMAND")
+    if(device != None):
+        usb_connection_active, wifi_connection_active = getADBStatus(device, log_command=False)
+        if (not wifi_connection_active and device.connected_wifi and not force_usb):
+            wifi_connection_active = connectWifiADB(device, force_connection=True)[1]
+        if (device.connected_wifi and wifi_connection_active and not force_usb):
+            selected_device = ['-s', "%s:5555" % device.ip]
+        elif (device.connected_usb and usb_connection_active):
+            selected_device = ['-s', device.name]
+        else:
+            return ""
     result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 
@@ -137,10 +137,10 @@ def connectWifiADB(device, retries=3, force_connection=True):
         if device.connected_wifi:
             for x in range(3):
                 sleep(5)
-                force_usb, connected = getADBStatus(device)
+                force_usb, connected = getADBStatus(device, log_command=False)
                 if connected:
                     return (device, True)
-        force_usb, _ = getADBStatus(device)
+        force_usb, _ = getADBStatus(device, log_command=False)
         if force_usb:
             if rebootAndWait(device, connectWifi=True, force_usb=True):
                 return (device, True)
@@ -404,7 +404,7 @@ def getDeviceIp(device, timeout=10):
 
 def rebootAndWait(device, timeout=300, connectWifi=False, force_usb=False):
     start_time = time()
-    adb(['reboot'], device, force_usb)
+    adb(['reboot'], device, force_usb=force_usb)
     if (device.connected_wifi or connectWifi):
         device.connected_wifi = False
         while (not connectWifiADB(device, force_connection=False)[1]):
