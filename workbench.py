@@ -13,6 +13,7 @@ import subprocess
 from datetime import datetime
 import argparse
 from collections import deque
+from func_timeout import func_set_timeout
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
@@ -236,11 +237,16 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             return
         log("STARTING_SERVICES\t%s" % device.name)
         worker = grpcControls.remoteClient(worker_ip, device.name, LOG_FILE)
+        @func_set_timeout(15)
         worker.connectLauncherService()
+        @func_set_timeout(15)
         worker.setLogName(experiment.name)
         if is_worker:
+            @func_set_timeout(15)
             worker.startWorker()
+        @func_set_timeout(15)
         worker.startScheduler()
+        @func_set_timeout(15)
         worker.connectBrokerService()
         sleep(2)
     except Exception:
@@ -450,6 +456,7 @@ def runExperiment(experiment):
                 completetion_timeout_start = time()
                 while (PENDING_JOBS > 0 and experiment.isOK()) or experiment.duration > time()-completetion_timeout_start:
                     sleep(2)
+                    log("CURRENT_EXPERIMENT_DURATION\t{}ms".format(time()-completetion_timeout_start))
                     if (time()-completetion_timeout_start > experiment.duration+experiment.timeout):
                         log("COMPLETION_TIMEOUT_EXCEDED")
                         os.system("touch logs/experiment/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
