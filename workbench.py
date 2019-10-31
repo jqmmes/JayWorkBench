@@ -439,11 +439,11 @@ def runExperiment(experiment):
                     i += 1
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
-                log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN_LOOP")
+                log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN")
                 if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, "MAIN"): # 15m
                     log("BROKEN_BARRIER\tBOOT_BARRIER\tMAIN")
                 sleep(1)
-                log("WAIT_ON_BARRIER\tSTART_BARRIER\tMAIN_LOOP")
+                log("WAIT_ON_BARRIER\tSTART_BARRIER\tMAIN")
                 if not barrierWithTimeout(start_barrier, 60, experiment, True, "MAIN"):
                     log("BROKEN_BARRIER\tSTART_BARRIER\tMAIN")
 
