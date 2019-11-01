@@ -39,8 +39,9 @@ FNULL = open(os.devnull, "w")
 def log(str, level, end="\n"):
     global ADB_LOGS_LOCK
     if DEBUG and ADB_DEBUG_FILE is not None and (level == LOG_LEVEL or LOG_LEVEL == "ALL"):
+        lock_acquired = False
         if ADB_LOGS_LOCK is not None:
-            ADB_LOGS_LOCK.acquire()
+            lock_acquired = ADB_LOGS_LOCK.acquire(timeout=2)
         try:
             ADB_DEBUG_FILE.write(ctime()+"\t"+str)
         except:
@@ -50,7 +51,7 @@ def log(str, level, end="\n"):
         except:
             None
         ADB_DEBUG_FILE.flush()
-        if ADB_LOGS_LOCK is not None:
+        if lock_acquired:
             ADB_LOGS_LOCK.release()
 
 def adb(cmd, device=None, force_usb=False, log_command=True):
@@ -226,13 +227,12 @@ def ping_thread(hostname, network_devices=[], lock=None):
     global COUNTER
     response = subprocess.run(['ping', '-t 1', '-c 5', hostname], stdout=FNULL, stderr=FNULL)
     #and then check the response..
-    if response.returncode == 0:
-        lock.acquire()
+    if response.returncode == 0 and lock.acquire(timeout=2):
         network_devices.append(hostname)
         lock.release()
-    lock.acquire()
-    COUNTER -= 1
-    lock.release()
+    if lock.acquire(timeout=2):
+        COUNTER -= 1
+        lock.release()
 
 def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, ignore_list=[]):
     global COUNTER

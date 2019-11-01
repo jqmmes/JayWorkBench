@@ -50,20 +50,17 @@ class cloudControl:
     def log(self, str, end="\n"):
         global GRPC_LOGS_LOCK
         if DEBUG:
+            lock_acquired = False
+            if GRPC_LOGS_LOCK is not None:
+                lock_acquired = GRPC_LOGS_LOCK.acquire(timeout=2)
             if GRPC_DEBUG_FILE is None:
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.acquire()
                 self.log_file.write(ctime()+"\t"+str+end)
                 self.log_file.flush()
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.release()
             else:
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.acquire()
                 GRPC_DEBUG_FILE.write(ctime()+"\t"+str+end)
                 GRPC_DEBUG_FILE.flush()
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.release()
+            if lock_acquired:
+                GRPC_LOGS_LOCK.release()
 
     def connect(self, retries=5):
         try:
@@ -132,20 +129,17 @@ class cloudClient:
     def log(self, str, end="\n"):
         global GRPC_LOGS_LOCK
         if DEBUG:
+            lock_acquired = False
+            if GRPC_LOGS_LOCK is not None:
+                lock_acquired = GRPC_LOGS_LOCK.acquire(timeout=2)
             if GRPC_DEBUG_FILE is None:
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.acquire()
                 self.log_file.write(ctime()+"\t"+str+end)
                 self.log_file.flush()
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.release()
             else:
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.acquire()
                 GRPC_DEBUG_FILE.write(ctime()+"\t"+str+end)
                 GRPC_DEBUG_FILE.flush()
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.release()
+            if lock_acquired:
+                GRPC_LOGS_LOCK.release()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status
@@ -311,20 +305,17 @@ class remoteClient:
     def log(self, str, end="\n"):
         global GRPC_LOGS_LOCK
         if DEBUG:
+            lock_acquired = False
+            if GRPC_LOGS_LOCK is not None:
+                lock_acquired = GRPC_LOGS_LOCK.acquire(timeout=2)
             if GRPC_DEBUG_FILE is None:
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.acquire()
                 self.log_file.write(ctime()+"\t"+str+end)
                 self.log_file.flush()
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.release()
             else:
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.acquire()
                 GRPC_DEBUG_FILE.write(ctime()+"\t"+str+end)
                 GRPC_DEBUG_FILE.flush()
-                if GRPC_LOGS_LOCK is not None:
-                    GRPC_LOGS_LOCK.release()
+            if lock_acquired:
+                GRPC_LOGS_LOCK.release()
 
     def launcherStubStatusCallback(self, status):
         self.launcherStubStatus = status

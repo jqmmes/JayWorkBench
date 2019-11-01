@@ -3,7 +3,7 @@ import lib.adb as adb
 from lib.curse import draw_curses
 from time import sleep, time, gmtime, ctime
 import random
-import threading
+from threading import Barrier, Lock, Thread, BrokenBarrierError
 import os
 import shutil
 import configparser
@@ -13,6 +13,7 @@ import subprocess
 from datetime import datetime
 import argparse
 from collections import deque
+from func_timeout import func_timeout, FunctionTimedOut
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
@@ -24,15 +25,15 @@ FNULL = open(os.devnull, "w")
 LOG_FILE = stdout
 CURSES = None
 CURSES_LOGS = None
-CURSES_LOGS_LOCK = threading.Lock()
-LOGS_LOCK = threading.Lock()
+CURSES_LOGS_LOCK = Lock()
+LOGS_LOCK = Lock()
 
 def log(str, end="\n"):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
-    LOGS_LOCK.acquire()
-    LOG_FILE.write(ctime()+"\t"+str+end)
-    LOG_FILE.flush()
-    LOGS_LOCK.release()
+    if LOGS_LOCK.acquire(timeout=2):
+        LOG_FILE.write(ctime()+"\t"+str+end)
+        LOG_FILE.flush()
+        LOGS_LOCK.release()
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
@@ -43,14 +44,14 @@ def write_curses_logs():
     global CURSES_LOGS, CURSES_LOGS_LOCK
     if not CURSES_LOGS:
         return
-    CURSES_LOGS_LOCK.acquire()
-    for i in range(min(len(CURSES_LOGS), CURSES.maxHeight()-5)):
-        CURSES.add_text(1,CURSES.maxWidth(),6+i,text="#\t{}".format(CURSES_LOGS[i]))
-    CURSES_LOGS_LOCK.release()
+    if CURSES_LOGS_LOCK.acquire(timeout=2):
+        for i in range(min(len(CURSES_LOGS), CURSES.maxHeight()-5)):
+            CURSES.add_text(1,CURSES.maxWidth(),6+i,text="#\t{}".format(CURSES_LOGS[i]))
+        CURSES_LOGS_LOCK.release()
 
 
 def brokenBarrierExceptionHook(exception_type, exception, traceback):
-    if (exception_type is threading.BrokenBarrierError):
+    if (exception_type is BrokenBarrierError):
         pass
     else:
         log("%s: %s" % (exception_type.__name__, exception))
@@ -119,7 +120,7 @@ def barrierWithTimeout(barrier, timeout=None, experiment=None, show_error=True, 
         if timeout is not None:
             barrier.wait(timeout=timeout)
         else:
-            barrier.wait()
+            barrier.wait(timeout=2400) # 40mins max timeout overall
     except Exception as barrier_exception:
         skipBarriers(experiment, show_error, device, *skip_barriers)
         return False
@@ -247,6 +248,11 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         #@func_set_timeout(15)
         worker.connectBrokerService()
         sleep(2)
+    except FunctionTimedOut:
+        log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
+        skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+        experiment.deviceFail(device.name)
+        return
     except Exception:
         log("Error Starting Worker %s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
@@ -255,9 +261,15 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if experiment.settings:
         print("---> SETTINGS")
         worker.setSettings(experiment.settings)
-    schedulers = worker.listSchedulers()
-    if is_worker:
-        models = worker.listModels()
+    try:
+        schedulers = worker.listSchedulers()
+        if is_worker:
+            models = worker.listModels()
+    except FunctionTimedOut:
+        log("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
+        skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+        experiment.deviceFail(device.name)
+        return
     if (schedulers is None):# or models is None):
         log("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
@@ -292,7 +304,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
         log("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
         sleep(job_intervals[i])
-        threading.Thread(target = createJob, args = (worker,asset_list[i])).start()
+        Thread(target = createJob, args = (worker,asset_list[i])).start()
         i = i+1
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
@@ -386,10 +398,10 @@ def runExperiment(experiment):
     for device in devices:
         if not device.already_rebooted:
             reboot_barrier_size += 1
-    reboot_barrier = threading.Barrier(reboot_barrier_size)
+    reboot_barrier = Barrier(reboot_barrier_size)
     for device in devices:
         if not device.already_rebooted:
-            threading.Thread(target=rebootDevice, args=(device,), kwargs={'reboot_barrier':reboot_barrier, 'screenOff':True}).start()
+            Thread(target=rebootDevice, args=(device,), kwargs={'reboot_barrier':reboot_barrier, 'screenOff':True}).start()
             sleep(2)
     barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
 
@@ -430,12 +442,12 @@ def runExperiment(experiment):
                             experiment_devices.remove(dev)
 
                 os.makedirs("logs/experiment/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
-                boot_barrier = threading.Barrier(experiment.devices + 1)
-                start_barrier = threading.Barrier(experiment.devices + 1)
-                complete_barrier = threading.Barrier(experiment.devices + 1)
-                log_pull_barrier = threading.Barrier(experiment.devices + 1)
-                finish_barrier = threading.Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
-                servers_finish_barrier = threading.Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
+                boot_barrier = Barrier(experiment.devices + 1)
+                start_barrier = Barrier(experiment.devices + 1)
+                complete_barrier = Barrier(experiment.devices + 1)
+                log_pull_barrier = Barrier(experiment.devices + 1)
+                finish_barrier = Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
+                servers_finish_barrier = Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
@@ -443,7 +455,7 @@ def runExperiment(experiment):
                 workers = experiment.workers
                 i = 0
                 for device in experiment_devices[:experiment.devices]:
-                    threading.Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
+                    Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
@@ -519,9 +531,9 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
             experiment.setFail()
             os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
             return []
-        battery_barrier = threading.Barrier(experiment.devices - len(good_to_use) + 1)
+        battery_barrier = Barrier(experiment.devices - len(good_to_use) + 1)
         for device in good_to_charge:
-            threading.Thread(target = chargeDevice, args = (experiment.min_battery, device, battery_barrier)).start()
+            Thread(target = chargeDevice, args = (experiment.min_battery, device, battery_barrier)).start()
         barrierWithTimeout(battery_barrier, 3600, show_error=False)
         return getNeededDevicesAvailable(experiment, devices, retries-1)
 
@@ -568,10 +580,10 @@ def chargeDevice(min_battery, device, battery_barrier):
     barrierWithTimeout(battery_barrier, 3600, show_error=False)
 
 def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
-    cloudlet_boot_barrier = threading.Barrier(len(experiment.cloudlets) + 1)
+    cloudlet_boot_barrier = Barrier(len(experiment.cloudlets) + 1)
     i = 0
     for cloudlet in experiment.cloudlets:
-        threading.Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+        Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         i += 1
     barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, "START_CLOUDLETS", servers_finish_barrier, finish_barrier)
 
@@ -634,7 +646,7 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     stdout.flush()
     if (not experiment.isOK()):
-        skipBarriers(experiment, True, cloud_instance, cloud_boot_barrier, servers_finish_barrier, finish_barrier)
+        skipBarriers(experiment, True, cloud.address, cloud_boot_barrier, servers_finish_barrier, finish_barrier)
         return
     adb.cloudInstanceStart(cloud.instance, cloud.zone)
     while (not adb.cloudInstanceRunning(cloud.instance)):
@@ -685,12 +697,12 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
 
 
 def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
-    cloud_boot_barrier = threading.Barrier(len(experiment.clouds) + 1)
+    cloud_boot_barrier = Barrier(len(experiment.clouds) + 1)
     for cloud in experiment.clouds:
         if (cloud.zone == "localhost"):
-            threading.Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+            Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         else:
-            threading.Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+            Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
     barrierWithTimeout(cloud_boot_barrier, 600, experiment, True, "START_CLOUDS", servers_finish_barrier, finish_barrier)
     if len(experiment.clouds) > 0:
         log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
