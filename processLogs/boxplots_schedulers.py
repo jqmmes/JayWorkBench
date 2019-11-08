@@ -124,6 +124,7 @@ for scheduler in schedulers:
                                 checking_5s = " 5s"
                             if use_calibrated:
                                 calibrated = " CALIBRATED"
+                            print("ADDING\t{}".format(scheduler+cloudlet+cloud+checking_5s+checking_500ms+calibrated))
                             fig_0.add_trace(go.Box(y=data_transfer, x=group_labels, name=scheduler+cloudlet+cloud+checking_5s+checking_500ms+calibrated))
                             fig_1.add_trace(go.Box(y=image_load, x=group_labels, name=scheduler+cloudlet+cloud+checking_5s+checking_500ms+calibrated))
                             fig_2.add_trace(go.Box(y=detection, x=group_labels, name=scheduler+cloudlet+cloud+checking_5s+checking_500ms+calibrated))
