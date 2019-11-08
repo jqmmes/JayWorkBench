@@ -55,13 +55,11 @@ def brokenBarrierExceptionHook(exception_type, exception, traceback):
         pass
     else:
         log("%s: %s" % (exception_type.__name__, exception))
-        #raise exception
 
 sys.excepthook = brokenBarrierExceptionHook
 
 def ping(hostname):
     response = os.system("ping -c 1 %s >/dev/null 2>&1" % hostname)
-    #and then check the response...
     if response == 0:
         return True
     else:
@@ -69,10 +67,7 @@ def ping(hostname):
 
 def pingWait(hostname):
     while(not ping(hostname)):
-        #log(".", end='')
-        #stdout.flush()
         sleep(2)
-    #log("")
 
 def createJob(worker, asset_id):
     global PENDING_JOBS
@@ -163,6 +158,18 @@ def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3
                     log("REBOOT_WORKER_FAIL\t%s" % device.name)
                     return False
 
+# TODO: tentar matar pelo system:
+# lsof -i tcp:50000 | grep "->device.host_name:50000"
+# tcpkill
+def destroyWorker(worker, device):
+    try:
+        log("STOP_WORKER\tSTART\t%s" % device.name)
+        worker.destroy()
+        adb.stopAll(device)
+        log("STOP_WORKER\tCOMPLETE\t%s" % device.name)
+    except:
+        log("STOP_WORKER\tERROR\t%s" % device.name)
+
 def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
     global PENDING_JOBS, PENDING_WORKERS
     if (adb.freeSpace(device=device) < 1.0):
@@ -227,6 +234,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
         return
+    worker = None
     try:
         worker_ip = getDeviceIp(device)
         if (worker_ip is None and retries < 5):
@@ -237,29 +245,24 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             return
         log("STARTING_SERVICES\t%s" % device.name)
         worker = grpcControls.remoteClient(worker_ip, device.name, LOG_FILE)
-        #@func_set_timeout(15)
         worker.connectLauncherService()
-        #@func_set_timeout(15)
         worker.setLogName(experiment.name)
         if is_worker:
             worker.startWorker()
-        #@func_set_timeout(15)
         worker.startScheduler()
-        #@func_set_timeout(15)
         worker.connectBrokerService()
         sleep(2)
     except FunctionTimedOut:
         log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
-        skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
-        experiment.deviceFail(device.name)
-        return
     except Exception:
         log("Error Starting Worker %s" % device.name)
+    finally:
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
+        if worker is not None:
+            destroyWorker(worker, device)
         return
     if experiment.settings:
-        print("---> SETTINGS")
         worker.setSettings(experiment.settings)
     try:
         schedulers = worker.listSchedulers()
@@ -269,11 +272,13 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
+        destroyWorker(worker, device)
         return
     if (schedulers is None):# or models is None):
         log("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
+        destroyWorker(worker, device)
         return
     for scheduler in schedulers.scheduler:
         if scheduler.name == experiment.scheduler and experiment.isOK():
@@ -281,6 +286,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                 log("Failed to setScheduler on %s" % device.name)
                 skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
                 experiment.deviceFail(device.name)
+                destroyWorker(worker, device)
                 return
             break
     if is_worker:
@@ -290,11 +296,13 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                     log("Failed to setModel on %s" % device.name)
                     skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
                     experiment.deviceFail(device.name)
+                    destroyWorker(worker, device)
                     return
                 break
     log("WAIT_ON_BARRIER\tBOOT_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, device.name, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
+        destroyWorker(worker, device)
         return
     if is_worker and experiment.calibration:
         calibrateWorkerThread(worker, worker_seed, device)
@@ -309,19 +317,14 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
+        destroyWorker(worker, device)
         return
     adb.screenOff(device)
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
         log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
+        destroyWorker(worker, device)
         return
-    try:
-        log("STOP_WORKER\tSTART\t%s" % device.name)
-        worker.destroy()
-        adb.stopAll(device)
-        log("STOP_WORKER\tCOMPLETE\t%s" % device.name)
-    except:
-        log("STOP_WORKER\tERROR\t%s" % device.name)
     try:
         if (experiment.isOK()):
             log("PULLING_LOG\t%s\tLOG" % device.name)
@@ -351,6 +354,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log("CHECKING_LOG\t%s\tFAILED" % device.name)
         experiment.setFail()
         experiment.deviceFail(device.name)
+    destroyWorker(worker, device)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
     barrierWithTimeout(finish_barrier)
     adb.screenOff(device)
@@ -382,7 +386,7 @@ def runExperiment(experiment):
     cleanLogs("logs/sys/%s/" % experiment.name)
     ASSETS=os.listdir(experiment.assets)
 
-    devices = ALL_DEVICES #adb.listDevices(0)
+    devices = ALL_DEVICES
     if (len(devices) < experiment.devices):
         os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
@@ -471,7 +475,7 @@ def runExperiment(experiment):
 
                 completetion_timeout_start = time()
                 i=0
-                while (PENDING_JOBS > 0 and experiment.isOK()) or experiment.duration > time()-completetion_timeout_start:
+                while (PENDING_JOBS > 0 and experiment.isOK()) or (experiment.duration > time()-completetion_timeout_start and experiment.isOK()):
                     sleep(2)
                     if (i % 20) == 0:
                         log("CURRENT_EXPERIMENT_DURATION\t{}s".format(time()-completetion_timeout_start))
