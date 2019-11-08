@@ -235,6 +235,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         experiment.deviceFail(device.name)
         return
     worker = None
+    error = False
     try:
         worker_ip = getDeviceIp(device)
         if (worker_ip is None and retries < 5):
@@ -254,9 +255,11 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         sleep(2)
     except FunctionTimedOut:
         log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
+        error = True
     except Exception:
         log("Error Starting Worker %s" % device.name)
-    finally:
+        error = True
+    if error:
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
         if worker is not None:
