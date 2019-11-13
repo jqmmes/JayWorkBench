@@ -26,6 +26,7 @@ class Device:
     connected_wifi = False
     connected_usb = True
     already_rebooted = False
+    battery_level = 0
 
     def __init__(self, name, ip = "", status = False, wifi = False, usb=True):
         self.name = name

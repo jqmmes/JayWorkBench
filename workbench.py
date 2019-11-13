@@ -522,11 +522,13 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
     to_charge = []
     good_to_use = []
     for device in devices:
-        if getBatteryLevel(device) >= experiment.min_battery:
+        device.battery_level = getBatteryLevel(device)
+        if device.battery_level >= experiment.min_battery:
             good_to_use.append(device)
         else:
             to_charge.append(device)
     if len(good_to_use) >= experiment.devices:
+        good_to_use.sort(key=lambda d: d.battery_level, reverse=True) #Return sorted by most battery
         return good_to_use
     else:
         discoverable_devices = adb.listDevices(0)
