@@ -228,12 +228,12 @@ class cloudClient:
         if (self.brokerStubReady()):
             try:
                 settings_proto = ODProto_pb2.Settings()
+                for key in settings_map:
+                    settings_proto.setting[key] = settings_map[key]
                 if mcast_interface:
                     settings_proto.setting["MCAST_INTERFACE"] = mcast_interface
                 if advertise_worker:
                     settings_proto.setting["ADVERTISE_WORKER_STATUS"] = "true"
-                for key in settings_map:
-                    settings_proto.setting[key] = settings_map[key]
                 return self.brokerStub.setSettings(settings_proto)
             except:
                 return False
