@@ -389,7 +389,8 @@ def runExperiment(experiment):
     cleanLogs("logs/sys/%s/" % experiment.name)
     ASSETS=os.listdir(experiment.assets)
 
-    devices = ALL_DEVICES
+    #devices = ALL_DEVICES
+    devices = getNeededDevicesAvailable(experiment, ALL_DEVICES)
     if (len(devices) < experiment.devices):
         os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
@@ -612,11 +613,12 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     cloudlet_instance.stop()
     cloudlet_instance.connectLauncherService()
     cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
-    if experiment.settings or experiment.mcast_interface:
-        cloudlet_instance.setSettings(experiment.settings, experiment.mcast_interface)
     cloudlet_instance.startWorker()
     sleep(1)
     cloudlet_instance.connectBrokerService()
+    sleep(1)
+    if experiment.settings or experiment.mcast_interface:
+        cloudlet_instance.setSettings(experiment.settings, experiment.mcast_interface, advertise_worker=True)
     sleep(1)
     models = cloudlet_instance.listModels()
     if (models is None):
@@ -671,9 +673,12 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     cloud_instance.connectLauncherService()
     cloud_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
     cloud_instance.startWorker()
-    sleep(2)
+    sleep(1)
     cloud_instance.connectBrokerService()
-    sleep(2)
+    sleep(1)
+    if experiment.settings:
+        cloud_instance.setSettings(experiment.settings)
+    sleep(1)
     models = cloud_instance.listModels()
     if (models is None):
         experiment.setFail()
@@ -756,6 +761,7 @@ class Experiment:
 
     def __init__(self, name):
         self.name = name
+        self.settings["ADVERTISE_WORKER_STATUS"] = "true"
 
     def setFail(self):
         self._running_status = False
@@ -937,13 +943,15 @@ def help():
                     PING_PAYLOAD_SIZE
                     averageComputationTimesToStore
                     workingThreads
-                    workerStatusUpdateInterval
-                    AUTO_STATUS_UPDATE_INTERVAL_MS
+                    [*] workerStatusUpdateInterval     default 5000 (5s)  LOCAL WORKER INFO UPDATE DELAY
+                    [*] AUTO_STATUS_UPDATE_INTERVAL_MS  default 5000 (5s) PROACTIVE REQUEST FOR WORKER DETAILS
                     RTTDelayMillisFailRetry
                     RTTDelayMillisFailAttempts
                     DEVICE_ID
-                    BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
+                    [*] BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
                     MCAST_INTERFACE
+                    BANDWIDTH_ESTIMATE_CALC_METHOD      [mean/median]  default: mean
+                    [*] ADVERTISE_WORKER_STATUS: [true/false] default: true ENABLES DEVICE ADVERTISMENT Use when want LOCAL + CLOUDLET
         ================================================ HELP ================================================''')
 
 def logExperiment(conf, experiment):

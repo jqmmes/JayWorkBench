@@ -418,6 +418,7 @@ def rebootAndWait(device, timeout=300, connectWifi=False, force_usb=False):
         if (time()-start_time > timeout):
             return False
         sleep(5)
+        boot_complete = adb(['shell', 'getprop', 'dev.bootcomplete'], device)
     device.already_rebooted = True
     return True
 

@@ -224,12 +224,14 @@ class cloudClient:
         sleep(5)
         return self.setModel(model, retries-1)
 
-    def setSettings(self, settings_map, mcast_interface = None):
+    def setSettings(self, settings_map, mcast_interface = None, advertise_worker=False):
         if (self.brokerStubReady()):
             try:
                 settings_proto = ODProto_pb2.Settings()
                 if mcast_interface:
                     settings_proto.setting["MCAST_INTERFACE"] = mcast_interface
+                if advertise_worker:
+                    settings_proto.setting["ADVERTISE_WORKER_STATUS"] = "true"
                 for key in settings_map:
                     settings_proto.setting[key] = settings_map[key]
                 return self.brokerStub.setSettings(settings_proto)
