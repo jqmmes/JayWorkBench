@@ -93,7 +93,7 @@ def gcloud(cmd):
   result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE, stderr=FNULL)
   return result.stdout.decode('UTF-8')
 
-def getBatteryLevel(device=None, retries=5):
+def getBatteryLevel(device=None, retries=3):
     if (retries <= 0):
         return -1
     battery_details = adb(['shell', 'dumpsys', 'battery'], device)

@@ -13,7 +13,7 @@ import subprocess
 from datetime import datetime
 import argparse
 from collections import deque
-from func_timeout import func_timeout, FunctionTimedOut
+from func_timeout import func_timeout, FunctionTimedOut, func_set_timeout
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
@@ -21,6 +21,7 @@ PENDING_JOBS = 0
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
+DEVICE_BLACKLIST = []
 FNULL = open(os.devnull, "w")
 LOG_FILE = stdout
 CURSES = None
@@ -28,11 +29,18 @@ CURSES_LOGS = None
 CURSES_LOGS_LOCK = Lock()
 LOGS_LOCK = Lock()
 
+@func_set_timeout(1)
+def write_to_file(f, str, end):
+    f.write(ctime()+"\t"+str+end)
+    f.flush()
+
 def log(str, end="\n"):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
     if LOGS_LOCK.acquire(timeout=2):
-        LOG_FILE.write(ctime()+"\t"+str+end)
-        LOG_FILE.flush()
+        try:
+            write_to_file(LOG_FILE,str,end)
+        except:
+            pass
         LOGS_LOCK.release()
     if CURSES:
         CURSES_LOGS.append(str)
@@ -138,8 +146,8 @@ def getDeviceIp(device):
         return worker_ip if worker_ip is not None else sleep(5)
     return None
 
-def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3):
-    global LAST_REBOOT_TIME
+def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=2):
+    global LAST_REBOOT_TIME, DEVICE_BLACKLIST
     while True:
         sleep_duration = device_random.randint(0,max_sleep_random)
         sleep(sleep_duration)
@@ -149,6 +157,8 @@ def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3
             pre_reboot_worker_ip = getDeviceIp(device)
             if adb.rebootAndWait(device, timeout=180):
                 log("REBOOT_WORKER_COMPLETE\t%s" % device.name)
+                if device.name in DEVICE_BLACKLIST:
+                    DEVICE_BLACKLIST.remove(device.name)
                 return True
             else:
                 if (retries > 0):
@@ -156,6 +166,8 @@ def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=3
                     return experimentRebootDevice(device, device_random, 10, retries - 1)
                 else:
                     log("REBOOT_WORKER_FAIL\t%s" % device.name)
+                    if device.name not in DEVICE_BLACKLIST:
+                        DEVICE_BLACKLIST.append(device.name)
                     return False
 
 # TODO: tentar matar pelo system:
@@ -374,7 +386,7 @@ def cleanLogs(path):
         os.makedirs(path, exist_ok=True)
 
 def runExperiment(experiment):
-    global PENDING_JOBS, ALL_DEVICES, ASSETS, CURSES
+    global PENDING_JOBS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES
 
     if CURSES:
         CURSES.add_text(1,200,3,text="EXPERIMENT: {}".format(experiment.name))
@@ -390,7 +402,14 @@ def runExperiment(experiment):
     ASSETS=os.listdir(experiment.assets)
 
     #devices = ALL_DEVICES
-    devices = getNeededDevicesAvailable(experiment, ALL_DEVICES)
+    if len(ALL_DEVICES) - len(DEVICE_BLACKLIST) >= experiment.devices:
+        devices_to_test = []
+        for dev in ALL_DEVICES:
+            if dev.name not in DEVICE_BLACKLIST:
+                devices_to_test.append(dev)
+        devices = getNeededDevicesAvailable(experiment, devices_to_test)
+    else:
+        devices = getNeededDevicesAvailable(experiment, ALL_DEVICES)
     if (len(devices) < experiment.devices):
         os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
@@ -432,7 +451,14 @@ def runExperiment(experiment):
                 experiment.setOK()
                 stopClouds(experiment)
 
-                experiment_devices = getNeededDevicesAvailable(experiment, devices)
+                if len(devices) - len(DEVICE_BLACKLIST) >= experiment.devices:
+                    devices_to_test = []
+                    for dev in devices:
+                        if dev.name not in DEVICE_BLACKLIST:
+                            devices_to_test.append(dev)
+                    experiment_devices = getNeededDevicesAvailable(experiment, devices_to_test)
+                else:
+                    experiment_devices = getNeededDevicesAvailable(experiment, devices)
                 if experiment_devices == []:
                     os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
                     log("=========================\tEXPERIMET_FAILED_NOT_ENOUGHT_DEVICES\t{}\t========================".format(experiment.name))
@@ -547,11 +573,14 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
         barrierWithTimeout(battery_barrier, 3600, show_error=False)
         return getNeededDevicesAvailable(experiment, devices, retries-1)
 
-def rebootDevice(device, retries=3, reboot_barrier=None, screenOff=False):
+def rebootDevice(device, retries=2, reboot_barrier=None, screenOff=False):
+    global DEVICE_BLACKLIST
     if retries < 0:
         log("REBOOT_DEVICE_FAIL\t%s" % device.name)
         if reboot_barrier is not None:
             skipBarriers(None, True, device.name, reboot_barrier)
+        if device.name not in DEVICE_BLACKLIST:
+            DEVICE_BLACKLIST.append(device)
         return False
     log("REBOOT_DEVICE\t%s" % device.name)
     pre_reboot_worker_ip = getDeviceIp(device)
@@ -561,12 +590,14 @@ def rebootDevice(device, retries=3, reboot_barrier=None, screenOff=False):
             adb.screenOff(device)
         if reboot_barrier is not None:
             barrierWithTimeout(reboot_barrier, show_error=True, device=device.name)
+        if device.name in DEVICE_BLACKLIST:
+            DEVICE_BLACKLIST.remove(device.name)
         return True
     else:
         log("REBOOT_DEVICE_RETRY\t%s" % device.name)
         return rebootDevice(device, retries - 1)
 
-def getBatteryLevel(device, retries=5):
+def getBatteryLevel(device, retries=2):
     if retries < 0:
         return -1
     battery_level = adb.getBatteryLevel(device)
@@ -952,7 +983,8 @@ def help():
                     DEVICE_ID
                     [*] BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
                     MCAST_INTERFACE
-                    BANDWIDTH_ESTIMATE_CALC_METHOD      [mean/median]  default: mean
+                    [*] BANDWIDTH_ESTIMATE_CALC_METHOD      [mean/median]  default: mean
+                    [*] BANDWIDTH_SCALING_FACTOR             [Float] default: 1.0
                     [*] ADVERTISE_WORKER_STATUS: [true/false] default: true ENABLES DEVICE ADVERTISMENT Use when want LOCAL + CLOUDLET
         ================================================ HELP ================================================''')
 
@@ -1083,7 +1115,7 @@ def main():
                 next_experiment = e
                 SCHEDULED_EXPERIMENTS.pop(e, None)
                 break
-        missing_experiments.truncate(0)
+        missing_experiments.truncate()
         if not run_scheduled:
             next_experiment = EXPERIMENTS[i]
             for e in EXPERIMENTS[i+1:]:
@@ -1101,7 +1133,7 @@ def main():
             complete_progress.updateText("COMPLETE {}/{}".format(i,len(EXPERIMENTS)))
             sleep(2)
         runExperiment(next_experiment)
-        in_progress_experiments.truncate(0)
+        in_progress_experiments.truncate()
         completed_experiments.write(next_experiment.name+"\n")
         completed_experiments.flush()
         for file in os.listdir(new_experiments):
