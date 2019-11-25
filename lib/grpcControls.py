@@ -99,14 +99,14 @@ class cloudControl:
             sleep(5)
             self.start(retries-1)
 
-    def stop(self, retries=5):
+    def stop(self, retries=3):
         if retries <= 0:
             self.log("GRPC %s stop FAIL" % (self.ip))
             return
         if (self.__checkChannelStatus()):
             self.log("GRPC %s stop %s" % (self.ip, self.protoStub.stopODLauncher(CloudletControl_pb2.Empty())))
         else:
-            sleep(5)
+            sleep(2)
             self.stop(retries-1)
 
 class cloudClient:
@@ -257,14 +257,14 @@ class cloudClient:
             except:
                 return False
 
-    def stop(self, retries=5):
+    def stop(self, retries=3):
         if retries <= 0:
             self.log("GRPC %s (%s) stop FAIL" % (self.name, self.ip))
             return
         if (self.launcherStubReady()):
             self.log("GRPC %s (%s) stop %s" % (self.name, self.ip, self.launcherStub.Stop(Cloud_pb2.Empty()).value))
         else:
-            sleep(5)
+            sleep(2)
             self.stop(retries-1)
 
     def destroy(self):
