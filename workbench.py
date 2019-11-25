@@ -419,7 +419,8 @@ def runExperiment(experiment):
     conf.close()
 
     killLocalCloudlet()
-    stopClouds(experiment)
+    # Temporary for faster results
+    #stopClouds(experiment)
 
     reboot_barrier_size = 1
     for device in devices:
@@ -449,7 +450,8 @@ def runExperiment(experiment):
                 log("=========================\tSEED_REPEAT {} | ATTEMPT {}\t========================".format(seed_repeat, repeat_tries))
                 timeout = False
                 experiment.setOK()
-                stopClouds(experiment)
+                # Temporary for faster results
+                #stopClouds(experiment)
 
                 if len(devices) - len(DEVICE_BLACKLIST) >= experiment.devices:
                     devices_to_test = []
@@ -703,6 +705,7 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     sleep(1)
 
     cloud_instance = grpcControls.cloudClient(cloud.address, cloud.instance, LOG_FILE)
+    cloud_instance.stop()
     cloud_instance.connectLauncherService()
     cloud_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
     cloud_instance.startWorker()
@@ -735,7 +738,8 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     if (not experiment.isOK()):
         skipBarriers(experiment, True, cloud_instance, finish_barrier)
         return
-    adb.cloudInstanceStop(cloud.instance, cloud.zone)
+    # Temporary to increase experiment speed
+    #adb.cloudInstanceStop(cloud.instance, cloud.zone)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud.instance)
     barrierWithTimeout(finish_barrier)
     log("CLOUD_FINISHED\t%s" % cloud.instance)
