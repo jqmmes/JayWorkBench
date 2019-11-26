@@ -42,7 +42,6 @@ def processDir(dir, avg, local=True, remote=True, cloud=True):
                       .filter(data.JOB_ID.isNotNull())\
                       .filter(data.JOB_ID != 'WORKER_CALIBRATION')\
                       .select('NODE_NAME','JOB_ID','TIMESTAMP','CLASS_METHOD_LINE','OPERATION', 'ACTIONS'))
-
     #.filter(jobData.CLASS_METHOD_LINE == 'services.broker.BrokerService_scheduleJob$ODLib_Common_95')\
     start = jobData\
               .filter(jobData.OPERATION == 'INIT')\
