@@ -36,12 +36,12 @@ def write_to_file(f, str, end):
 
 def log(str, end="\n"):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
-    if LOGS_LOCK.acquire(timeout=2):
-        try:
-            write_to_file(LOG_FILE,str,end)
-        except:
-            pass
-        LOGS_LOCK.release()
+    #if LOGS_LOCK.acquire(timeout=2):
+    try:
+        write_to_file(LOG_FILE,str,end)
+    except:
+        pass
+    # LOGS_LOCK.release()
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
@@ -278,6 +278,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             destroyWorker(worker, device)
         return
     if experiment.settings:
+        log("SETTING_SETTINGS: {}".format(experiment.settings))
         worker.setSettings(experiment.settings)
     try:
         schedulers = worker.listSchedulers()
@@ -789,16 +790,17 @@ class Experiment:
     asset_type = "image"
     calibration = False
     asset_quality = "SD"
-    settings = {}
     mcast_interface = None
     min_battery = 20
-
     _failed_devices = {}
     _running_status = True
 
     def __init__(self, name):
         self.name = name
-        self.settings["ADVERTISE_WORKER_STATUS"] = "true"
+        self.settings = {"ADVERTISE_WORKER_STATUS": "true"}
+
+    def setSetting(self, key, val):
+        self.settings[key] = val
 
     def setFail(self):
         self._running_status = False
@@ -827,6 +829,7 @@ def readConfig(confName):
         startTime = None
         endTime = None
         experiment = Experiment(section)
+        log("{}".format(experiment.settings))
         for option in config.options(section):
             if option == "strategy":
                 experiment.scheduler = config[section][option]
@@ -883,8 +886,10 @@ def readConfig(confName):
                     experiment.asset_quality = config[section][option]
             elif option == "settings":
                 for entry in config[section][option].split(';'):
+                    setting = ""
                     setting = entry.split(':')
-                    experiment.settings[setting[0].strip()] = setting[1].strip()
+                    experiment.setSetting(setting[0].strip(), setting[1].strip())
+                    log("READING_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
             elif option == "multicastinterface":
                 experiment.mcast_interface = config[section][option]
             elif option == "minbattery":
@@ -1098,7 +1103,7 @@ def main():
     for cfg in args.configs:
         readConfig(cfg)
         shutil.copy(cfg, "{}/{}.loaded".format(loaded_experiments,cfg.split("/")[-1]))
-    EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
+    #EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
 
     if args.use_curses and not args.use_stdout:
         CURSES = draw_curses()
@@ -1119,7 +1124,8 @@ def main():
                 next_experiment = e
                 SCHEDULED_EXPERIMENTS.pop(e, None)
                 break
-        missing_experiments.truncate()
+        missing_experiments.truncate(0)
+        missing_experiments.seek(0)
         if not run_scheduled:
             next_experiment = EXPERIMENTS[i]
             for e in EXPERIMENTS[i+1:]:
@@ -1137,7 +1143,8 @@ def main():
             complete_progress.updateText("COMPLETE {}/{}".format(i,len(EXPERIMENTS)))
             sleep(2)
         runExperiment(next_experiment)
-        in_progress_experiments.truncate()
+        in_progress_experiments.truncate(0)
+        in_progress_experiments.seek(0)
         completed_experiments.write(next_experiment.name+"\n")
         completed_experiments.flush()
         for file in os.listdir(new_experiments):
