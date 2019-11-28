@@ -583,7 +583,7 @@ def rebootDevice(device, retries=2, reboot_barrier=None, screenOff=False):
         if reboot_barrier is not None:
             skipBarriers(None, True, device.name, reboot_barrier)
         if device.name not in DEVICE_BLACKLIST:
-            DEVICE_BLACKLIST.append(device)
+            DEVICE_BLACKLIST.append(device.name)
         return False
     log("REBOOT_DEVICE\t%s" % device.name)
     pre_reboot_worker_ip = getDeviceIp(device)
