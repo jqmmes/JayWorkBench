@@ -9,17 +9,18 @@ from IPython.display import Image
 
 asset_types = ["SD", "HD", "UHD"]
 #asset_types = ["UHD"]
-#schedulers_map = {'Speedup_Local_{}_1': "local", 'Saturation_Cloud_{}_8_5s': "cloud", 'Saturation_Cloudlet_{}_8_5s': "cloudlet", 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud", 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8_5s': "local remote cloud", 'Saturation_EstimatedTime_Local_Remote_{}_8_5s': "local remote", 'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet", 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8_5s': "local remote cloudlet"}
-schedulers_map = {'New_Saturation_Local_{}_8_5s': "local", 'New_Saturation_Cloud_{}_8_5s': "cloud", 'New_Saturation_Cloudlet_{}_8_5s': "cloudlet", 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud", 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8_5s': "local remote cloud", 'Saturation_EstimatedTime_Local_Remote_{}_8_5s': "local remote", 'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet", 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8_5s': "local remote cloudlet"}
+#schedulers_map = {'Speedup_Local_{}_1': "local", 'Saturation_Cloud_{}_4_5s': "cloud", 'Saturation_Cloudlet_{}_4_5s': "cloudlet", 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud", 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4_5s': "local remote cloud", 'Saturation_EstimatedTime_Local_Remote_{}_4_5s': "local remote", 'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet", 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4_5s': "local remote cloudlet"}
+schedulers_map = {'New_Saturation_Local_{}_8_5s': "local", 'Saturation_Cloud_{}_4_5s': "cloud", 'New_Saturation_Cloudlet_{}_4_5s': "cloudlet", 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud", 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4_5s': "local remote cloud", 'Saturation_EstimatedTime_Local_Remote_{}_4_5s': "local remote", 'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet", 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4_5s': "local remote cloudlet"}
 
 base_dir = sys.argv[1]
 processed_experiments = []
 
 if True:
     for asset_type in asset_types:
-        for key in list(schedulers_map.keys())[:3]:
-            print("python3 printJobDetails.py {}/{}/0/* > csv/saturation_boxplot_{}_{}.csv 2> /dev/null".format(base_dir.replace(" ", "\ "), key.format(asset_type), schedulers_map[key].replace(" ", "_"), asset_type))
-            os.system("python3 printJobDetails.py {}/{}/0/* > csv/saturation_boxplot_{}_{}.csv 2> /dev/null".format(base_dir.replace(" ", "\ "), key.format(asset_type), schedulers_map[key].replace(" ", "_"), asset_type))
+        #for key in list(schedulers_map.keys()):
+        key = "Saturation_Cloud_{}_4_5s"
+        print("python3 printJobDetails.py {}/{}/0/* > csv/saturation_boxplot_{}_{}_4.csv 2> /dev/null".format(base_dir.replace(" ", "\ "), key.format(asset_type), schedulers_map[key].replace(" ", "_"), asset_type))
+        os.system("python3 printJobDetails.py {}/{}/0/* > csv/saturation_boxplot_{}_{}_4.csv 2> /dev/null".format(base_dir.replace(" ", "\ "), key.format(asset_type), schedulers_map[key].replace(" ", "_"), asset_type))
 
 fig_0 = go.Figure()
 fig_1 = go.Figure()
@@ -33,10 +34,10 @@ for asset_type in ["SD", "HD", "UHD"]: #asset_types:
     detection_group_labels = []
     total_group_labels = []
     for device_type in ["local remote cloud", "local remote cloudlet", "local cloud", "local cloudlet", "local remote", "cloud", "cloudlet", "local"]:
-        if os.path.isfile("csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type)):
-            print("reading csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type))
+        if os.path.isfile("csv/saturation_boxplot_{}_{}_4.csv".format(device_type.replace(" ", "_"), asset_type)):
+            print("reading csv/saturation_boxplot_{}_{}_4.csv".format(device_type.replace(" ", "_"), asset_type))
             new_data = True
-            data = pd.read_csv("csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type))
+            data = pd.read_csv("csv/saturation_boxplot_{}_{}_4.csv".format(device_type.replace(" ", "_"), asset_type))
             data_transfer += data["DATA_TRANSFER"].values.tolist()
             data_transfer_group_labels += ["{}".format(device_type)]*len(data["DATA_TRANSFER"].values.tolist())
             detection += data["DETECTION"].values.tolist()
@@ -59,7 +60,7 @@ fig_0.update_layout(
 
 fig_0.update_traces(orientation="h")
 
-pio.write_image(fig_0, "saturation_data_transfer_logscale.pdf")
+pio.write_image(fig_0, "saturation_data_transfer_logscale_4.pdf")
 
 fig_1.update_layout(
     xaxis_title='Computation Time (seconds)',
@@ -72,7 +73,7 @@ fig_1.update_layout(
 
 fig_1.update_traces(orientation="h")
 
-pio.write_image(fig_1, "saturation_computation_logscale.pdf")
+pio.write_image(fig_1, "saturation_computation_logscale_4.pdf")
 
 fig_2.update_layout(
     xaxis_title='Total Time (seconds)',
@@ -84,7 +85,7 @@ fig_2.update_layout(
 )
 
 fig_2.update_traces(orientation="h")
-pio.write_image(fig_2, "saturation_total_logscale.pdf")
+pio.write_image(fig_2, "saturation_total_logscale_4.pdf")
 
 fig_0.update_layout(
     xaxis_title='Communcation Time (seconds)',
@@ -97,7 +98,7 @@ fig_0.update_layout(
 
 fig_0.update_traces(orientation="h")
 
-pio.write_image(fig_0, "saturation_data_transfer_linear.pdf")
+pio.write_image(fig_0, "saturation_data_transfer_linear_4.pdf")
 
 fig_1.update_layout(
     xaxis_title='Computation Time (seconds)',
@@ -110,7 +111,7 @@ fig_1.update_layout(
 
 fig_1.update_traces(orientation="h")
 
-pio.write_image(fig_1, "saturation_computation_linear.pdf")
+pio.write_image(fig_1, "saturation_computation_linear_4.pdf")
 
 fig_2.update_layout(
     xaxis_title='Total Time (seconds)',
@@ -123,4 +124,4 @@ fig_2.update_layout(
 )
 
 fig_2.update_traces(orientation="h")
-pio.write_image(fig_2, "saturation_total_linear.pdf")
+pio.write_image(fig_2, "saturation_total_linear_4.pdf")

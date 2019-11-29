@@ -328,7 +328,8 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
         log("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
         sleep(job_intervals[i])
-        Thread(target = createJob, args = (worker,asset_list[i])).start()
+        if not experiment.isSequential() or PENDING_JOBS < 1:
+            Thread(target = createJob, args = (worker,asset_list[i])).start()
         i = i+1
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
@@ -798,9 +799,16 @@ class Experiment:
     def __init__(self, name):
         self.name = name
         self.settings = {"ADVERTISE_WORKER_STATUS": "true"}
+        self.sequential_mode = False
 
     def setSetting(self, key, val):
         self.settings[key] = val
+
+    def setSequential(self):
+        self.sequential_mode = True
+
+    def isSequential(self):
+        return self.sequential_mode
 
     def setFail(self):
         self._running_status = False
@@ -894,6 +902,9 @@ def readConfig(confName):
                 experiment.mcast_interface = config[section][option]
             elif option == "minbattery":
                 experiment.min_battery = int(config[section][option])
+            elif option == "sequentialmode":
+                if config[section][option].lower() == "true":
+                    experiment.setSequential()
             elif option == "runbetween":
                 try:
                     times = config[section][option].split("-")
