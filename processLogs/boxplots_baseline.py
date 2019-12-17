@@ -6,13 +6,13 @@ import sys
 from IPython.display import Image
 
 
-basename = "BaseLine"
+basename = "New_BaseLine"
 asset_types = ["SD", "HD", "UHD"]
 device_types = ["Cloudlet", "Local", "Cloud"]
 base_dir = sys.argv[1]
 processed_experiments = []
 
-if False:
+if True:
     for asset_type in asset_types:
         for device_type in device_types:
             print("PROCESSING\t{}\t{}\tINTO\tcsv/baseline_boxplot_{}_{}.csv".format(device_type, asset_type, device_type, asset_type), end="\n")

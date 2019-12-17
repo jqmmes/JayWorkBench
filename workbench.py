@@ -1137,7 +1137,7 @@ def main():
                 break
         missing_experiments.truncate(0)
         missing_experiments.seek(0)
-        if not run_scheduled:
+        if not run_scheduled and i < len(EXPERIMENTS):
             next_experiment = EXPERIMENTS[i]
             for e in EXPERIMENTS[i+1:]:
                 missing_experiments.write(e.name+"\n")
@@ -1147,22 +1147,26 @@ def main():
         for e,t in SCHEDULED_EXPERIMENTS.items():
             missing_experiments.write(e.name+"\t({} - {})\n".format(t[0], t[1]))
         missing_experiments.flush()
-        in_progress_experiments.write(next_experiment.name+"\n")
-        in_progress_experiments.flush()
+        if next_experiment is not None:
+            in_progress_experiments.write(next_experiment.name+"\n")
+            in_progress_experiments.flush()
         if args.use_curses:
             progressBar_0.updateProgress(100*(i/max(len(EXPERIMENTS), 1)))
             complete_progress.updateText("COMPLETE {}/{}".format(i,len(EXPERIMENTS)))
             sleep(2)
-        runExperiment(next_experiment)
-        in_progress_experiments.truncate(0)
-        in_progress_experiments.seek(0)
-        completed_experiments.write(next_experiment.name+"\n")
-        completed_experiments.flush()
+        if next_experiment is not None:
+            runExperiment(next_experiment)
+            in_progress_experiments.truncate(0)
+            in_progress_experiments.seek(0)
+            completed_experiments.write(next_experiment.name+"\n")
+            completed_experiments.flush()
+        else:
+            sleep(5)
         for file in os.listdir(new_experiments):
             if os.path.isfile("{}/{}".format(new_experiments,file)):
                 readConfig("{}/{}".format(new_experiments,file))
                 shutil.move("{}/{}".format(new_experiments,file), "{}/{}.loaded".format(loaded_experiments,file))
-        if not run_scheduled:
+        if not run_scheduled and next_experiment is not None:
             i += 1
     if args.use_curses:
         progressBar_0.updateProgress(100)

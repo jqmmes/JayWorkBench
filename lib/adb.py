@@ -74,6 +74,11 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
         log(debug, "COMMAND")
     if(device != None):
         usb_connection_active, wifi_connection_active = getADBStatus(device, log_command=False)
+        if (not wifi_connection_active and not device.connected_wifi and not force_usb):
+            try:
+                connectWifiADB(device)
+            except:
+                pass
         if (not wifi_connection_active and device.connected_wifi and not force_usb):
             wifi_connection_active = connectWifiADB(device, force_connection=True)[1]
         if (device.connected_wifi and wifi_connection_active and not force_usb):
@@ -81,7 +86,7 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
         elif (device.connected_usb and usb_connection_active):
             selected_device = ['-s', device.name]
         else:
-            return ""
+            return "FAILED_TO_RUN_ADB_PLEASE_CANCEL"
     result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 

@@ -12,7 +12,7 @@ asset_types = ["SD","HD","UHD"]
 #schedulers_map = {'Speedup_Local_{}_1': "local", 'Saturation_Cloud_{}_8_5s': "cloud", 'Saturation_Cloudlet_{}_8_5s': "cloudlet", 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud", 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8_5s': "local remote cloud", 'Saturation_EstimatedTime_Local_Remote_{}_8_5s': "local remote", 'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet", 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8_5s': "local remote cloudlet"}
 #schedulers_map = {'New_Saturation_Cloudlet_{}_1_5s': "cloudlet 1",'New_Saturation_Cloudlet_{}_2_5s': "cloudlet 2", 'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4", 'New_Saturation_Cloudlet_{}_6_5s': "cloudlet 6", 'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8", 'New_Saturation_Local_{}_8_5s': "local"}
 schedulers_map = {
-'New_Saturation_Local_{}_8_5s': "local 6",
+#'New_Saturation_Local_{}_8_5s': "local 6",
 #'New_Saturation_Cloud_{}_6_5s': "cloud 6",
 #'New_Saturation_Cloudlet_{}_6_5s': "cloudlet 6",
 #'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6", 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_6_5s': "local remote cloud 6",
@@ -22,10 +22,13 @@ schedulers_map = {
 #'Saturation_EstimatedTime_Local_Remote_Cloud_0.8_{}_8d_1p_6x12_5s': "local remote cloud 1p 8d 6x12 0.8",
 #'Saturation_EstimatedTime_Local_Remote_Cloud_0.5_{}_6d_1p_6x12_5s': "local remote cloud 1p 6d 6x12 0.5",
 #'Saturation_EstimatedTime_Local_Remote_Cloud_0.5_{}_8d_1p_6x12_5s': "local remote cloud 1p 8d 6x12 0.5",
-'Saturation_EstimatedTime_Local_Remote_{}_6_5s': "local remote 6",
-'Saturation_EstimatedTime_Local_Remote_{}_6d_1p_6x12_5s': "local remote 1p 6d 6x12",
-'Saturation_EstimatedTime_Local_Remote_{}_8d_1p_6x12_5s': "local remote 1p 8d 6x12",}
-#'Saturation_EstimatedTime_Local_Cloudlet_{}_6_5s': "local cloudlet 6",
+#'Saturation_EstimatedTime_Local_Remote_{}_6_5s': "local remote 6",
+#'Saturation_EstimatedTime_Local_Remote_{}_6d_1p_6x12_5s': "local remote 1p 6d 6x12",
+#'Saturation_EstimatedTime_Local_Remote_{}_8d_1p_6x12_5s': "local remote 1p 8d 6x12",}
+'Saturation_EstimatedTime_Local_Cloudlet_{}_4d_1p_4x12_5s': "local cloudlet 1p 4d 4x12",
+'Saturation_EstimatedTime_Local_Cloudlet_{}_6d_1p_4x12_5s': "local cloudlet 1p 6d 4x12",
+'Saturation_EstimatedTime_Local_Cloud_{}_4d_1p_4x12_5s': "local cloud 1p 4d 4x12",
+'Saturation_EstimatedTime_Local_Cloud_{}_6d_1p_4x12_5s': "local cloud 1p 6d 4x12",}
 #'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_6_5s': "local remote cloudlet 6",
 #'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_6d_1p_6x12_5s': "local remote cloudlet 1p 6d 6x12",
 #'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_6x12_5s': "local remote cloudlet 1p 8d 6x12"}
@@ -33,11 +36,13 @@ schedulers_map = {
 base_dir = sys.argv[1]
 processed_experiments = []
 
-if False:
+if True:
     for asset_type in asset_types:
-        for key in list(schedulers_map.keys())[1:]:
+        for key in list(schedulers_map.keys()):#[1:]:
             print("python3 printJobDetails.py {}/{}/0/* > csv/saturation_boxplot_{}_{}.csv 2> /dev/null".format(base_dir.replace(" ", "\ "), key.format(asset_type), schedulers_map[key].replace(" ", "_"), asset_type))
             os.system("python3 printJobDetails.py {}/{}/0/* > csv/saturation_boxplot_{}_{}.csv 2> /dev/null".format(base_dir.replace(" ", "\ "), key.format(asset_type), schedulers_map[key].replace(" ", "_"), asset_type))
+
+exit()
 
 fig_0 = go.Figure()
 fig_1 = go.Figure()
