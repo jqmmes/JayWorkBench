@@ -6,31 +6,46 @@ import sys
 from IPython.display import Image
 
 #pdf_name = "all_comparison_6_remote"
-pdf_name = "ld_ec_ic_4_8_1p"
+pdf_name = "ld_ec_ic_4_8_combi"
 asset_types = ["SD","HD","UHD"]
 schedulers_map = {
 
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
-'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
-'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
+'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud cloudlet 1p 8d 8x12",
+'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local cloud cloudlet 1p 4d 8x12",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud",
+'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet",
 
-'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_8x12_5s': "local cloud 1p 8d 8x12",
+'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_8x12_5s': "local cloud 1p 4d 8x12",
+'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud",
 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-'Saturation_Cloud_{}_4_5s': "cloud 4",
 
-'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet 1p 8d 8x12",
+'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_8x12_5s': "local cloudlet 1p 4d 8x12",
+'Saturation_EstimatedTime_Local_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet",
+'New_Saturation_Cloudlet_{}_8_5s': "cloudlet",
+
+#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
+#'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
+#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
+#'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
+
+#'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+#'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+#'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+#'Saturation_Cloud_{}_4_5s': "cloud 4",
+
+#'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-'Saturation_Cloud_{}_4_5s': "cloud 4",
+#'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+#'Saturation_Cloud_{}_4_5s': "cloud 4",
 
-'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
-'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
-'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
-'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
+#'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
+#'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
+#'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
+#'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
 
-'New_Saturation_Local_{}_8_5s': "local",
+#'New_Saturation_Local_{}_8_5s': "local",
 
 
 #'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6",
@@ -114,9 +129,12 @@ for asset_type in asset_types:
             label = label.replace(alias_key, aliases[alias_key])
         if label.find("LD") != -1 and label.find("ND") != -1:
             label = label.replace("LD", "")
-        label.strip()
-        label.replace(" ", "/")
-        label = label[:label.rfind("/")] + " " + label[label.rfind("/")+1:]
+        label = label.strip()
+        label = label.replace("1p 4d  4x12", "4")
+        label = label.replace("1p 8d  4x12", "8")
+        label = label.replace(" ", "/")
+        if label.rfind("/") != -1:
+            label = label[:label.rfind("/")] + " " + label[label.rfind("/")+1:]
         if os.path.isfile("csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type)):
             print("reading csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type))
             new_data = True
