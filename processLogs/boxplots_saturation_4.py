@@ -6,9 +6,10 @@ import sys
 from IPython.display import Image
 
 #pdf_name = "all_comparison_6_remote"
-pdf_name = "ld_ec_ic_4_8_combi"
+pdf_name = "ld_ec_ic_4_8_1p_combi"
 asset_types = ["SD","HD","UHD"]
 schedulers_map = {
+'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s_0.8_early': "local cloud UHD",
 
 # 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloud cloudlet 1p 8d 8x12",
 # 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloud cloudlet 1p 4d 8x12",
@@ -25,27 +26,27 @@ schedulers_map = {
 # 'Saturation_EstimatedTime_Local_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet",
 # 'New_Saturation_Cloudlet_{}_8_5s': "cloudlet",
 
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
-'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
-'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
-
-'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-'Saturation_Cloud_{}_4_5s': "cloud 4",
-
-'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-'Saturation_Cloud_{}_4_5s': "cloud 4",
-
-'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
-'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
-'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
-'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
-
-'New_Saturation_Local_{}_8_5s': "local",
+# 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
+# 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
+# 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
+# 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
+#
+# 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+# 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+# 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+# 'Saturation_Cloud_{}_4_5s': "cloud 4",
+#
+# 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+# 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+# 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+# 'Saturation_Cloud_{}_4_5s': "cloud 4",
+#
+# 'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
+# 'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
+# 'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
+# 'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
+#
+# 'New_Saturation_Local_{}_8_5s': "local",
 
 
 #'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6",
