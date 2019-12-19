@@ -6,7 +6,7 @@ import sys
 from IPython.display import Image
 
 #pdf_name = "all_comparison_6_remote"
-pdf_name = "ld_ec_ic_4_8_combi"
+pdf_name = "ld_ec_ic_4_8_1p_combi"
 asset_types = ["SD","HD","UHD"]
 schedulers_map = {
 
