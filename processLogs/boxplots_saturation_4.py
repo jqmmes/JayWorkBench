@@ -6,46 +6,46 @@ import sys
 from IPython.display import Image
 
 #pdf_name = "all_comparison_6_remote"
-pdf_name = "ld_ec_ic_4_8_1p_combi"
+pdf_name = "ld_ec_ic_4_8_combi"
 asset_types = ["SD","HD","UHD"]
 schedulers_map = {
 
-'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloud cloudlet 1p 8d 8x12",
-'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloud cloudlet 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud cloudlet",
-'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet",
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloud cloudlet 1p 8d 8x12",
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloud cloudlet 1p 4d 8x12",
+# 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud cloudlet",
+# 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet",
+#
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_8x12_5s': "local remote cloud 1p 8d 8x12",
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_8x12_5s': "local remote cloud 1p 4d 8x12",
+# 'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud",
+# 'New_Saturation_Cloud_{}_8_5s': "cloud",
+#
+# 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloudlet 1p 8d 8x12",
+# 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloudlet 1p 4d 8x12",
+# 'Saturation_EstimatedTime_Local_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet",
+# 'New_Saturation_Cloudlet_{}_8_5s': "cloudlet",
 
-'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_8x12_5s': "local remote cloud 1p 8d 8x12",
-'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_8x12_5s': "local remote cloud 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud",
-'New_Saturation_Cloud_{}_8_5s': "cloud",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
+'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
+'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
 
-'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloudlet 1p 8d 8x12",
-'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloudlet 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet",
-'New_Saturation_Cloudlet_{}_8_5s': "cloudlet",
+'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+'Saturation_Cloud_{}_4_5s': "cloud 4",
 
-#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
-#'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
-#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
-#'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
+'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+'Saturation_Cloud_{}_4_5s': "cloud 4",
 
-#'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-#'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-#'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-#'Saturation_Cloud_{}_4_5s': "cloud 4",
+'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
+'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
+'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
+'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
 
-#'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-#'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-#'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-#'Saturation_Cloud_{}_4_5s': "cloud 4",
-
-#'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
-#'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
-#'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
-#'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
-
-#'New_Saturation_Local_{}_8_5s': "local",
+'New_Saturation_Local_{}_8_5s': "local",
 
 
 #'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6",
@@ -156,7 +156,8 @@ fig_0.update_layout(
     boxmode='group',
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="log"
+    xaxis_type="log",
+    legend_orientation="h"
 )
 
 fig_0.update_traces(orientation="h")
@@ -169,7 +170,8 @@ fig_1.update_layout(
     boxmode='group',
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="log"
+    xaxis_type="log",
+    legend_orientation="h"
 )
 
 fig_1.update_traces(orientation="h")
@@ -178,11 +180,13 @@ pio.write_image(fig_1, "computation_logscale_" + pdf_name + ".pdf")
 
 fig_2.update_layout(
     xaxis_title='Total Time (seconds)',
+    margin=dict(l=0, r=0, t=0, b=0),
     xaxis=dict(zeroline=False, gridcolor='lightgray'),
     boxmode='group',
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="log"
+    xaxis_type="log",
+    legend_orientation="h"
 )
 
 fig_2.update_traces(orientation="h")
@@ -194,7 +198,8 @@ fig_0.update_layout(
     boxmode='group',
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="linear"
+    xaxis_type="linear",
+    legend_orientation="h",
 )
 
 fig_0.update_traces(orientation="h")
@@ -207,7 +212,8 @@ fig_1.update_layout(
     boxmode='group',
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="linear"
+    xaxis_type="linear",
+    legend_orientation="h"
 )
 
 fig_1.update_traces(orientation="h")
@@ -221,7 +227,8 @@ fig_2.update_layout(
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
     xaxis_type="linear",
-    showlegend=True
+    showlegend=True,
+    legend_orientation="h"
 )
 
 fig_2.update_traces(orientation="h")
