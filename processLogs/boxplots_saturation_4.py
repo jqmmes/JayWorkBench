@@ -10,36 +10,50 @@ pdf_name = "ld_ec_ic_4_8_1p"
 asset_types = ["SD","HD","UHD"]
 schedulers_map = {
 
-# 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-#
-# 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-# 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
+'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
+'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
+
+'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
 'Saturation_Cloud_{}_4_5s': "cloud 4",
 
-#'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6",
+'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
+'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
+'Saturation_Cloud_{}_4_5s': "cloud 4",
 
-
-#'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
-#'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
-#'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
+'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
+'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
+'Saturation_EstimatedTime_Local_Cloudlet_{}_4_5s': "local cloudlet 4",
 'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
-#'New_Saturation_Local_{}_8_5s': "local",
+
+'New_Saturation_Local_{}_8_5s': "local",
+
+
+#'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6",
 #'New_Saturation_Cloud_{}_6_5s': "cloud 6",
 #'New_Saturation_Cloudlet_{}_6_5s': "cloudlet 6",
+
+
+
+
 #'Saturation_EstimatedTime_Local_Remote_{}_4_5s': "local remote 4",
 #'Saturation_EstimatedTime_Local_Remote_{}_6_5s': "local remote 6",
 #'Saturation_EstimatedTime_Local_Remote_{}_8_5s': "local remote 8",
-'Saturation_EstimatedTime_Local_Remote_{}_4d_1p_4x12_5s': "local remote 1p 4d 4x12",
-'Saturation_EstimatedTime_Local_Remote_{}_8d_1p_4x12_5s': "local remote 1p 8d 4x12",
+#'Saturation_EstimatedTime_Local_Remote_{}_4d_1p_4x12_5s': "local remote 1p 4d 4x12",
+#'Saturation_EstimatedTime_Local_Remote_{}_8d_1p_4x12_5s': "local remote 1p 8d 4x12",
 #'Saturation_EstimatedTime_Local_Remote_{}_6d_1p_6x12_5s': "local remote 1p 6d 6x12",
 #'Saturation_EstimatedTime_Local_Remote_{}_8d_1p_6x12_5s': "local remote 1p 8d 6x12",
 
 #'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4_5s': "local remote cloud 4",
 #'Saturation_EstimatedTime_Local_Remote_Cloud_{}_6_5s': "local remote cloud 6",
 #'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8_5s': "local remote cloud 8",
-'Saturation_EstimatedTime_Local_Cloud_{}_4d_1p_4x12_5s': "local cloud 1p 4d 4x12",
-'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_4x12_5s': "local remote cloud 1p 4d 4x12",
-'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_4x12_5s': "local remote cloud 1p 8d 4x12",
+#'Saturation_EstimatedTime_Local_Cloud_{}_4d_1p_4x12_5s': "local cloud 1p 4d 4x12",
+#'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_4x12_5s': "local remote cloud 1p 4d 4x12",
+#'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_4x12_5s': "local remote cloud 1p 8d 4x12",
 #'Saturation_EstimatedTime_Local_Cloud_{}_6d_1p_6x12_5s': "local cloud 1p 6d 6x12",
 #'Saturation_EstimatedTime_Local_Remote_Cloud_{}_6d_1p_6x12_5s': "local remote cloud 1p 6d 6x12",
 #'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_6x12_5s': "local remote cloud 1p 8d 6x12",
@@ -50,9 +64,9 @@ schedulers_map = {
 
 #'Saturation_EstimatedTime_Local_Cloudlet_{}_6_5s': "local cloudlet 6",
 
-'Saturation_EstimatedTime_Local_Cloudlet_{}_4d_1p_4x12_5s': "local cloudlet 1p 4d 4x12",
-'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_4x12_5s': "local remote cloudlet 1p 4d 4x12",
-'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_4x12_5s': "local remote cloudlet 1p 8d 4x12",
+#'Saturation_EstimatedTime_Local_Cloudlet_{}_4d_1p_4x12_5s': "local cloudlet 1p 4d 4x12",
+#'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_4x12_5s': "local remote cloudlet 1p 4d 4x12",
+#'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_4x12_5s': "local remote cloudlet 1p 8d 4x12",
 #'Saturation_EstimatedTime_Local_Cloudlet_{}_6d_1p_6x12_5s': "local cloudlet 1p 6d 6x12",
 #'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_6d_1p_6x12_5s': "local remote cloudlet 1p 6d 6x12",
 #'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_6x12_5s': "local remote cloudlet 1p 8d 6x12",
@@ -100,8 +114,9 @@ for asset_type in asset_types:
             label = label.replace(alias_key, aliases[alias_key])
         if label.find("LD") != -1 and label.find("ND") != -1:
             label = label.replace("LD", "")
-        #for to_remove in [" 4x12", " 6x12", " 6", " 4", " 8"]:
-        #    label = label.replace(to_remove, "")
+        label.strip()
+        label.replace(" ", "/")
+        label = label[:label.rfind("/")] + " " + label[label.rfind("/")+1:]
         if os.path.isfile("csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type)):
             print("reading csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type))
             new_data = True
