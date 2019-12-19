@@ -12,7 +12,7 @@ schedulers_map = {
 
 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloud cloudlet 1p 8d 8x12",
 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloud cloudlet 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud cloudlet",
 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet",
 
 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_8x12_5s': "local remote cloud 1p 8d 8x12",
@@ -133,7 +133,7 @@ for asset_type in asset_types:
         label = label.replace("1p 4d 8x12", "4")
         label = label.replace("1p 8d 8x12", "8")
         label = label.replace(" ", "/")
-        if label.rfind("/") != -1 and len(label.split(" ")[-1]) == 1:
+        if label.rfind("/") != -1 and len(label.split("/")[-1]) == 1:
             label = label[:label.rfind("/")] + " " + label[label.rfind("/")+1:]
         if os.path.isfile("csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type)):
             print("reading csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type))
