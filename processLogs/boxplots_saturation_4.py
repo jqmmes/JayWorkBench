@@ -36,7 +36,7 @@ schedulers_map = {
 #'Saturation_Cloud_{}_4_5s': "cloud 4",
 
 #'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-'New_Saturation_Cloud_{}_8_5s': "cloud 8",
+#'New_Saturation_Cloud_{}_8_5s': "cloud 8",
 #'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
 #'Saturation_Cloud_{}_4_5s': "cloud 4",
 
