@@ -35,7 +35,7 @@ schedulers_map = {
 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_8x12_5s': "local remote cloud 1p 4d 8x12",
 'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud",
 'New_Saturation_Cloud_{}_8_5s': "cloud",
-#'SingleDevice_Cloud_{}_8d_1p_8x12_5s': "cloud new",
+'SingleDevice_Cloud_{}_8d_1p_8x12_5s': "cloud new",
 
 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloudlet 1p 8d 8x12",
 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloudlet 1p 4d 8x12",
