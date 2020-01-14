@@ -19,14 +19,14 @@ sources = {
 "local_cloud_cloudlet_4": [[0,0,0],[0,0,0],[0,0,0]],
 "cloud_cloudlet_4": [[0,0,0],[0,0,0],[0,0,0]],
 "local_cloud_8": [[0,0,0],[0,0,0],[0,0,0]],
-"cloud_8": [[0,0,0],[0,0,0],[0,0,0]],
+#"cloud_8": [[0,0,0],[0,0,0],[0,0,0]],
 "local_cloud_4": [[0,0,0],[0,0,0],[0,0,0]],
-"cloud_4": [[0,0,0],[0,0,0],[0,0,0]],
+#"cloud_4": [[0,0,0],[0,0,0],[0,0,0]],
 "local_cloudlet_8": [[0,0,0],[0,0,0],[0,0,0]],
-"cloudlet_8": [[0,0,0],[0,0,0],[0,0,0]],
+#"cloudlet_8": [[0,0,0],[0,0,0],[0,0,0]],
 "local_cloudlet_4": [[0,0,0],[0,0,0],[0,0,0]],
-"cloudlet_4": [[0,0,0],[0,0,0],[0,0,0]],
-"local": [[0,0,0],[0,0,0],[0,0,0]]
+#"cloudlet_4": [[0,0,0],[0,0,0],[0,0,0]],
+#"local": [[0,0,0],[0,0,0],[0,0,0]]
 }
 
 translate = {
@@ -137,7 +137,7 @@ fig.update_layout(
     )
 
 #pio.write_image(fig, "device_distribution_1p.pdf")#_no_ec_ic.pdf")
-pio.write_image(fig, "device_distribution_p_eq_w.pdf")#_no_ld_ec_ic.pdf")
+pio.write_image(fig, "device_distribution_p_eq_w_no_ld_ec_ic.pdf")#_no_ld_ec_ic.pdf")
 
 exit()
 

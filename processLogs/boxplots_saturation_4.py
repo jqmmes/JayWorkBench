@@ -64,11 +64,11 @@ schedulers_map = {
 #'SingleDevice_Cloudlet_{}_8d_1p_8x12_5s': "cloudlet new",
 
 # ld_ec_ic_4_8_combi
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8 old",
+#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8 old",
 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s_paper': "local cloud cloudlet 8",
 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4 old",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s_paper': "local cloud cloudlet 4 paper",
+#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4 old",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s_paper': "local cloud cloudlet 4",
 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s_paper': "cloud cloudlet 4",
 
 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
@@ -194,7 +194,7 @@ for asset_type in asset_types:
         fig_2.add_trace(go.Box(x=[x / 1000.0 for x in total], y=total_group_labels, name=asset_type, marker_size=2, line_width=0.7, marker_color=asset_colors[asset_type],fillcolor=asset_colors[asset_type], line_color='#000000'))#, fillcolor="green", marker_color='rgb(8,81,156)', line_color='rgb(8,81,156)'))
 
 
-exit()
+#exit()
 
 fig_0.update_layout(
     xaxis_title='Communcation Time (seconds)',
