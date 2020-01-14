@@ -6,8 +6,9 @@ import sys
 from IPython.display import Image
 
 #pdf_name = "all_comparison_6_remote"
-pdf_name = "ld_ec_ic_4_8_1p_combi_new"
+pdf_name = "comparison_nd_ic_ec_median"#_median"
 asset_types = ["SD","HD","UHD"]
+asset_colors = {'SD': '#424242', 'HD': '#BDBDBD', 'UHD': '#757575'}
 schedulers_map = {
 # 'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s_0.8_early': "local cloud 0.8 early",
 # 'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s_0.5_early': "local cloud 0.5 early",
@@ -24,43 +25,54 @@ schedulers_map = {
 # 'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud new",
 
 
+
+# comparison_nd_ic_ec
+'Saturation_Random_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s_paper': "Random",
+'Saturation_ComputationEstimate_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s_paper': "Computation Estimate",
+'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "Estimated Time",
+
+
 # ld_ec_ic_4_8_1p_combi
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloud cloudlet 1p 8d 8x12",
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloud cloudlet 1p 4d 8x12",
+# 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud cloudlet",
+# #'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet",
+# #'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8d_1p_8x12_5s_paper': "cloud cloudlet",
+# 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8d_1p_8x12_5s_paper_retry_1': "cloud cloudlet",
+#
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_8x12_5s': "local remote cloud 1p 8d 8x12",
+# 'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_8x12_5s': "local remote cloud 1p 4d 8x12",
+# 'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud",
+# #'New_Saturation_Cloud_{}_8_5s': "cloud",
+# 'SingleDevice_Cloud_{}_8d_1p_8x12_5s': "cloud",
+#
+#
+# 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloudlet 1p 8d 8x12",
+# 'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloudlet 1p 4d 8x12",
+# 'Saturation_EstimatedTime_Local_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet",
+# #'New_Saturation_Cloudlet_{}_8_5s': "cloudlet",
+# 'SingleDevice_Cloudlet_{}_8d_1p_8x12_5s': "cloudlet",
+#
+# 'Saturation_EstimatedTime_Local_Remote_{}_8d_1p_8x12_5s_paper': 'remote 1p 8d 8x12',
+# 'Saturation_EstimatedTime_Local_Remote_{}_4d_1p_8x12_5s_paper_retry': 'remote 1p 4d 8x12',
 
-'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloud cloudlet 1p 8d 8x12",
-'Saturation_EstimatedTime_Local_Remote_Cloud_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloud cloudlet 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8d_1p_8x12_5s': "local cloud cloudlet",
-'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet",
+#Extra results
 
-'Saturation_EstimatedTime_Local_Remote_Cloud_{}_8d_1p_8x12_5s': "local remote cloud 1p 8d 8x12",
-'Saturation_EstimatedTime_Local_Remote_Cloud_{}_4d_1p_8x12_5s': "local remote cloud 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloud_{}_8d_1p_8x12_5s': "local cloud",
-'Saturation_EstimatedTime_Local_Cloud_UHD_8d_1p_8x12_5s_0.35_new': "local cloud new",
-'New_Saturation_Cloud_{}_8_5s': "cloud",
-'SingleDevice_Cloud_{}_8d_1p_8x12_5s': "cloud new",
-
-'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_8d_1p_8x12_5s': "local remote cloudlet 1p 8d 8x12",
-'Saturation_EstimatedTime_Local_Remote_Cloudlet_{}_4d_1p_8x12_5s': "local remote cloudlet 1p 4d 8x12",
-'Saturation_EstimatedTime_Local_Cloudlet_{}_8d_1p_8x12_5s': "local cloudlet",
-'New_Saturation_Cloudlet_{}_8_5s': "cloudlet",
+#'Saturation_EstimatedTime_Local_Cloud_UHD_8d_1p_8x12_5s_0.35_new': "local cloud new",
+#'SingleDevice_Cloud_{}_8d_1p_8x12_5s': "cloud new",
 #'SingleDevice_Cloudlet_{}_8d_1p_8x12_5s': "cloudlet new",
-
 
 # ld_ec_ic_4_8_combi
 
-# 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
+# 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s_paper': "local cloud cloudlet 8",
 # 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
 # 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
-# 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s': "cloud cloudlet 4",
+# 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s_paper': "cloud cloudlet 4",
 #
 # 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
 # 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
 # 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-# 'Saturation_Cloud_{}_4_5s': "cloud 4",
-#
-# 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
-# 'New_Saturation_Cloud_{}_8_5s': "cloud 8",
-# 'Saturation_EstimatedTime_Local_Cloud_{}_4_5s': "local cloud 4",
-# 'Saturation_Cloud_{}_4_5s': "cloud 4",
+# 'New_Saturation_Cloud_{}_4_5s': "cloud 4",
 #
 # 'Saturation_EstimatedTime_Local_Cloudlet_{}_8_5s': "local cloudlet 8",
 # 'New_Saturation_Cloudlet_{}_8_5s': "cloudlet 8",
@@ -68,6 +80,9 @@ schedulers_map = {
 # 'New_Saturation_Cloudlet_{}_4_5s': "cloudlet 4",
 #
 # 'New_Saturation_Local_{}_8_5s': "local",
+
+
+
 
 
 #'Saturation_EstimatedTime_Local_Cloud_{}_6_5s': "local cloud 6",
@@ -117,7 +132,10 @@ aliases = {
 'cloudlet': 'EC',
 'cloud': 'IC',
 'remote': 'ND',
-'local': 'LD'
+'local': 'LD',
+'Estimated Time': 'C+N',
+'Computation Estimate': 'C',
+'Random': 'R'
 }
 
 
@@ -157,6 +175,7 @@ for asset_type in asset_types:
         label = label.replace(" ", "/")
         if label.rfind("/") != -1 and len(label.split("/")[-1]) == 1:
             label = label[:label.rfind("/")] + " " + label[label.rfind("/")+1:]
+        label = label.replace("IC/EC", "EC/IC")
         if os.path.isfile("csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type)):
             print("reading csv/saturation_boxplot_{}_{}.csv".format(device_type.replace(" ", "_"), asset_type))
             new_data = True
@@ -168,51 +187,10 @@ for asset_type in asset_types:
             total += data["TOTAL_DURATION"].values.tolist()
             total_group_labels += ["{}".format(label)]*len(data["TOTAL_DURATION"].values.tolist())
     if new_data:
-        fig_0.add_trace(go.Box(x=[x / 1000.0 for x in data_transfer], y=data_transfer_group_labels, name=asset_type, marker_size=2, line_width=1))
-        fig_1.add_trace(go.Box(x=[x / 1000.0 for x in detection], y=detection_group_labels, name=asset_type, marker_size=2, line_width=1))
-        fig_2.add_trace(go.Box(x=[x / 1000.0 for x in total], y=total_group_labels, name=asset_type, marker_size=2, line_width=1))#, fillcolor="green", marker_color='rgb(8,81,156)', line_color='rgb(8,81,156)'))
+        fig_0.add_trace(go.Box(x=[x / 1000.0 for x in data_transfer], y=data_transfer_group_labels, name=asset_type, marker_size=2, line_width=1, marker_color=asset_colors[asset_type]))
+        fig_1.add_trace(go.Box(x=[x / 1000.0 for x in detection], y=detection_group_labels, name=asset_type, marker_size=2, line_width=1, marker_color=asset_colors[asset_type]))
+        fig_2.add_trace(go.Box(x=[x / 1000.0 for x in total], y=total_group_labels, name=asset_type, marker_size=2, line_width=0.7, marker_color=asset_colors[asset_type],fillcolor=asset_colors[asset_type], line_color='#000000'))#, fillcolor="green", marker_color='rgb(8,81,156)', line_color='rgb(8,81,156)'))
 
-fig_0.update_layout(
-    xaxis_title='Communcation Time (seconds)',
-    xaxis=dict(zeroline=False, gridcolor='lightgray'),
-    boxmode='group',
-    paper_bgcolor='rgb(255, 255, 255)',
-    plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="log",
-    legend_orientation="h"
-)
-
-fig_0.update_traces(orientation="h")
-
-pio.write_image(fig_0, "data_transfer_logscale_" + pdf_name + ".pdf")
-
-fig_1.update_layout(
-    xaxis_title='Computation Time (seconds)',
-    xaxis=dict(zeroline=False, gridcolor='lightgray'),
-    boxmode='group',
-    paper_bgcolor='rgb(255, 255, 255)',
-    plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="log",
-    legend_orientation="h"
-)
-
-fig_1.update_traces(orientation="h")
-
-pio.write_image(fig_1, "computation_logscale_" + pdf_name + ".pdf")
-
-fig_2.update_layout(
-    xaxis_title='Total Time (seconds)',
-    margin=dict(l=0, r=0, t=0, b=0),
-    xaxis=dict(zeroline=False, gridcolor='lightgray'),
-    boxmode='group',
-    paper_bgcolor='rgb(255, 255, 255)',
-    plot_bgcolor='rgb(255, 255, 255)',
-    xaxis_type="log",
-    legend_orientation="h"
-)
-
-fig_2.update_traces(orientation="h")
-pio.write_image(fig_2, "total_logscale_" + pdf_name + ".pdf")
 
 fig_0.update_layout(
     xaxis_title='Communcation Time (seconds)',
@@ -222,6 +200,7 @@ fig_0.update_layout(
     plot_bgcolor='rgb(255, 255, 255)',
     xaxis_type="linear",
     legend_orientation="h",
+    font=dict(size=10) #default 12
 )
 
 fig_0.update_traces(orientation="h")
@@ -235,7 +214,8 @@ fig_1.update_layout(
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
     xaxis_type="linear",
-    legend_orientation="h"
+    legend_orientation="h",
+    font=dict(size=10) #default 12
 )
 
 fig_1.update_traces(orientation="h")
@@ -243,15 +223,62 @@ fig_1.update_traces(orientation="h")
 pio.write_image(fig_1, "computation_linear_" + pdf_name + ".pdf")
 
 fig_2.update_layout(
-    xaxis_title='Total Time (seconds)',
+    #xaxis_title='Total Time (seconds)',
+    margin=dict(l=0, r=0, t=0, b=0),
     xaxis=dict(zeroline=False, gridcolor='lightgray'),
     boxmode='group',
     paper_bgcolor='rgb(255, 255, 255)',
     plot_bgcolor='rgb(255, 255, 255)',
     xaxis_type="linear",
     showlegend=True,
-    legend_orientation="h"
+    legend_orientation="h",
+    font=dict(size=10) #default 12
 )
 
 fig_2.update_traces(orientation="h")
 pio.write_image(fig_2, "total_linear_" + pdf_name + ".pdf")
+
+fig_0.update_layout(
+    xaxis_title='Communcation Time (seconds)',
+    xaxis=dict(zeroline=False, gridcolor='lightgray'),
+    boxmode='group',
+    paper_bgcolor='rgb(255, 255, 255)',
+    plot_bgcolor='rgb(255, 255, 255)',
+    xaxis_type="log",
+    legend_orientation="h",
+    font=dict(size=10) #default 12
+)
+
+fig_0.update_traces(orientation="h")
+
+pio.write_image(fig_0, "data_transfer_logscale_" + pdf_name + ".pdf")
+
+fig_1.update_layout(
+    xaxis_title='Computation Time (seconds)',
+    xaxis=dict(zeroline=False, gridcolor='lightgray'),
+    boxmode='group',
+    paper_bgcolor='rgb(255, 255, 255)',
+    plot_bgcolor='rgb(255, 255, 255)',
+    xaxis_type="log",
+    legend_orientation="h",
+    font=dict(size=10) #default 12
+)
+
+fig_1.update_traces(orientation="h")
+
+pio.write_image(fig_1, "computation_logscale_" + pdf_name + ".pdf")
+
+fig_2.update_layout(
+    #xaxis_title='Total Time (seconds)',
+    margin=dict(l=0, r=0, t=0, b=0),
+    xaxis=dict(zeroline=False, gridcolor='lightgray',tick0 = 0, dtick = 1,tickvals = [1, 2, 5, 10, 20, 50, 100, 200, 300], ticktext=['1', '2', '5', '10', '20', '50', '100', '200','300']),
+    boxmode='group',
+    paper_bgcolor='rgb(255, 255, 255)',
+    plot_bgcolor='rgb(255, 255, 255)',
+    xaxis_type="log",
+    legend_orientation="h",
+    font=dict(size=10) #default 12
+)
+
+fig_2.update_traces(orientation="h")
+pio.write_image(fig_2, "total_logscale_" + pdf_name + ".pdf")
