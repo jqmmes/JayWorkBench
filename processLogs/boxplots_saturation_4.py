@@ -67,7 +67,8 @@ schedulers_map = {
 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8 old",
 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s_paper': "local cloud cloudlet 8",
 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
-'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4 old",
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s_paper': "local cloud cloudlet 4 paper",
 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_4_5s_paper': "cloud cloudlet 4",
 
 'Saturation_EstimatedTime_Local_Cloud_{}_8_5s': "local cloud 8",
