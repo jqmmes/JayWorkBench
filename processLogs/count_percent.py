@@ -28,6 +28,8 @@ if c_cloudlet > 0:
 if c_cloud > 0:
     print("cloud: {}".format(c_cloud/total*100))
 if c_local > 0:
-    print("local: {}".format(c_local/total*100))
+    print("local: {}".format((c_local)/total*100))
 if c_remote > 0:
-    print("remote: {}".format(c_remote/total*100))
+    print("remote: {}".format((c_remote)/total*100))
+if c_local+c_remote > 0:
+    print("local+remote: {}".format((c_local+c_remote)/total*100))

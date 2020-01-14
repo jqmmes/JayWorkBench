@@ -1044,6 +1044,7 @@ def main():
     argparser.add_argument('-nc', '--use-curses', default=False, action='store_true', required=False)
     argparser.add_argument('-ip', '--ip-mask', action='store', required=False)
     argparser.add_argument('-r', '--reboot-devices', default=False, action='store_true', required=False)
+    argparser.add_argument('-d', '--daemon', default=False, action='store_true', required=False)
 
     args = argparser.parse_args()
 
@@ -1126,7 +1127,7 @@ def main():
         complete_progress = CURSES.add_text(1,15,1)
 
     i = 0
-    while i < len(EXPERIMENTS) or len(SCHEDULED_EXPERIMENTS) > 0:
+    while i < len(EXPERIMENTS) or len(SCHEDULED_EXPERIMENTS) > 0 or args.daemon:
         run_scheduled = False
         next_experiment = None
         for e,t in SCHEDULED_EXPERIMENTS.items():
