@@ -47,6 +47,9 @@ schedulers_map = {
 
 # ld_ec_ic_4_8_combi
 
+'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8 old",
+#'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s_paper': "local cloud cloudlet 4 paper",
+
 # 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_8_5s': "local cloud cloudlet 8",
 # 'Saturation_EstimatedTime_Cloud_Cloudlet_{}_8_5s': "cloud cloudlet 8",
 # 'Saturation_EstimatedTime_Local_Cloud_Cloudlet_{}_4_5s': "local cloud cloudlet 4",
@@ -171,6 +174,8 @@ for asset_type in asset_types:
         fig_0.add_trace(go.Box(x=[x / 1000.0 for x in data_transfer], y=data_transfer_group_labels, name=asset_type, marker_size=2, line_width=1))
         fig_1.add_trace(go.Box(x=[x / 1000.0 for x in detection], y=detection_group_labels, name=asset_type, marker_size=2, line_width=1))
         fig_2.add_trace(go.Box(x=[x / 1000.0 for x in total], y=total_group_labels, name=asset_type, marker_size=2, line_width=1))#, fillcolor="green", marker_color='rgb(8,81,156)', line_color='rgb(8,81,156)'))
+
+exit()
 
 fig_0.update_layout(
     xaxis_title='Communcation Time (seconds)',
