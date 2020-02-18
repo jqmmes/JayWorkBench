@@ -1,0 +1,2 @@
+apps/Jay-x86.jar filter=lfs diff=lfs merge=lfs -text
+apps/Jay-Android[[:space:]]Launcher-release.apk filter=lfs diff=lfs merge=lfs -text
