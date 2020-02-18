@@ -36,12 +36,10 @@ def write_to_file(f, str, end):
 
 def log(str, end="\n"):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
-    #if LOGS_LOCK.acquire(timeout=2):
     try:
         write_to_file(LOG_FILE,str,end)
     except:
         pass
-    # LOGS_LOCK.release()
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
@@ -170,9 +168,6 @@ def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=2
                         DEVICE_BLACKLIST.append(device.name)
                     return False
 
-# TODO: tentar matar pelo system:
-# lsof -i tcp:50000 | grep "->device.host_name:50000"
-# tcpkill
 def destroyWorker(worker, device):
     try:
         log("STOP_WORKER\tSTART\t%s" % device.name)
@@ -188,9 +183,9 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log('LOW_SDCARD_SPACE\t%s' % device.name)
         adb.uninstallPackage(device)
         log('PACKAGE_UNINSTALLED\t%s' % device.name)
-        adb.pushFile('apps', 'ODLauncher-release.apk', path='', device=device)
+        adb.pushFile('apps', 'Jay-Android\ Launcher-release.apk', path='', device=device)
         log('PACKAGE_PUSHED\t%s' % device.name)
-        adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
+        adb.pmInstallPackage('apps', 'Jay-Android\ Launcher-release.apk', device)
         log('PACKAGE_INSTALLED\t%s' % device.name)
     adb.connectWifiADB(device)
     log("START_DEVICE\t%s" % device.name)
@@ -241,7 +236,9 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     adb.stopAll(device)
     sleep(2)
     log("STARTING_LAUNCH_SERVICE\t%s" % device.name)
-    if not adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True):
+    # TODO: Alternativa que funciona sem permissions: am start -n pt.up.fc.dcc.hyrax.jay_droid_launcher/pt.up.fc.dcc.hyrax.jay.MainActivity
+    #if not adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True):
+    if not adb.startApplication(device=device, wait=True):
         log("FAILED_LAUNCH_SERVICE\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
@@ -345,7 +342,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     try:
         if (experiment.isOK()):
             log("PULLING_LOG\t%s\tLOG" % device.name)
-            adb.pullLog(adb.LAUNCHER_PACKAGE, 'files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+            adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
             log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
     except:
         log("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
@@ -539,7 +536,6 @@ def runExperiment(experiment):
             if CURSES:
                 progressBar_0.updateProgress(int(100*((seed_repeat+1)/experiment.repeat_seed)))
 
-
         if (repetition != experiment.repetitions - 1):
             log("Waiting 5s for next repetition")
             sleep(5)
@@ -633,7 +629,7 @@ def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, 
     barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, "START_CLOUDLETS", servers_finish_barrier, finish_barrier)
 
 def killLocalCloudlet():
-    pid = os.popen("jps -lV | grep ODCloud.jar | cut -d' ' -f1").read()[:-1]
+    pid = os.popen("jps -lV | grep .Jay-x86.jar | cut -d' ' -f1").read()[:-1]
     if pid != '':
         subprocess.run(['kill', '-9', pid])
 
@@ -679,14 +675,14 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
     log_name = "%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat)
     for cloud in experiment.clouds:
         if (cloud.zone == 'localhost'):
-            os.system("cp %s/ODCloud/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloud.address))
+            os.system("cp %s/Jay-x86/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloud.address))
         else:
-            os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
+            os.system("scp joaquim@%s:~/Jay-x86/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
-            os.system("cp %s/ODCloud/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("cp %s/Jay-x86/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloudlet))
         else:
-            os.system("scp joaquim@%s:~/ODCloud/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("scp joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
@@ -948,8 +944,8 @@ def help():
                     Workers                 = Number of Workers [BOOL] (Default True)
                     Assets                  = Assets directory [assets] (Default Value)
                     AssetType               = Asset Type (image/video) [image] (Default Value)
-                    Calibration             = Run ODLib calibration before begin [BOOL] (Default False)
-                    Settings                = Set ODLib settings (setting: value;...) [LIST]
+                    Calibration             = Run Jay calibration before begin [BOOL] (Default False)
+                    Settings                = Set Jay settings (setting: value;...) [LIST]
                     AssetQuality            = Inform about asset quality (SD/HD/UHD) [STR] (Default SD)
                     MultiCastInterface      = MCAST_INTERFACE: interface to use in cloudlet [STR]
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
@@ -961,6 +957,12 @@ def help():
                     ssd_mobilenet_v2_coco
                     ssdlite_mobilenet_v2_coco
                     ssd_resnet_50_fpn_coco
+                    ssd_mobilenet_v3_large_coco
+                    ssd_mobilenet_v3_small_coco
+
+                    Lite:
+                    ssd_mobilenet_v3_large_coco
+                    ssd_mobilenet_v3_small_coco
 
         Strategies:
                     SingleDeviceScheduler [LOCAL]
@@ -1042,6 +1044,7 @@ def main():
     argparser.add_argument('-dg', '--debug-grpc', default=False, action='store_true', required=False)
     argparser.add_argument('-p', '--use-stdout', default=False, action='store_true', required=False)
     argparser.add_argument('-nc', '--use-curses', default=False, action='store_true', required=False)
+    argparser.add_argument('-w', '--wifi', default=False, action='store_true', required=False)
     argparser.add_argument('-ip', '--ip-mask', action='store', required=False)
     argparser.add_argument('-r', '--reboot-devices', default=False, action='store_true', required=False)
     argparser.add_argument('-d', '--daemon', default=False, action='store_true', required=False)
@@ -1064,7 +1067,10 @@ def main():
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
 
-    log("Searching for devices...")
+    if args.wifi:
+        log("Searching for devices [USB/WIFI]...")
+    else:
+        log("Searching for devices [USB]...")
     if args.debug_adb:
         adb.DEBUG = True
         adb.ADB_DEBUG_FILE = LOG_FILE
@@ -1076,20 +1082,20 @@ def main():
                 print("# WARNING: Invalid log level ({}). Logging ALL".format(args.adb_log_level))
                 adb.LOG_LEVEL = "ALL"
     if args.ip_mask:
-        ALL_DEVICES = adb.listDevices(0, True, ip_mask=args.ip_mask)
+        ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=True, ip_mask=args.ip_mask)
     else:
-        ALL_DEVICES = adb.listDevices(0, True)
+        ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=args.wifi)
     if args.show_help:
         help()
         return
     if args.install:
         log('INSTALLING_APKS')
         for device in ALL_DEVICES:
-            adb.uninstallPackage(device)
+            adb.uninstallPackage(device=device)
             log('PACKAGE_UNINSTALLED\t%s' % device.name)
-            adb.pushFile('apps', 'ODLauncher-release.apk', path='', device=device)
+            adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
             log('PACKAGE_PUSHED\t%s' % device.name)
-            adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
+            adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
             log('PACKAGE_INSTALLED\t%s' % device.name)
     if args.debug_grpc:
         grpcControls.DEBUG = True
@@ -1101,14 +1107,14 @@ def main():
     log("===================================")
     for device in ALL_DEVICES:
         adb.screenOff(device)
-        if not adb.checkPackageInstalled(device):
+        if not adb.checkPackageInstalled(device=device):
             log('PACKAGE_MISSING\t%s' % device.name)
             log('CLEANING_SYSTEM\t%s' % device.name)
-            adb.uninstallPackage(device)
+            adb.uninstallPackage(device=device)
             log('PUSHING_PACKAGE\t%s' % device.name)
-            adb.pushFile('apps', 'ODLauncher-release.apk', path='', device=device)
+            adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
             log('INSTALLING_PACKAGE\t%s' % device.name)
-            adb.pmInstallPackage('apps', 'ODLauncher-release.apk', device)
+            adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
             log('PACKAGE_INSTALLED\t%s' % device.name)
         if args.reboot_devices:
             adb.rebootAndWait(device)

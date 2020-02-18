@@ -8,9 +8,10 @@ import threading
 import concurrent.futures
 from sys import stdout
 
-PACKAGE = 'pt.up.fc.dcc.hyrax.odlib'
-LAUNCHER_PACKAGE = 'pt.up.fc.dcc.hyrax.od_launcher'
-LAUNCHER_SERVICE = '.ODLauncherService'
+JAY_SERVICE_PACKAGE = 'pt.up.fc.dcc.hyrax.jay'
+LAUNCHER_APP = 'pt.up.fc.dcc.hyrax.jay_droid_launcher'
+LAUNCHER_PACKAGE = 'pt.up.fc.dcc.hyrax.droid_jay_app'
+LAUNCHER_SERVICE = 'pt.up.fc.dcc.hyrax.droid_jay_app.DroidJayLauncherService'
 BROKER = '.services.BrokerAndroidService'
 SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
@@ -264,20 +265,20 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
             devices.append(host)
     return devices
 
-def mkdir(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+def mkdir(path='Android/data/'+LAUNCHER_APP+'/files/', basepath='/sdcard/', device=None):
     status = adb(['shell', 'mkdir', '%s%s' % (basepath, path)], device)
     if ('File exists' in status):
         return True # Return true if folder already exists
     return False
 
-def rmFiles(path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+def rmFiles(path='Android/data/'+LAUNCHER_APP+'/files/', basepath='/sdcard/', device=None):
     status = adb(['shell', 'rm', '-rf', '%s%s/' % (basepath, path)], device)
     mkdir(path, basepath, device)
 
-def pushFile(filePath, fileName, path='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+def pushFile(filePath, fileName, path='Android/data/'+LAUNCHER_APP+'/files/', basepath='/sdcard/', device=None):
     adb(['push', '%s/%s' % (filePath, fileName), '%s%s/%s' % (basepath, path, fileName)], device)
 
-def listFiles(filePath='Android/data/pt.up.fc.dcc.hyrax.od_launcher/files/', basepath='/sdcard/', device=None):
+def listFiles(filePath='Android/data/'+LAUNCHER_APP+'/files/', basepath='/sdcard/', device=None):
     status = adb(['ls', basepath+filePath], device).split('\n')
     files = []
     for entry in status:
@@ -320,7 +321,7 @@ def screenOff(device = None):
     if (status.find('Display Power: state=ON') != -1):
         adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
 
-def startService(service, package=PACKAGE, device=None, wait=False, timeout=120): # 2mins timeout
+def startService(service, package=JAY_SERVICE_PACKAGE, device=None, wait=False, timeout=120): # 2mins timeout
     adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)
     start_time = time()
     if wait:
@@ -331,19 +332,20 @@ def startService(service, package=PACKAGE, device=None, wait=False, timeout=120)
             if (time()-start_time > timeout):
                 return False
             if ((retries % 5) == 0):
+                #adb(['shell', "\"su -c \'am startservice %s/%s\'\"" % (package, service)], device)
                 adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)
         sleep(4)
     return True
 
-def stopService(service, package=PACKAGE, device=None):
+def stopService(service, package=JAY_SERVICE_PACKAGE, device=None):
     adb(['shell', 'am', 'stopservice', "%s/%s" % (package, service)], device)
 
 def stopAll(device=None):
     stopService(LAUNCHER_SERVICE, LAUNCHER_PACKAGE, device)
-    forceStopApplication(PACKAGE, device=device)
-    stopService("%s%s" % (PACKAGE, WORKER), LAUNCHER_PACKAGE, device)
-    stopService("%s%s" % (PACKAGE, SCHEDULER), LAUNCHER_PACKAGE, device)
-    stopService("%s%s" % (PACKAGE, BROKER), LAUNCHER_PACKAGE, device)
+    forceStopApplication(LAUNCHER_APP, device=device)
+    stopService("%s%s" % (JAY_SERVICE_PACKAGE, WORKER), JAY_SERVICE_PACKAGE, device)
+    stopService("%s%s" % (JAY_SERVICE_PACKAGE, SCHEDULER), JAY_SERVICE_PACKAGE, device)
+    stopService("%s%s" % (JAY_SERVICE_PACKAGE, BROKER), JAY_SERVICE_PACKAGE, device)
 
 def init():
     adb(['start-server'])
@@ -351,21 +353,21 @@ def init():
 def close():
     adb(['kill-server'])
 
-def checkPackageInstalled(device=None):
-    return (LAUNCHER_PACKAGE in adb(['shell', 'pm', 'list', 'packages'], device))
+def checkPackageInstalled(package=LAUNCHER_APP, device=None):
+    return (package in adb(['shell', 'pm', 'list', 'packages'], device))
 
 def installPackage(package, device=None):
     adb(['install', package], device)
 
 def pmInstallPackage(packagePath, package, device=None):
-    adb(['shell', 'pm', 'install', '/sdcard/%s' % package], device)
+    adb(['shell', 'pm', 'install', '/sdcard/%s' % package.replace(" ", "\ ")], device)
 
-def uninstallPackage(device=None):
-    adb(['shell', 'pm', 'uninstall', LAUNCHER_PACKAGE], device)
+def uninstallPackage(package=LAUNCHER_APP, device=None):
+    adb(['shell', 'pm', 'uninstall', package], device)
 
-def removePackage(device=None):
-    adb(['shell', 'pm', 'clear', LAUNCHER_PACKAGE], device)
-    adb(['shell', 'pm', 'reset-permissions', LAUNCHER_PACKAGE], device)
+def removePackage(package=LAUNCHER_APP, device=None):
+    adb(['shell', 'pm', 'clear', package], device)
+    adb(['shell', 'pm', 'reset-permissions', package], device)
     uninstallPackage(device)
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
@@ -384,14 +386,21 @@ def cloudInstanceStop(instanceName = 'hyrax', zone = 'europe-west1-b'):
     if cloudInstanceRunning(instanceName):
         gcloud(['compute', 'instances', 'stop', instanceName, '--zone=' + zone])
 
-def startApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', entryPoint = 'MainActivity', device=None):
-    adb(['shell', 'am', 'start', '-n', "%s/%s.%s" % (PACKAGE, applicationName, entryPoint)], device)
+def startApplication(appName = LAUNCHER_APP, applicationPackage = LAUNCHER_PACKAGE, entryPoint = 'MainActivity', device=None, wait=False, service=LAUNCHER_SERVICE, retries=5):
+    if retries <= 0:
+        return False
+    adb(['shell', 'am', 'start', '-n', "%s/%s.%s" % (appName, applicationPackage, entryPoint)], device)
+    if wait:
+        sleep(0.5)
+        if not isServiceRunning(device, service):
+            sleep(4)
+            startApplication(appName, appName, entryPoint, device, wait, service, retries-1)
+    return True
 
+def forceStopApplication(applicationPackage = LAUNCHER_APP, device=None):
+    adb(['shell', 'am', 'force-stop', applicationPackage], device)
 
-def forceStopApplication(applicationName = 'pt.up.fc.dcc.hyrax.odlib', device=None):
-    adb(['shell', 'am', 'force-stop', applicationName], device)
-
-def pullLog(applicationName=PACKAGE, path="files/log", format="csv", destination=".", device=None):
+def pullLog(applicationName=LAUNCHER_APP, path="files/log", format="csv", destination=".", device=None):
     adb(['pull', "/sdcard/Android/data/%s/%s.%s" % (applicationName, path, format), destination], device)
 
 def getDeviceIp(device, timeout=10):

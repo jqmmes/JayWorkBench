@@ -18,11 +18,11 @@ class CloudletControl(CloudletControl_pb2_grpc.CloudletControlServicer):
             if os.path.exists("/Library/Java/JavaVirtualMachines/openjdk-12.0.1.jdk/Contents/Home/bin/java"):
                 path = "/Library/Java/JavaVirtualMachines/openjdk-12.0.1.jdk/Contents/Home/bin/java"
         od_path = os.environ['HOME']
-        os.system("%s -jar %s/ODCloud/ODCloud.jar&" % (path, od_path))
+        os.system("%s -jar %s/Jay-x86/Jay-x86.jar&" % (path, od_path))
         return CloudletControl_pb2.Empty()
 
     def stopODLauncher(self, request, context):
-        pid = os.popen("jps -lV | grep ODCloud.jar | cut -d' ' -f1").read()[:-1]
+        pid = os.popen("jps -lV | grep Jay-x86.jar | cut -d' ' -f1").read()[:-1]
         if pid != '':
             subprocess.run(['kill', '-9', pid])
         return CloudletControl_pb2.Empty()
