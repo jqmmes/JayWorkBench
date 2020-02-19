@@ -1032,6 +1032,34 @@ def logExperiment(conf, experiment):
     conf.write("Timeout: %s\n" % experiment.timeout)
     conf.write("======================================\n")
 
+def getESSID(interface):
+    interface_data = subprocess.run(["iwlist", interface, "scan"], stdout=subprocess.PIPE, stderr=open(os.devnull, "w")).stdout.decode("UTF-8")
+    if interface_data.find("Interface doesn't support scanning.") != -1:
+        return ""
+    begin = interface_data.find("ESSID:")
+    if begin != -1:
+        end = interface_data[begin+7:].find("\"")
+        return interface_data[begin+7:][:end]
+    return ""
+
+def checkInterfaces():
+    iface_raw = subprocess.run(["ip", "link", "show"], stdout=subprocess.PIPE, stderr=open(os.devnull, "w")).stdout.decode("UTF-8").split("\n")
+    ifaces = []
+    for line in iface_raw:
+        if line.find("state UP") != -1:
+            ifaces.append(line.split()[1][:-1])
+    if "flannel.1" in ifaces:
+        subprocess.run(["sudo", "ip", "link", "set", "flannel.1", "down"])
+    print("AVAILABLE INTERFACES:")
+    for iface in ifaces:
+        print("\t[*] {}".format(iface), end="")
+        wlan = getESSID(iface)
+        if wlan != "":
+            print(" ({})".format(wlan))
+        else:
+            print()
+    print("==========================================================================================")
+
 def main():
     global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
 
@@ -1062,6 +1090,7 @@ def main():
     os.makedirs(new_experiments)
     os.makedirs(loaded_experiments)
 
+    checkInterfaces()
     log("Starting... Please wait")
 
     if not args.use_stdout:

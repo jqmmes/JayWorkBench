@@ -214,8 +214,6 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                     new_device.connected_usb = getADBStatus(new_device)[0]
                 devices.append(new_device)
                 log("NEW_DEVICE\t{} ({})\tUSB: {}\tWIFI: {}".format(new_device.name, new_device.ip, new_device.connected_usb, new_device.connected_wifi), "ACTION")
-
-
     if discover_wifi:
         log("DISCOVERING_WIFI_DEVICES", "ACTION")
         network_devices = discoverWifiADBDevices(ip_mask, range_min, range_max, devices)

@@ -37,8 +37,18 @@ def serve():
   while True:
       sleep(1)
 
+def getESSID(interface):
+    interface_data = subprocess.run(["iwlist", interface, "scan"], stdout=subprocess.PIPE, stderr=open(os.devnull, "w")).stdout.decode("UTF-8")
+    if interface_data.find("Interface doesn't support scanning.") != -1:
+        return ""
+    begin = interface_data.find("ESSID:")
+    if begin != -1:
+        end = interface_data[begin+7:].find("\"")
+        return interface_data[begin+7:][:end]
+    return ""
+
 def checkInterfaces():
-    iface_raw = subprocess.run(["ip", "link", "show"], stdout=subprocess.PIPE).stdout.decode("UTF-8").split("\n")
+    iface_raw = subprocess.run(["ip", "link", "show"], stdout=subprocess.PIPE, stderr=open(os.devnull, "w")).stdout.decode("UTF-8").split("\n")
     ifaces = []
     for line in iface_raw:
         if line.find("state UP") != -1:
@@ -47,7 +57,12 @@ def checkInterfaces():
         subprocess.run(["sudo", "ip", "link", "set", "flannel.1", "down"])
     print("AVAILABLE INTERFACES:")
     for iface in ifaces:
-        print("\t[*] {}".format(iface))
+        print("\t[*] {}".format(iface), end="")
+        wlan = getESSID(iface)
+        if wlan != "":
+            print(" ({})".format(wlan))
+        else:
+            print()
 
 if __name__ == '__main__':
     checkInterfaces()

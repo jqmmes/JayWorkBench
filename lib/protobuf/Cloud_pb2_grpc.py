@@ -15,17 +15,17 @@ class LauncherServiceStub(object):
       channel: A grpc.Channel.
     """
     self.StartWorker = channel.unary_unary(
-        '/odcloudservice.LauncherService/StartWorker',
+        '/jayx86service.LauncherService/StartWorker',
         request_serializer=Cloud__pb2.Empty.SerializeToString,
         response_deserializer=Cloud__pb2.BoolValue.FromString,
         )
     self.Stop = channel.unary_unary(
-        '/odcloudservice.LauncherService/Stop',
+        '/jayx86service.LauncherService/Stop',
         request_serializer=Cloud__pb2.Empty.SerializeToString,
         response_deserializer=Cloud__pb2.BoolValue.FromString,
         )
     self.SetLogName = channel.unary_unary(
-        '/odcloudservice.LauncherService/SetLogName',
+        '/jayx86service.LauncherService/SetLogName',
         request_serializer=Cloud__pb2.String.SerializeToString,
         response_deserializer=Cloud__pb2.BoolValue.FromString,
         )
@@ -76,5 +76,5 @@ def add_LauncherServiceServicer_to_server(servicer, server):
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(
-      'odcloudservice.LauncherService', rpc_method_handlers)
+      'jayx86service.LauncherService', rpc_method_handlers)
   server.add_generic_rpc_handlers((generic_handler,))
