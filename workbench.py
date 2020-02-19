@@ -28,6 +28,7 @@ CURSES = None
 CURSES_LOGS = None
 CURSES_LOGS_LOCK = Lock()
 LOGS_LOCK = Lock()
+REBOOT_ON_RUN_EXPERIMENT = False
 
 @func_set_timeout(1)
 def write_to_file(f, str, end):
@@ -277,6 +278,25 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if experiment.settings:
         log("SETTING_SETTINGS: {}".format(experiment.settings))
         worker.setSettings(experiment.settings)
+
+    ''' Experimental CODE
+
+        IN PROGRESS:
+                listTaskExecutors
+                selectTaskExecutor
+        REPLACE:
+                listModels w/ callExecutorAction
+                selectModel w/ runExecutorAction
+
+        ALLOW FOR MULTIPLE EXECUTORS IN 1 EXPERIMENT
+
+    '''
+    task_executors = worker.listTaskExecutors()
+    for task_executor in task_executors.taskExecutors:
+        if task_executor.name == "Tensorflow":
+            log("SELECTING_TASK_EXECUTOR: {}".format(task_executor.name))
+            worker.selectTaskExecutor(task_executor)
+
     try:
         schedulers = worker.listSchedulers()
         if is_worker:
@@ -421,16 +441,17 @@ def runExperiment(experiment):
     # Temporary for faster results
     #stopClouds(experiment)
 
-    reboot_barrier_size = 1
-    for device in devices:
-        if not device.already_rebooted:
-            reboot_barrier_size += 1
-    reboot_barrier = Barrier(reboot_barrier_size)
-    for device in devices:
-        if not device.already_rebooted:
-            Thread(target=rebootDevice, args=(device,), kwargs={'reboot_barrier':reboot_barrier, 'screenOff':True}).start()
-            sleep(2)
-    barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
+    if REBOOT_ON_RUN_EXPERIMENT:
+        reboot_barrier_size = 1
+        for device in devices:
+            if not device.already_rebooted:
+                reboot_barrier_size += 1
+        reboot_barrier = Barrier(reboot_barrier_size)
+        for device in devices:
+            if not device.already_rebooted:
+                Thread(target=rebootDevice, args=(device,), kwargs={'reboot_barrier':reboot_barrier, 'screenOff':True}).start()
+                sleep(2)
+        barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
 
     for repetition in range(experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
@@ -950,19 +971,36 @@ def help():
                     MultiCastInterface      = MCAST_INTERFACE: interface to use in cloudlet [STR]
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
                     RunBetween              = Define the experiment run interval (hour - hour)
+                    TaskExecutor            = Task executor to use
+                    CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices, ... [LIST]
 
         Models:
+            Tensorflow:
+                All:
                     ssd_mobilenet_v1_fpn_coco
                     ssd_mobilenet_v1_coco
                     ssd_mobilenet_v2_coco
                     ssdlite_mobilenet_v2_coco
                     ssd_resnet_50_fpn_coco
+
+                Android:
                     ssd_mobilenet_v3_large_coco
                     ssd_mobilenet_v3_small_coco
 
-                    Lite:
+                x86:
+                    faster_rcnn_resnet101_coco
+                    faster_rcnn_inception_resnet_v2_atrous_coco
+                    faster_rcnn_nas
+                    faster_rcnn_nas_lowproposals_coco
+
+            TensorflowLite:
+                Lite:
                     ssd_mobilenet_v3_large_coco
                     ssd_mobilenet_v3_small_coco
+
+        TaskExecutors:
+                    Tensorflow
+                    TensorflowLite
 
         Strategies:
                     SingleDeviceScheduler [LOCAL]

@@ -2,8 +2,8 @@ import lib.protobuf.Launcher_pb2 as Launcher_pb2
 import lib.protobuf.Launcher_pb2_grpc as Launcher_pb2_grpc
 import lib.protobuf.Cloud_pb2 as Cloud_pb2
 import lib.protobuf.Cloud_pb2_grpc as Cloud_pb2_grpc
-import lib.protobuf.ODProto_pb2 as ODProto_pb2
-import lib.protobuf.ODProto_pb2_grpc as ODProto_pb2_grpc
+import lib.protobuf.JayProto_pb2 as JayProto_pb2
+import lib.protobuf.JayProto_pb2_grpc as JayProto_pb2_grpc
 
 import lib.protobuf.cloudlet.CloudletControl_pb2 as CloudletControl_pb2
 import lib.protobuf.cloudlet.CloudletControl_pb2_grpc as CloudletControl_pb2_grpc
@@ -30,7 +30,7 @@ GRPC_DEBUG_FILE = None
 GRPC_LOGS_LOCK = None
 
 def getProtoString(str):
-    string = ODProto_pb2.String()
+    string = JayProto_pb2.String()
     string.str = str
     return string
 
@@ -164,7 +164,7 @@ class cloudClient:
     def connectBrokerService(self, retries=5):
         try:
             self.brokerChannel = grpc.insecure_channel('%s:50051' % self.ip)
-            self.brokerStub = ODProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
+            self.brokerStub = JayProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
             sleep(1)
             self.brokerStubReady()
             self.log("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
@@ -227,7 +227,7 @@ class cloudClient:
     def setSettings(self, settings_map, mcast_interface = None, advertise_worker=False):
         if (self.brokerStubReady()):
             try:
-                settings_proto = ODProto_pb2.Settings()
+                settings_proto = JayProto_pb2.Settings()
                 for key in settings_map:
                     settings_proto.setting[key] = settings_map[key]
                 if mcast_interface:
@@ -294,6 +294,7 @@ class remoteClient:
     ip = None
     name = ""
     schedulers = None
+    task_executors = None
     models = None
     log_file = stdout
 
@@ -343,7 +344,7 @@ class remoteClient:
     def connectBrokerService(self, retries=5):
         try:
             self.brokerChannel = grpc.insecure_channel('%s:50051' % self.ip)
-            self.brokerStub = ODProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
+            self.brokerStub = JayProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
             sleep(1)
             self.brokerStubReady()
             self.log("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
@@ -415,6 +416,35 @@ class remoteClient:
         sleep(5)
         return self.listSchedulers(retries-1)
 
+    def listTaskExecutors(self, retries=5):
+        self.log("GRPC %s (%s) listTaskExecutors" % (self.name, self.ip))
+        if retries <= 0:
+            return self.task_executors
+        if (self.brokerStubReady()):
+            try:
+                self.task_executors = self.brokerStub.listTaskExecutors(google_empty.Empty())
+            except:
+                self.task_executors = None
+        if (self.task_executors is not None):
+            return self.task_executors
+        sleep(5)
+        return self.listTaskExecutors(retries-1)
+
+    def selectTaskExecutor(self, taskExecutor, retries=5):
+        self.log("GRPC %s (%s) selectTaskExecutor" % (self.name, self.ip))
+        if retries <= 0:
+            self.log("GRPC %s (%s) selectTaskExecutor FAIL" % (self.name, self.ip))
+            return None
+        if (self.brokerStubReady()):
+            self.log("GRPC %s (%s) selectTaskExecutor DONE" % (self.name, self.ip))
+            try:
+                return self.brokerStub.selectTaskExecutor(taskExecutor)
+            except:
+                return None
+        sleep(5)
+        return self.selectTaskExecutor(taskExecutor, retries-1)
+
+
     @func_set_timeout(35)
     def listModels(self, retries=5):
         self.log("GRPC %s (%s) listModels" % (self.name, self.ip))
@@ -443,7 +473,7 @@ class remoteClient:
             except:
                 return None
         sleep(5)
-        return self.setModel(scheduler, retries-1)
+        return self.setScheduler(scheduler, retries-1)
 
     @func_set_timeout(300)
     def setModel(self, model, retries=5):
@@ -484,7 +514,7 @@ class remoteClient:
     def setSettings(self, settings_map):
         if (self.brokerStubReady()):
             try:
-                settings_proto = ODProto_pb2.Settings()
+                settings_proto = JayProto_pb2.Settings()
                 for key in settings_map:
                     settings_proto.setting[key] = settings_map[key]
                 return self.brokerStub.setSettings(settings_proto)
@@ -541,7 +571,7 @@ class Job:
         self.data = bytes
 
     def getProto(self):
-        job = ODProto_pb2.Job()
+        job = JayProto_pb2.Job()
         job.id = self.id
         job.data = self.data
         return job
