@@ -34,6 +34,16 @@ def getProtoString(str):
     string.str = str
     return string
 
+def genRequest(self, action, args):
+    request = JayProto_pb2.Request()
+    request.request = action
+    for arg in args:
+        if isinstance(arg, str):
+            request.args.append(bytes(arg, "utf-8"))
+        else:
+            request.args.append(bytes(arg))
+    return request
+
 class cloudControl:
     protoChannel = None
     channelStatus = ChannelConnectivity.SHUTDOWN
@@ -201,6 +211,48 @@ class cloudClient:
             sleep(5)
             self.startWorker(retries-1)
 
+    def callExecutorAction(self, action, args=[], retries=5):
+        self.log("GRPC %s (%s) callExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
+        if retries <= 0:
+            return None
+        call_return = None
+        if (self.brokerStubReady()):
+            try:
+                call_return = self.brokerStub.callExecutorAction(genRequest(action, args))
+            except:
+                call_return = None
+        if (call_return is not None):
+            return call_return
+        sleep(5)
+        return self.callExecutorAction(action, args, retries-1)
+
+    def runExecutorAction(self, action, args=[], retries=5):
+        self.log("GRPC %s (%s) runExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
+        if retries <= 0:
+            return None
+        call_return = None
+        if (self.brokerStubReady()):
+            try:
+                call_return = self.brokerStub.runExecutorAction(genRequest(action, args))
+            except:
+                call_return = None
+        if (call_return is not None):
+            return call_return
+        sleep(5)
+        return self.runExecutorAction(action, args, retries-1)
+
+    def listModels(self, retries=5):
+        models = self.callExecutorAction("listModels")
+        if models == None:
+            return None
+        ret_models =  JayProto_pb2.Models()
+        ret_models.ParseFromString(models.bytes)
+        return ret_models
+
+    def setModel(self, model, retries=5):
+        return self.runExecutorAction("loadModel", model.SerializeToString())
+
+    '''
     def listModels(self, retries=5):
         self.log("GRPC %s (%s) listModels" % (self.name, self.ip))
         if retries <= 0:
@@ -223,6 +275,7 @@ class cloudClient:
             return status
         sleep(5)
         return self.setModel(model, retries-1)
+    '''
 
     def setSettings(self, settings_map, mcast_interface = None, advertise_worker=False):
         if (self.brokerStubReady()):
@@ -444,17 +497,6 @@ class remoteClient:
         sleep(5)
         return self.selectTaskExecutor(taskExecutor, retries-1)
 
-    def genRequest(self, action, args):
-        request = JayProto_pb2.Request()
-        request.request = action
-        for arg in args:
-            if isinstance(arg, str):
-                request.args.append(bytes(arg, "utf-8"))
-            else:
-                request.args.append(bytes(arg))
-        return request
-
-    @func_set_timeout(35)
     def callExecutorAction(self, action, args=[], retries=5):
         self.log("GRPC %s (%s) callExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
         if retries <= 0:
@@ -462,7 +504,7 @@ class remoteClient:
         call_return = None
         if (self.brokerStubReady()):
             try:
-                call_return = self.brokerStub.callExecutorAction(self.genRequest(action, args))
+                call_return = self.brokerStub.callExecutorAction(genRequest(action, args))
             except:
                 call_return = None
         if (call_return is not None):
@@ -470,22 +512,22 @@ class remoteClient:
         sleep(5)
         return self.callExecutorAction(action, args, retries-1)
 
-    @func_set_timeout(35)
     def runExecutorAction(self, action, args=[], retries=5):
         self.log("GRPC %s (%s) runExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
         if retries <= 0:
             return None
         call_return = None
         if (self.brokerStubReady()):
-            #try:
-            call_return = self.brokerStub.runExecutorAction(self.genRequest(action, args))
-            #except:
-            #    call_return = None
+            try:
+                call_return = self.brokerStub.runExecutorAction(genRequest(action, args))
+            except:
+                call_return = None
         if (call_return is not None):
             return call_return
         sleep(5)
         return self.runExecutorAction(action, args, retries-1)
 
+    @func_set_timeout(35)
     def listModels(self, retries=5):
         models = self.callExecutorAction("listModels")
         if models == None:
@@ -493,6 +535,10 @@ class remoteClient:
         ret_models =  JayProto_pb2.Models()
         ret_models.ParseFromString(models.bytes)
         return ret_models
+
+    @func_set_timeout(300)
+    def setModel(self, model, retries=5):
+        return self.runExecutorAction("loadModel", model.SerializeToString())
 
     @func_set_timeout(35)
     def setScheduler(self, scheduler, retries=5):
@@ -508,25 +554,6 @@ class remoteClient:
                 return None
         sleep(5)
         return self.setScheduler(scheduler, retries-1)
-
-    @func_set_timeout(300)
-    def setModel(self, model, retries=5):
-        return self.runExecutorAction("loadModel", model.SerializeToString())
-
-
-        '''
-        self.log("GRPC %s (%s) setModel" % (self.name, self.ip))
-        if retries <= 0:
-            self.log("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
-            return None
-        if (self.brokerStubReady()):
-            self.log("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
-            try:
-                return self.brokerStub.setModel(model)
-            except:
-                return None
-        sleep(5)
-        return self.setModel(model, retries-1)'''
 
     def scheduleJob(self, job):
         if (self.brokerStubReady()):
