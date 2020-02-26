@@ -34,7 +34,7 @@ def getProtoString(str):
     string.str = str
     return string
 
-def genRequest(self, action, args):
+def genRequest(action, args):
     request = JayProto_pb2.Request()
     request.request = action
     for arg in args:
@@ -127,6 +127,7 @@ class cloudClient:
     launcherStub = None
     ip = None
     name = ""
+    task_executors = None
     models = None
     log_file = stdout
 
@@ -176,7 +177,6 @@ class cloudClient:
             self.brokerChannel = grpc.insecure_channel('%s:50051' % self.ip)
             self.brokerStub = JayProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
             sleep(1)
-            self.brokerStubReady()
             self.log("GRPC %s (%s) connectBrokerService" % (self.name, self.ip))
         except:
             sleep(5)
@@ -211,7 +211,7 @@ class cloudClient:
             sleep(5)
             self.startWorker(retries-1)
 
-    def callExecutorAction(self, action, args=[], retries=5):
+    def callExecutorAction(self, action, *args, retries=5):
         self.log("GRPC %s (%s) callExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
         if retries <= 0:
             return None
@@ -226,7 +226,7 @@ class cloudClient:
         sleep(5)
         return self.callExecutorAction(action, args, retries-1)
 
-    def runExecutorAction(self, action, args=[], retries=5):
+    def runExecutorAction(self, action, *args, retries=5):
         self.log("GRPC %s (%s) runExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
         if retries <= 0:
             return None
@@ -251,6 +251,34 @@ class cloudClient:
 
     def setModel(self, model, retries=5):
         return self.runExecutorAction("loadModel", model.SerializeToString())
+
+    def listTaskExecutors(self, retries=5):
+        self.log("GRPC %s (%s) listTaskExecutors" % (self.name, self.ip))
+        if retries <= 0:
+            return self.task_executors
+        if (self.brokerStubReady()):
+            try:
+                self.task_executors = self.brokerStub.listTaskExecutors(google_empty.Empty())
+            except:
+                self.task_executors = None
+        if (self.task_executors is not None):
+            return self.task_executors
+        sleep(5)
+        return self.listTaskExecutors(retries-1)
+
+    def selectTaskExecutor(self, taskExecutor, retries=5):
+        self.log("GRPC %s (%s) selectTaskExecutor" % (self.name, self.ip))
+        if retries <= 0:
+            self.log("GRPC %s (%s) selectTaskExecutor FAIL" % (self.name, self.ip))
+            return None
+        if (self.brokerStubReady()):
+            self.log("GRPC %s (%s) selectTaskExecutor DONE" % (self.name, self.ip))
+            try:
+                return self.brokerStub.selectTaskExecutor(taskExecutor)
+            except:
+                return None
+        sleep(5)
+        return self.selectTaskExecutor(taskExecutor, retries-1)
 
     '''
     def listModels(self, retries=5):
@@ -497,7 +525,7 @@ class remoteClient:
         sleep(5)
         return self.selectTaskExecutor(taskExecutor, retries-1)
 
-    def callExecutorAction(self, action, args=[], retries=5):
+    def callExecutorAction(self, action, *args, retries=5):
         self.log("GRPC %s (%s) callExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
         if retries <= 0:
             return None
@@ -512,7 +540,7 @@ class remoteClient:
         sleep(5)
         return self.callExecutorAction(action, args, retries-1)
 
-    def runExecutorAction(self, action, args=[], retries=5):
+    def runExecutorAction(self, action, *args, retries=5):
         self.log("GRPC %s (%s) runExecutorAction(%s [%d args])" % (self.name, self.ip, action, len(args)))
         if retries <= 0:
             return None

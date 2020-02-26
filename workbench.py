@@ -663,17 +663,29 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     cloudlet_control.stop()
     cloudlet_control.start()
     sleep(1)
+    log("Setting up %s Cloudlet Instance" % cloudlet)
     cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet, LOG_FILE)
     cloudlet_instance.stop()
     cloudlet_instance.connectLauncherService()
+    log("Setting log name %s Cloudlet Instance" % cloudlet)
     cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    log("Starting Worker %s Cloudlet Instance" % cloudlet)
     cloudlet_instance.startWorker()
     sleep(1)
+    log("Connecting to Broker %s Cloudlet Instance" % cloudlet)
     cloudlet_instance.connectBrokerService()
     sleep(1)
     if experiment.settings or experiment.mcast_interface:
         cloudlet_instance.setSettings(experiment.settings, experiment.mcast_interface, advertise_worker=True)
     sleep(1)
+    log("Selecting Task Executor %s Cloudlet Instance" % cloudlet)
+    task_executors = cloudlet_instance.listTaskExecutors()
+    for task_executor in task_executors.taskExecutors:
+        if task_executor.name == "Tensorflow":
+            log("SELECTING_TASK_EXECUTOR: {}".format(task_executor.name))
+            cloudlet_instance.selectTaskExecutor(task_executor)
+    sleep(1)
+    log("Selecting Model %s Cloudlet Instance" % cloudlet)
     models = cloudlet_instance.listModels()
     if (models is None):
         experiment.setFail()
@@ -1088,15 +1100,15 @@ def checkInterfaces():
             ifaces.append(line.split()[1][:-1])
     if "flannel.1" in ifaces:
         subprocess.run(["sudo", "ip", "link", "set", "flannel.1", "down"])
-    print("AVAILABLE INTERFACES:")
+    log("AVAILABLE INTERFACES:")
     for iface in ifaces:
-        print("\t[*] {}".format(iface), end="")
+        log("\t[*] {}".format(iface), end="")
         wlan = getESSID(iface)
         if wlan != "":
-            print(" ({})".format(wlan))
+            log(" ({})".format(wlan))
         else:
-            print()
-    print("==========================================================================================")
+            log("")
+    log("==========================================================================================")
 
 def main():
     global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
