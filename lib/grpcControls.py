@@ -280,32 +280,11 @@ class cloudClient:
         sleep(5)
         return self.selectTaskExecutor(taskExecutor, retries-1)
 
-    '''
-    def listModels(self, retries=5):
-        self.log("GRPC %s (%s) listModels" % (self.name, self.ip))
+    def setSettings(self, settings_map, mcast_interface = None, advertise_worker=False, retries=5):
+        self.log("GRPC: {}, ({}) setSettings({}, mcast_interface={}, advertise_worker={})".format(self.name, self.ip, settings_map, mcast_interface, advertise_worker))
         if retries <= 0:
-            return self.models
-        if (self.brokerStubReady()):
-            self.models = self.brokerStub.getModels(google_empty.Empty())
-        if (self.models is not None):
-            return self.models
-        sleep(5)
-        return self.listModels(retries-1)
-
-    def setModel(self, model, retries=5):
-        self.log("GRPC %s (%s) setModel" % (self.name, self.ip))
-        if retries <= 0:
-            self.log("GRPC %s (%s) setModel FAIL" % (self.name, self.ip))
-            return None
-        if (self.brokerStubReady()):
-            status = self.brokerStub.setModel(model)
-            self.log("GRPC %s (%s) setModel DONE" % (self.name, self.ip))
-            return status
-        sleep(5)
-        return self.setModel(model, retries-1)
-    '''
-
-    def setSettings(self, settings_map, mcast_interface = None, advertise_worker=False):
+            self.log("GRPC %s (%s) setSettings FAIL" % (self.name, self.ip))
+            return False
         if (self.brokerStubReady()):
             try:
                 settings_proto = JayProto_pb2.Settings()
@@ -317,7 +296,10 @@ class cloudClient:
                     settings_proto.setting["ADVERTISE_WORKER_STATUS"] = "true"
                 return self.brokerStub.setSettings(settings_proto)
             except:
-                return False
+                None
+        sleep(5)
+        return self.setSettings(settings_map, mcast_interface, advertise_worker, retries-1)
+
 
     def setLogName(self, log_name, retries=5):
         if retries <= 0:
@@ -604,7 +586,11 @@ class remoteClient:
             except:
                 return False
 
-    def setSettings(self, settings_map):
+    def setSettings(self, settings_map, retries=5):
+        self.log("GRPC: {}, ({}) setSettings({})".format(self.name, self.ip, settings_map))
+        if retries <= 0:
+            self.log("GRPC %s (%s) setSettings FAIL" % (self.name, self.ip))
+            return False
         if (self.brokerStubReady()):
             try:
                 settings_proto = JayProto_pb2.Settings()
@@ -612,7 +598,9 @@ class remoteClient:
                     settings_proto.setting[key] = settings_map[key]
                 return self.brokerStub.setSettings(settings_proto)
             except:
-                return False
+                None
+        sleep(5)
+        return self.setSettings(settings_map, retries-1)
 
     def setLogName(self, log_name, retries=5):
         if retries <= 0:

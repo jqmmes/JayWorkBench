@@ -178,7 +178,7 @@ def destroyWorker(worker, device):
     except:
         log("STOP_WORKER\tERROR\t%s" % device.name)
 
-def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_model=None, custom_task_executor=None):
     global PENDING_JOBS, PENDING_WORKERS
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
@@ -237,8 +237,6 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     adb.stopAll(device)
     sleep(2)
     log("STARTING_LAUNCH_SERVICE\t%s" % device.name)
-    # TODO: Alternativa que funciona sem permissions: am start -n pt.up.fc.dcc.hyrax.jay_droid_launcher/pt.up.fc.dcc.hyrax.jay.MainActivity
-    #if not adb.startService(adb.LAUNCHER_SERVICE, adb.LAUNCHER_PACKAGE, device, wait=True):
     if not adb.startApplication(device=device, wait=True):
         log("FAILED_LAUNCH_SERVICE\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
@@ -279,24 +277,15 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log("SETTING_SETTINGS: {}".format(experiment.settings))
         worker.setSettings(experiment.settings)
 
-    ''' Experimental CODE
-
-        IN PROGRESS:
-                listTaskExecutors
-                selectTaskExecutor
-        REPLACE:
-                listModels w/ callExecutorAction
-                selectModel w/ runExecutorAction
-
-        ALLOW FOR MULTIPLE EXECUTORS IN 1 EXPERIMENT
-
-    '''
-    task_executors = worker.listTaskExecutors()
-    for task_executor in task_executors.taskExecutors:
-        if task_executor.name == "Tensorflow":
-            log("SELECTING_TASK_EXECUTOR: {}".format(task_executor.name))
-            worker.selectTaskExecutor(task_executor)
-
+    if is_worker:
+        selected_task_executor = custom_task_executor if (custom_task_executor != None) else experiment.task_executor
+        print("SELECTED TASK EXECUTOR \"{}\"".format(selected_task_executor))
+        task_executors = worker.listTaskExecutors()
+        for task_executor in task_executors.taskExecutors:
+            log("TASK_EXECUTOR: {}".format(task_executor.name))
+            if task_executor.name == selected_task_executor:
+                log("SELECTING_TASK_EXECUTOR: {}".format(task_executor.name))
+                worker.selectTaskExecutor(task_executor)
     try:
         schedulers = worker.listSchedulers()
         if is_worker:
@@ -323,8 +312,9 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                 return
             break
     if is_worker:
+        selected_model = custom_model if (custom_model != None) else experiment.model
         for model in models.models:
-            if model.name == experiment.model and experiment.isOK():
+            if model.name == selected_model and experiment.isOK():
                 if (worker.setModel(model) is None):
                     log("Failed to setModel on %s" % device.name)
                     skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
@@ -470,8 +460,8 @@ def runExperiment(experiment):
                 log("=========================\tSEED_REPEAT {} | ATTEMPT {}\t========================".format(seed_repeat, repeat_tries))
                 timeout = False
                 experiment.setOK()
-                # Temporary for faster results
-                #stopClouds(experiment)
+
+                stopClouds(experiment)
 
                 if len(devices) - len(DEVICE_BLACKLIST) >= experiment.devices:
                     devices_to_test = []
@@ -510,8 +500,16 @@ def runExperiment(experiment):
                 producers = experiment.producers
                 workers = experiment.workers
                 i = 0
+                custom_executors_mobile = []
+                if (experiment.custom_executors.mobile != None):
+                    for custom_executor in experiment.custom_executors.mobile:
+                        for i in range(custom_executor[2]):
+                            custom_executors_mobile.append((custom_executor[0], custom_executor[1]))
                 for device in experiment_devices[:experiment.devices]:
-                    Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
+                    if (i < len(custom_executors_mobile)):
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][1], custom_executors_mobile[i][0])).start()
+                    else:
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
@@ -796,6 +794,29 @@ def stopClouds(experiment):
         stdout.flush()
         adb.cloudInstanceStop(cloud.instance, cloud.zone)
 
+class CustomExecutors:
+    cloud = None
+    cloudlet = None
+    mobile = None
+
+    def addCloud(self, task_executor, model, num_devices):
+        if self.cloud is None:
+            self.cloud = [(task_executor, model, num_devices)]
+        else:
+            self.cloud.append((task_executor, model, num_devices))
+
+    def addCloudlet(self, task_executor, model, num_devices):
+        if self.cloudlet is None:
+            self.cloudlet = [(task_executor, model, num_devices)]
+        else:
+            self.cloudlet.append((task_executor, model, num_devices))
+
+    def addMobile(self, task_executor, model, num_devices):
+        if self.mobile is None:
+            self.mobile = [(task_executor, model, num_devices)]
+        else:
+            self.mobile.append((task_executor, model, num_devices))
+
 class Experiment:
     name = ""
     scheduler = "SingleDevice [LOCAL]"
@@ -824,6 +845,8 @@ class Experiment:
     min_battery = 20
     _failed_devices = {}
     _running_status = True
+    task_executor = "Tensorflow"
+    custom_executors = None
 
     def __init__(self, name):
         self.name = name
@@ -941,6 +964,23 @@ def readConfig(confName):
                     endTime = int(times[1])
                 except:
                     None
+            elif option == "taskexecutor":
+                experiment.task_executor = config[section][option]
+            elif option == "customexecutors":
+                custom_executors = CustomExecutors()
+                for entry in config[section][option].split(','):
+                    executor_model_device_number = entry.split("/")
+                    if len(executor_model_device_number) != 4:
+                        log("INVALID CUSTOM_EXECUTOR {}".format(entry))
+                    elif executor_model_device_number[2].strip().lower() == "cloud":
+                        custom_executors.addCloud(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]))
+                    elif executor_model_device_number[2].strip().lower() == "cloudlet":
+                        custom_executors.addCloudlet(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]))
+                    elif executor_model_device_number[2].strip().lower() == "mobile":
+                        custom_executors.addMobile(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]))
+                    else:
+                        log("INVALID DEVICE_TYPE {}".format(entry))
+                experiment.custom_executors = custom_executors
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1058,6 +1098,31 @@ def help():
                     [*] BANDWIDTH_ESTIMATE_CALC_METHOD      [mean/median]  default: mean
                     [*] BANDWIDTH_SCALING_FACTOR             [Float] default: 1.0
                     [*] ADVERTISE_WORKER_STATUS: [true/false] default: true ENABLES DEVICE ADVERTISMENT Use when want LOCAL + CLOUDLET
+
+
+            Setting Defaults:
+                    SINGLE_REMOTE_IP: String = "0.0.0.0"
+                    CLOUDLET_ID = ""
+                    ADVERTISE_WORKER_STATUS: Boolean = false
+                    BANDWIDTH_ESTIMATE_CALC_METHOD: String = "mean"
+                    BANDWIDTH_SCALING_FACTOR: Float = 1.0f
+                    BROKER_PORT: Int = 50051
+                    WORKER_PORT: Int = 50053
+                    SCHEDULER_PORT: Int = 50055
+                    GRPC_MAX_MESSAGE_SIZE: Int = 150000000
+                    RTT_HISTORY_SIZE: Int = 5
+                    PING_TIMEOUT: Long = 10000L // 15s
+                    RTT_DELAY_MILLIS: Long = 10000L // 10s
+                    PING_PAYLOAD_SIZE: Int = 32000 // 32Kb
+                    AVERAGE_COMPUTATION_TIME_TO_SCORE: Int = 10
+                    WORKING_THREADS: Int = 1
+                    WORKER_STATUS_UPDATE_INTERVAL: Long = 5000 // 5s
+                    AUTO_STATUS_UPDATE_INTERVAL_MS: Long = 5000 // 5s
+                    RTTDelayMillisFailRetry: Long = 500 // 0.5s
+                    RTTDelayMillisFailAttempts: Long = 5
+                    MCAST_INTERFACE: String? = null
+                    DEVICE_ID: String = ""
+                    BANDWIDTH_ESTIMATE_TYPE = "ALL" // ACTIVE/PASSIVE/ALL
         ================================================ HELP ================================================''')
 
 def logExperiment(conf, experiment):
