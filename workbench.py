@@ -169,16 +169,41 @@ def experimentRebootDevice(device, device_random, max_sleep_random=10, retries=2
                         DEVICE_BLACKLIST.append(device.name)
                     return False
 
-def destroyWorker(worker, device):
+def destroyWorker(worker, launcher, device):
     try:
         log("STOP_WORKER\tSTART\t%s" % device.name)
         worker.destroy()
+        launcher.destroy()
         adb.stopAll(device)
         log("STOP_WORKER\tCOMPLETE\t%s" % device.name)
     except:
         log("STOP_WORKER\tERROR\t%s" % device.name)
 
-def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_model=None, custom_task_executor=None):
+
+
+def selectTaskExecutor(experiment, jay_instance, custom_task_executor=None):
+    selected_task_executor = custom_task_executor if (custom_task_executor != None) else experiment.task_executor
+    task_executors = jay_instance.listTaskExecutors()
+    for task_executor in task_executors.taskExecutors:
+        if task_executor.name == selected_task_executor:
+            log("SELECTED TASK EXECUTOR \"{}\"\t{}".format(selected_task_executor, jay_instance.name))
+            jay_instance.selectTaskExecutor(task_executor)
+    sleep(1)
+
+def selectModel(experiment, jay_instance, custom_model):
+    models = jay_instance.listModels()
+    if (models is None):
+        experiment.setFail()
+    selected_model = custom_model if (custom_model != None) else experiment.model
+    for model in models.models:
+        if model.name == selected_model and experiment.isOK():
+            if (jay_instance.setModel(model) is None):
+                break
+            log("SELECTED MODEL \"{}\"\t{}".format(selected_model, jay_instance.name))
+            return True
+    return False
+
+def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None):
     global PENDING_JOBS, PENDING_WORKERS
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
@@ -242,7 +267,8 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
         return
-    worker = None
+    droid_launcher = None
+    jay_instance = None
     error = False
     try:
         worker_ip = getDeviceIp(device)
@@ -253,82 +279,69 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             adb.rebootAndWait(device)
             return
         log("STARTING_SERVICES\t%s" % device.name)
-        worker = grpcControls.remoteClient(worker_ip, device.name, LOG_FILE)
-        worker.connectLauncherService()
-        worker.setLogName(experiment.name)
+        droid_launcher = grpcControls.droidLauncher(worker_ip, device.name)
+        jay_instance = grpcControls.jayClient(worker_ip, device.name)
+        droid_launcher.connectLauncherService()
+        droid_launcher.setLogName(experiment.name)
         if is_worker:
-            worker.startWorker()
-        worker.startScheduler()
-        worker.connectBrokerService()
+            droid_launcher.startWorker()
+        droid_launcher.startScheduler()
+        jay_instance.connectBrokerService()
         sleep(2)
     except FunctionTimedOut:
-        log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
-        error = True
+       log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
+       error = True
     except Exception:
-        log("Error Starting Worker %s" % device.name)
-        error = True
+       log("Error Starting Worker %s" % device.name)
+       error = True
     if error:
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
-        if worker is not None:
-            destroyWorker(worker, device)
+        if jay_instance is not None:
+            destroyWorker(jay_instance, droid_launcher, device)
         return
-    if experiment.settings:
-        log("SETTING_SETTINGS: {}".format(experiment.settings))
-        worker.setSettings(experiment.settings)
 
-    if is_worker:
-        selected_task_executor = custom_task_executor if (custom_task_executor != None) else experiment.task_executor
-        print("SELECTED TASK EXECUTOR \"{}\"".format(selected_task_executor))
-        task_executors = worker.listTaskExecutors()
-        for task_executor in task_executors.taskExecutors:
-            log("TASK_EXECUTOR: {}".format(task_executor.name))
-            if task_executor.name == selected_task_executor:
-                log("SELECTING_TASK_EXECUTOR: {}".format(task_executor.name))
-                worker.selectTaskExecutor(task_executor)
+
+    jay_instance.setSettings(experiment.settings) if experiment.settings else None
+    selectTaskExecutor(experiment, jay_instance, custom_task_executor) if is_worker else None
+
     try:
-        schedulers = worker.listSchedulers()
-        if is_worker:
-            models = worker.listModels()
+        schedulers = jay_instance.listSchedulers()
     except FunctionTimedOut:
-        log("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
+        log("ERROR_GETTING_SCHEDULERS\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
-        destroyWorker(worker, device)
+        destroyWorker(jay_instance, droid_launcher, device)
         return
-    if (schedulers is None):# or models is None):
+    if (schedulers is None):
         log("ERROR_GETTING_MODELS_OR_SCHEDULERS\t%s" % device.name)
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
-        destroyWorker(worker, device)
+        destroyWorker(jay_instance, droid_launcher, device)
         return
     for scheduler in schedulers.scheduler:
         if scheduler.name == experiment.scheduler and experiment.isOK():
-            if (worker.setScheduler(scheduler) is None):
+            if (jay_instance.setScheduler(scheduler) is None):
                 log("Failed to setScheduler on %s" % device.name)
                 skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
                 experiment.deviceFail(device.name)
-                destroyWorker(worker, device)
+                destroyWorker(jay_instance, droid_launcher, device)
                 return
             break
     if is_worker:
-        selected_model = custom_model if (custom_model != None) else experiment.model
-        for model in models.models:
-            if model.name == selected_model and experiment.isOK():
-                if (worker.setModel(model) is None):
-                    log("Failed to setModel on %s" % device.name)
-                    skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
-                    experiment.deviceFail(device.name)
-                    destroyWorker(worker, device)
-                    return
-                break
+        if not selectModel(experiment, jay_instance, custom_model):
+            log("Failed to setModel on %s" % device.name)
+            skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+            experiment.deviceFail(device.name)
+            destroyWorker(jay_instance, droid_launcher, device)
+
     log("WAIT_ON_BARRIER\tBOOT_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, device.name, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
-        destroyWorker(worker, device)
+        destroyWorker(jay_instance, droid_launcher, device)
         return
     if is_worker and experiment.calibration:
-        calibrateWorkerThread(worker, worker_seed, device)
+        calibrateWorkerThread(jay_instance, worker_seed, device)
     log("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
     barrierWithTimeout(start_barrier)
     i = 0
@@ -336,18 +349,18 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
         sleep(job_intervals[i])
         if not experiment.isSequential() or PENDING_JOBS < 1:
-            Thread(target = createJob, args = (worker,asset_list[i])).start()
+            Thread(target = createJob, args = (jay_instance,asset_list[i])).start()
         i = i+1
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
-        destroyWorker(worker, device)
+        destroyWorker(jay_instance, droid_launcher, device)
         return
     adb.screenOff(device)
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
         log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
-        destroyWorker(worker, device)
+        destroyWorker(jay_instance, droid_launcher, device)
         return
     try:
         if (experiment.isOK()):
@@ -378,7 +391,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log("CHECKING_LOG\t%s\tFAILED" % device.name)
         experiment.setFail()
         experiment.deviceFail(device.name)
-    destroyWorker(worker, device)
+    destroyWorker(jay_instance, droid_launcher, device)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
     barrierWithTimeout(finish_barrier)
     adb.screenOff(device)
@@ -507,7 +520,7 @@ def runExperiment(experiment):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1]))
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][1], custom_executors_mobile[i][0])).start()
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1])).start()
                     else:
                         Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
@@ -642,8 +655,16 @@ def chargeDevice(min_battery, device, battery_barrier):
 def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
     cloudlet_boot_barrier = Barrier(len(experiment.cloudlets) + 1)
     i = 0
+    custom_executors_cloudlet = []
+    if (experiment.custom_executors.cloudlet != None):
+        for custom_executor in experiment.custom_executors.cloudlet:
+            for i in range(custom_executor[2]):
+                custom_executors_cloudlet.append((custom_executor[0], custom_executor[1]))
     for cloudlet in experiment.cloudlets:
-        Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+        if (i < len(custom_executors_cloudlet)):
+            Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1])).start()
+        else:
+            Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         i += 1
     barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, "START_CLOUDLETS", servers_finish_barrier, finish_barrier)
 
@@ -652,54 +673,44 @@ def killLocalCloudlet():
     if pid != '':
         subprocess.run(['kill', '-9', pid])
 
-def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier):
+def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None):
     log("Starting %s Cloudlet Instance" % cloudlet)
     device_random = random.Random()
     device_random.seed(experiment.seed+cloudlet_seed+str(repetition))
-    cloudlet_control = grpcControls.cloudControl(cloudlet, "%s_cloudlet" % cloudlet, LOG_FILE)
-    cloudlet_control.connect()
-    cloudlet_control.stop()
-    cloudlet_control.start()
+    x86_remote_control = grpcControls.x86RemoteControl(cloudlet, "%s_cloudlet" % cloudlet)
+    x86_remote_control.connect()
+    x86_remote_control.stop()
+    x86_remote_control.start()
     sleep(1)
     log("Setting up %s Cloudlet Instance" % cloudlet)
-    cloudlet_instance = grpcControls.cloudClient(cloudlet, "%s_cloudlet" % cloudlet, LOG_FILE)
-    cloudlet_instance.stop()
-    cloudlet_instance.connectLauncherService()
+    x86_launcher = grpcControls.x86Launcher(cloudlet, "%s_cloudlet" % cloudlet)
+    x86_launcher.stop()
+    x86_launcher.connectLauncherService()
     log("Setting log name %s Cloudlet Instance" % cloudlet)
-    cloudlet_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    x86_launcher.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
     log("Starting Worker %s Cloudlet Instance" % cloudlet)
-    cloudlet_instance.startWorker()
+    x86_launcher.startWorker()
     sleep(1)
+    jay_instance = grpcControls.jayClient(cloudlet, "%s_cloudlet" % cloudlet)
     log("Connecting to Broker %s Cloudlet Instance" % cloudlet)
-    cloudlet_instance.connectBrokerService()
+
+    jay_instance.connectBrokerService()
     sleep(1)
     if experiment.settings or experiment.mcast_interface:
-        cloudlet_instance.setSettings(experiment.settings, experiment.mcast_interface, advertise_worker=True)
+        jay_instance.setSettings(experiment.settings, experiment.mcast_interface, advertise_worker=True)
     sleep(1)
-    log("Selecting Task Executor %s Cloudlet Instance" % cloudlet)
-    task_executors = cloudlet_instance.listTaskExecutors()
-    for task_executor in task_executors.taskExecutors:
-        if task_executor.name == "Tensorflow":
-            log("SELECTING_TASK_EXECUTOR: {}".format(task_executor.name))
-            cloudlet_instance.selectTaskExecutor(task_executor)
-    sleep(1)
-    log("Selecting Model %s Cloudlet Instance" % cloudlet)
-    models = cloudlet_instance.listModels()
-    if (models is None):
+
+    selectTaskExecutor(experiment, jay_instance, custom_task_executor)
+    if not selectModel(experiment, jay_instance, custom_model):
+        log("Failed to setScheduler on %s" % cloudlet)
         experiment.setFail()
-    else:
-        for model in models.models:
-            if model.name == experiment.model:
-                if (cloudlet_instance.setModel(model) is None):
-                    log("Failed to setScheduler on %s" % cloudlet)
-                    experiment.setFail()
-                break
+
     barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, cloudlet, servers_finish_barrier, finish_barrier) #inform startCloudlets that you have booted
     if (experiment.calibration):
-        calibrateWorkerThread(cloudlet_instance, cloudlet_seed, asset_id="%s.jpg" % experiment.asset_quality)
+        calibrateWorkerThread(jay_instance, cloudlet_seed, asset_id="%s.jpg" % experiment.asset_quality)
     barrierWithTimeout(servers_finish_barrier) #wait experiment completion to init shutdown
-    cloudlet_instance.stop()
-    cloudlet_control.stop()
+    x86_launcher.stop()
+    x86_remote_control.stop()
     barrierWithTimeout(finish_barrier)
 
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
@@ -715,7 +726,7 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
         else:
             os.system("scp joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
-def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier):
+def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     stdout.flush()
     if (not experiment.isOK()):
@@ -727,48 +738,47 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     log("WAITING_FOR_CLOUD_DNS_UPDATE\t%s\t(%s)" % (cloud.instance, cloud.address))
     pingWait(cloud.address)
 
-    cloud_control = grpcControls.cloudControl(cloud.address, "{}_{}_cloud".format(cloud.instance, cloud.zone), LOG_FILE)
-    cloud_control.connect()
-    cloud_control.stop()
-    cloud_control.start()
+    x86_remote_control = grpcControls.x86RemoteControl(cloud.address, "{}_{}_cloud".format(cloud.instance, cloud.zone))
+    x86_remote_control.connect()
+    x86_remote_control.stop()
+    x86_remote_control.start()
     sleep(1)
 
-    cloud_instance = grpcControls.cloudClient(cloud.address, cloud.instance, LOG_FILE)
-    cloud_instance.stop()
-    cloud_instance.connectLauncherService()
-    cloud_instance.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
-    cloud_instance.startWorker()
+    x86_launcher = grpcControls.x86Launcher(cloud.address, cloud.instance)
+    x86_launcher.stop()
+    x86_launcher.connectLauncherService()
+    x86_launcher.setLogName("%s_%s_%s.csv" % (experiment.name, repetition, seed_repeat))
+    x86_launcher.startWorker()
     sleep(1)
-    cloud_instance.connectBrokerService()
+
+
+    jay_instance = grpcControls.jayClient(cloud.address, cloud.instance)
+    jay_instance.connectBrokerService()
     sleep(1)
     if experiment.settings:
-        cloud_instance.setSettings(experiment.settings)
+        jay_instance.setSettings(experiment.settings)
     sleep(1)
-    models = cloud_instance.listModels()
-    if (models is None):
+
+    selectTaskExecutor(experiment, jay_instance, custom_task_executor)
+    if not selectModel(experiment, jay_instance, custom_model):
+        log("Failed to setScheduler on %s" % cloudlet)
         experiment.setFail()
-    else:
-        for model in models.models:
-            if model.name == experiment.model:
-                if (cloud_instance.setModel(model) is None):
-                    log("Failed to setScheduler on %s" % cloud.instance)
-                    experiment.setFail()
-                break
+
     log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud.instance)
     barrierWithTimeout(cloud_boot_barrier, 600, experiment, True, cloud.instance, servers_finish_barrier, finish_barrier)
     if (experiment.calibration):
-        calibrateWorkerThread(cloud_instance, "cloud_{}".format(cloud.address), asset_id="%s.jpg" % experiment.asset_quality)
+        calibrateWorkerThread(jay_instance, "cloud_{}".format(cloud.address), asset_id="%s.jpg" % experiment.asset_quality)
     log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\t%s" % cloud.instance)
     barrierWithTimeout(servers_finish_barrier)
     log("Stopping %s Cloud Instance" % cloud.instance)
-    cloud_instance.stop()
-    cloud_control.stop()
+    x86_launcher.stop()
+    x86_remote_control.stop()
     log("STOPPING_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     if (not experiment.isOK()):
-        skipBarriers(experiment, True, cloud_instance, finish_barrier)
+        skipBarriers(experiment, True, cloud.instance, finish_barrier)
         return
     # Temporary to increase experiment speed
-    #adb.cloudInstanceStop(cloud.instance, cloud.zone)
+    adb.cloudInstanceStop(cloud.instance, cloud.zone)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % cloud.instance)
     barrierWithTimeout(finish_barrier)
     log("CLOUD_FINISHED\t%s" % cloud.instance)
@@ -776,11 +786,24 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
 
 def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
     cloud_boot_barrier = Barrier(len(experiment.clouds) + 1)
+    i = 0
+    custom_executors_cloud = []
+    if (experiment.custom_executors.cloud != None):
+        for custom_executor in experiment.custom_executors.cloud:
+            for i in range(custom_executor[2]):
+                custom_executors_cloud.append((custom_executor[0], custom_executor[1]))
     for cloud in experiment.clouds:
-        if (cloud.zone == "localhost"):
-            Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+        if (i < len(custom_executors_cloud)):
+            if (cloud.zone == "localhost"):
+                Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1])).start()
+            else:
+                Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1])).start()
         else:
-            Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+            if (cloud.zone == "localhost"):
+                Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+            else:
+                Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
+        i += 1
     barrierWithTimeout(cloud_boot_barrier, 600, experiment, True, "START_CLOUDS", servers_finish_barrier, finish_barrier)
     if len(experiment.clouds) > 0:
         log("CLOUDS_BOOTED\tWAIT_5S_FOR_DEVICE_TO_FIND_THEM_ACTIVE")
@@ -1242,9 +1265,12 @@ def main():
             adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
             log('PACKAGE_INSTALLED\t%s' % device.name)
     if args.debug_grpc:
-        grpcControls.DEBUG = True
-        grpcControls.GRPC_DEBUG_FILE = LOG_FILE
-        grpcControls.GRPC_LOGS_LOCK = LOGS_LOCK
+        grpcControls.grpcLogs.debug = True
+        grpcControls.grpcLogs.log_file = LOG_FILE
+        grpcControls.grpcLogs.lock = LOGS_LOCK
+        #grpcControls.DEBUG = True
+        #grpcControls.GRPC_DEBUG_FILE = LOG_FILE
+        #grpcControls.GRPC_LOGS_LOCK = LOGS_LOCK
     log("============\tDEVICES\t============")
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))
