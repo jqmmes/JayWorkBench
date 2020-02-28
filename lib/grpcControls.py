@@ -479,7 +479,7 @@ class jayClient:
             except:
                 None
         sleep(5)
-        return self.setSettings(settings_map, mcast_interface, advertise_worker, etries-1)
+        return self.setSettings(settings_map, mcast_interface, advertise_worker, retries-1)
 
     def destroy(self):
         if self.brokerChannel is not None:
