@@ -412,7 +412,25 @@ class jayClient:
 
     '''
         TODO: SET TASK_EXECUTOR_SETTINGS
+
+        Colocar TaskExecutorSettings Geral e custom
     '''
+
+    def setTaskExecutorSettings(self, settings_map, retries=5):
+        if retries <= 0:
+            log("%s (%s) taskExecutor setSettings FAIL" % (self.name, self.ip))
+            return False
+        if (self.brokerStubReady()):
+            try:
+                settings_proto = JayProto_pb2.Settings()
+                for key in settings_map:
+                    log("{} ({}) taskExecutor settings[{}]: {}".format(self.name, self.ip, key, settings_map[key]))
+                    settings_proto.setting[key] = settings_map[key]
+                return self.brokerStub.setExecutorSettings(settings_proto)
+            except:
+                None
+        sleep(5)
+        return self.setSettings(settings_map, retries-1)
 
     @func_set_timeout(35)
     def listModels(self, retries=5):

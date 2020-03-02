@@ -190,6 +190,13 @@ def selectTaskExecutor(experiment, jay_instance, custom_task_executor=None):
             jay_instance.selectTaskExecutor(task_executor)
     sleep(1)
 
+def setTaskExecutorSettings(experiment, custom_task_executor):
+    if custom_settings_map is not None:
+        jay_instance.setTaskExecutorSettings(custom_settings_map)
+    elif experiment.task_executor_settings is not None:
+        jay_instance.setTaskExecutorSettings(task_executor_settings)
+    sleep(1)
+
 def selectModel(experiment, jay_instance, custom_model):
     models = jay_instance.listModels()
     if (models is None):
@@ -304,6 +311,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
 
     jay_instance.setSettings(experiment.settings) if experiment.settings else None
     selectTaskExecutor(experiment, jay_instance, custom_task_executor) if is_worker else None
+    setTaskExecutorSettings(experiment, custom_settings_map)
 
     try:
         schedulers = jay_instance.listSchedulers()
@@ -701,6 +709,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     sleep(1)
 
     selectTaskExecutor(experiment, jay_instance, custom_task_executor)
+    setTaskExecutorSettings(experiment, custom_settings_map)
     if not selectModel(experiment, jay_instance, custom_model):
         log("Failed to setScheduler on %s" % cloudlet)
         experiment.setFail()
@@ -760,6 +769,8 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     sleep(1)
 
     selectTaskExecutor(experiment, jay_instance, custom_task_executor)
+    setTaskExecutorSettings(experiment, custom_task_executor)
+
     if not selectModel(experiment, jay_instance, custom_model):
         log("Failed to setScheduler on %s" % cloudlet)
         experiment.setFail()
@@ -869,6 +880,7 @@ class Experiment:
     _failed_devices = {}
     _running_status = True
     task_executor = "Tensorflow"
+    task_executor_settings = None
     custom_executors = None
 
     def __init__(self, name):
@@ -878,6 +890,11 @@ class Experiment:
 
     def setSetting(self, key, val):
         self.settings[key] = val
+
+    def setTaskExecutorSetting(self, key, val):
+        if self.task_executor_settings is None:
+            self.task_executor_settings = {}
+        self.task_executor_settings[key] = val
 
     def setSequential(self):
         self.sequential_mode = True
@@ -904,6 +921,8 @@ class Experiment:
         return self._failed_devices
 
 def processSettingsMap(raw_settings):
+    if raw_settings.strip() == "":
+        return None
     map = {}
     for setting in raw_settings.split(";"):
         key_val = setting.strip().split(":")
@@ -981,6 +1000,12 @@ def readConfig(confName):
                     setting = entry.split(':')
                     experiment.setSetting(setting[0].strip(), setting[1].strip())
                     log("READING_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
+            elif opetion = "taskexecutorsettings":
+                for entry in config[section][option].split(';'):
+                    setting = ""
+                    setting = entry.split(':')
+                    experiment.setTaskExecutorSetting(setting[0].strip(), setting[1].strip())
+                    log("READING_TASK_EXECUTOR_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
             elif option == "multicastinterface":
                 experiment.mcast_interface = config[section][option]
             elif option == "minbattery":
@@ -1055,6 +1080,7 @@ def help():
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
                     RunBetween              = Define the experiment run interval (hour - hour)
                     TaskExecutor            = Task executor to use
+                    TaskExecutorSettings    = Set Task Executor settings (setting: value;...) [LIST]
                     CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices/setting:value;setting:value, ... [LIST]
 
         Models:
