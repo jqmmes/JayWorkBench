@@ -203,7 +203,7 @@ def selectModel(experiment, jay_instance, custom_model):
             return True
     return False
 
-def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None):
+def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
     global PENDING_JOBS, PENDING_WORKERS
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
@@ -517,10 +517,10 @@ def runExperiment(experiment):
                 if (experiment.custom_executors.mobile != None):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
-                            custom_executors_mobile.append((custom_executor[0], custom_executor[1]))
+                            custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1])).start()
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
                     else:
                         Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
@@ -659,10 +659,10 @@ def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, 
     if (experiment.custom_executors.cloudlet != None):
         for custom_executor in experiment.custom_executors.cloudlet:
             for i in range(custom_executor[2]):
-                custom_executors_cloudlet.append((custom_executor[0], custom_executor[1]))
+                custom_executors_cloudlet.append((custom_executor[0], custom_executor[1], custom_executor[3]))
     for cloudlet in experiment.cloudlets:
         if (i < len(custom_executors_cloudlet)):
-            Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1])).start()
+            Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1], custom_executors_cloudlet[i][2])).start()
         else:
             Thread(target = startCloudletThread, args = (cloudlet, experiment, "cloudlet_seed_{}".format(i), repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier)).start()
         i += 1
@@ -673,7 +673,7 @@ def killLocalCloudlet():
     if pid != '':
         subprocess.run(['kill', '-9', pid])
 
-def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None):
+def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_repeat, cloudlet_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
     log("Starting %s Cloudlet Instance" % cloudlet)
     device_random = random.Random()
     device_random.seed(experiment.seed+cloudlet_seed+str(repetition))
@@ -726,7 +726,7 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
         else:
             os.system("scp joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
-def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None):
+def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
     stdout.flush()
     if (not experiment.isOK()):
@@ -791,13 +791,13 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
     if (experiment.custom_executors.cloud != None):
         for custom_executor in experiment.custom_executors.cloud:
             for i in range(custom_executor[2]):
-                custom_executors_cloud.append((custom_executor[0], custom_executor[1]))
+                custom_executors_cloud.append((custom_executor[0], custom_executor[1], custom_executor[3]))
     for cloud in experiment.clouds:
         if (i < len(custom_executors_cloud)):
             if (cloud.zone == "localhost"):
-                Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1])).start()
+                Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloud[i][0], custom_executors_cloud[i][1], custom_executors_cloud[i][2])).start()
             else:
-                Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloudlet[i][0], custom_executors_cloudlet[i][1])).start()
+                Thread(target = startCloudThread, args = (cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_executors_cloud[i][0], custom_executors_cloud[i][1], custom_executors_cloud[i][2])).start()
         else:
             if (cloud.zone == "localhost"):
                 Thread(target = startCloudletThread, args = (cloud.address, experiment, "cloudlet_seed_{}".format(cloud.address), repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier)).start()
@@ -822,23 +822,23 @@ class CustomExecutors:
     cloudlet = None
     mobile = None
 
-    def addCloud(self, task_executor, model, num_devices):
+    def addCloud(self, task_executor, model, num_devices, settings_map):
         if self.cloud is None:
-            self.cloud = [(task_executor, model, num_devices)]
+            self.cloud = [(task_executor, model, num_devices, settings_map)]
         else:
-            self.cloud.append((task_executor, model, num_devices))
+            self.cloud.append((task_executor, model, num_devices, settings_map))
 
-    def addCloudlet(self, task_executor, model, num_devices):
+    def addCloudlet(self, task_executor, model, num_devices, settings_map):
         if self.cloudlet is None:
-            self.cloudlet = [(task_executor, model, num_devices)]
+            self.cloudlet = [(task_executor, model, num_devices, settings_map)]
         else:
-            self.cloudlet.append((task_executor, model, num_devices))
+            self.cloudlet.append((task_executor, model, num_devices, settings_map))
 
-    def addMobile(self, task_executor, model, num_devices):
+    def addMobile(self, task_executor, model, num_devices, settings_map):
         if self.mobile is None:
-            self.mobile = [(task_executor, model, num_devices)]
+            self.mobile = [(task_executor, model, num_devices, settings_map)]
         else:
-            self.mobile.append((task_executor, model, num_devices))
+            self.mobile.append((task_executor, model, num_devices, settings_map))
 
 class Experiment:
     name = ""
@@ -903,6 +903,14 @@ class Experiment:
     def getFailedDevices(self):
         return self._failed_devices
 
+def processSettingsMap(raw_settings):
+    map = {}
+    for setting in raw_settings.split(";"):
+        key_val = setting.strip().split(":")
+        if (len(key_val) != 2):
+            continue
+        map[key_val[0].strip()] = key_val[1].strip()
+    return map
 
 def readConfig(confName):
     global EXPERIMENTS, SCHEDULED_EXPERIMENTS
@@ -993,14 +1001,14 @@ def readConfig(confName):
                 custom_executors = CustomExecutors()
                 for entry in config[section][option].split(','):
                     executor_model_device_number = entry.split("/")
-                    if len(executor_model_device_number) != 4:
+                    if len(executor_model_device_number) != 5:
                         log("INVALID CUSTOM_EXECUTOR {}".format(entry))
                     elif executor_model_device_number[2].strip().lower() == "cloud":
-                        custom_executors.addCloud(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]))
+                        custom_executors.addCloud(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]), processSettingsMap(executor_model_device_number[4]))
                     elif executor_model_device_number[2].strip().lower() == "cloudlet":
-                        custom_executors.addCloudlet(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]))
+                        custom_executors.addCloudlet(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]), processSettingsMap(executor_model_device_number[4]))
                     elif executor_model_device_number[2].strip().lower() == "mobile":
-                        custom_executors.addMobile(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]))
+                        custom_executors.addMobile(executor_model_device_number[0].strip(), executor_model_device_number[1].strip(), int(executor_model_device_number[3]), processSettingsMap(executor_model_device_number[4]))
                     else:
                         log("INVALID DEVICE_TYPE {}".format(entry))
                 experiment.custom_executors = custom_executors
@@ -1047,7 +1055,7 @@ def help():
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
                     RunBetween              = Define the experiment run interval (hour - hour)
                     TaskExecutor            = Task executor to use
-                    CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices, ... [LIST]
+                    CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices/setting:value;setting:value, ... [LIST]
 
         Models:
             Tensorflow:
@@ -1072,6 +1080,7 @@ def help():
                 Lite:
                     ssd_mobilenet_v3_large_coco
                     ssd_mobilenet_v3_small_coco
+                    ssd_mobilenet_v1_fpn_coco
 
         TaskExecutors:
                     Tensorflow

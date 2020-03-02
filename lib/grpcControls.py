@@ -410,6 +410,10 @@ class jayClient:
         sleep(5)
         return self.runExecutorAction(action, args, retries-1)
 
+    '''
+        TODO: SET TASK_EXECUTOR_SETTINGS
+    '''
+
     @func_set_timeout(35)
     def listModels(self, retries=5):
         models = self.callExecutorAction("listModels")
