@@ -1127,8 +1127,10 @@ def main():
     loaded_experiments = "logs/workbench/{}/loaded_experiments/".format(experiment_name)
     os.makedirs(new_experiments)
     os.makedirs(loaded_experiments)
-
-    checkInterfaces()
+    try:
+        checkInterfaces()
+    except:
+        None
     log("Starting... Please wait")
 
     if not args.use_stdout:

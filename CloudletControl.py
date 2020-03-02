@@ -65,5 +65,8 @@ def checkInterfaces():
             print()
 
 if __name__ == '__main__':
-    checkInterfaces()
+    try:
+        checkInterfaces()
+    except:
+        None
     serve()
