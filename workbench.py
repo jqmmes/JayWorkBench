@@ -1108,6 +1108,8 @@ def help():
                     ssd_mobilenet_v3_large_coco  (BROKEN RESULTS)
                     ssd_mobilenet_v3_small_coco
                     ssd_mobilenet_v1_fpn_coco
+                    ssd_resnet50_v1_fpn
+                    ssd_mobilenet_v3_quantized_large_coco
 
         TaskExecutors:
                     Tensorflow
