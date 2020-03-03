@@ -190,11 +190,11 @@ def selectTaskExecutor(experiment, jay_instance, custom_task_executor=None):
             jay_instance.selectTaskExecutor(task_executor)
     sleep(1)
 
-def setTaskExecutorSettings(experiment, custom_task_executor):
+def setTaskExecutorSettings(experiment, jay_instance, custom_settings_map):
     if custom_settings_map is not None:
         jay_instance.setTaskExecutorSettings(custom_settings_map)
     elif experiment.task_executor_settings is not None:
-        jay_instance.setTaskExecutorSettings(task_executor_settings)
+        jay_instance.setTaskExecutorSettings(experiment.task_executor_settings)
     sleep(1)
 
 def selectModel(experiment, jay_instance, custom_model):
@@ -311,7 +311,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
 
     jay_instance.setSettings(experiment.settings) if experiment.settings else None
     selectTaskExecutor(experiment, jay_instance, custom_task_executor) if is_worker else None
-    setTaskExecutorSettings(experiment, custom_settings_map)
+    setTaskExecutorSettings(experiment, jay_instance, custom_settings_map)
 
     try:
         schedulers = jay_instance.listSchedulers()
@@ -709,7 +709,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     sleep(1)
 
     selectTaskExecutor(experiment, jay_instance, custom_task_executor)
-    setTaskExecutorSettings(experiment, custom_settings_map)
+    setTaskExecutorSettings(experiment, jay_instance, custom_settings_map)
     if not selectModel(experiment, jay_instance, custom_model):
         log("Failed to setScheduler on %s" % cloudlet)
         experiment.setFail()
@@ -769,7 +769,7 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
     sleep(1)
 
     selectTaskExecutor(experiment, jay_instance, custom_task_executor)
-    setTaskExecutorSettings(experiment, custom_task_executor)
+    setTaskExecutorSettings(experiment, setTaskExecutorSettings, custom_task_executor)
 
     if not selectModel(experiment, jay_instance, custom_model):
         log("Failed to setScheduler on %s" % cloudlet)
@@ -882,6 +882,7 @@ class Experiment:
     task_executor = "Tensorflow"
     task_executor_settings = None
     custom_executors = None
+    settings = {}
 
     def __init__(self, name):
         self.name = name
@@ -1000,7 +1001,7 @@ def readConfig(confName):
                     setting = entry.split(':')
                     experiment.setSetting(setting[0].strip(), setting[1].strip())
                     log("READING_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
-            elif opetion = "taskexecutorsettings":
+            elif option == "taskexecutorsettings":
                 for entry in config[section][option].split(';'):
                     setting = ""
                     setting = entry.split(':')
@@ -1104,13 +1105,18 @@ def help():
 
             TensorflowLite:
                 Lite:
-                    ssd_mobilenet_v3_large_coco
+                    ssd_mobilenet_v3_large_coco  (BROKEN RESULTS)
                     ssd_mobilenet_v3_small_coco
                     ssd_mobilenet_v1_fpn_coco
 
         TaskExecutors:
                     Tensorflow
+
                     TensorflowLite
+                        Settings:
+                            CPU -> USE CPU
+                            GPU -> USE GPU (BROKEN IN MODELS FOR OD)
+                            NNAPI -> USE NNAPI
 
         Strategies:
                     SingleDeviceScheduler [LOCAL]
@@ -1187,11 +1193,12 @@ def logExperiment(conf, experiment):
     conf.write("Experiment: %s\n" % experiment.name)
     conf.write("==============\tCONFIG\t==============\n")
     conf.write("Scheduler: %s\n" % experiment.scheduler)
-    conf.write("TF Model: %s\n" % experiment.model)
+    conf.write("TensorflowModel: %s\n" % experiment.model)
+    conf.write("TaskExecutor: %s\n" % experiment.task_executor)
     conf.write("Devices: %s\n" % str(experiment.devices))
     conf.write("Reboot: %s\n" % experiment.reboot)
     conf.write("Rate: %s\n" % str(experiment.request_rate))
-    conf.write("Rate Time: %s" % str(experiment.request_time) + "s\n")
+    conf.write("RateTime: %s" % str(experiment.request_time) + "s\n")
     conf.write("Duration: %s" % str(experiment.duration) + "s\n")
     conf.write("Clouds: [")
     for cloud in experiment.clouds:
@@ -1200,9 +1207,23 @@ def logExperiment(conf, experiment):
     conf.write("Cloudlets: %s\n" % str(experiment.cloudlets))
     conf.write("Seed: %s\n" % experiment.seed)
     conf.write("Repetitions: %s\n" % str(experiment.repetitions))
+    conf.write("Workers: %s\n" % experiment.workers)
     conf.write("Producers: %s\n" % experiment.producers)
+    conf.write("StartWorkers: %s\n" % experiment.start_worker)
+    conf.write("Assets: %s\n" % experiment.assets)
+    conf.write("AssetQuality: %s\n" % experiment.asset_quality)
+    conf.write("AssetType: %s\n" % experiment.asset_type)
+    conf.write("MCastInterface: %s\n" % experiment.mcast_interface)
+    conf.write("MinBattery: %d\n" % experiment.min_battery)
+    conf.write("Calibration: %s\n" % experiment.calibration)
     conf.write("RepeatSeed: %s\n" % experiment.repeat_seed)
     conf.write("Timeout: %s\n" % experiment.timeout)
+    conf.write("Settings: %s\n" % experiment.settings)
+    conf.write("TaskExecutorSettings: %s\n" % experiment.task_executor_settings)
+    conf.write("CustomExecutors: [")
+    if experiment.custom_executors is not None:
+        conf.write("Mobile: {}; Cloudlet: {}; Cloud: {}".format(experiment.custom_executors.mobile, experiment.custom_executors.cloudlet, experiment.custom_executors.cloud))
+    conf.write("]\n")
     conf.write("======================================\n")
 
 def getESSID(interface):
@@ -1225,12 +1246,11 @@ def checkInterfaces():
         subprocess.run(["sudo", "ip", "link", "set", "flannel.1", "down"])
     log("AVAILABLE INTERFACES:")
     for iface in ifaces:
-        log("\t[*] {}".format(iface), end="")
         wlan = getESSID(iface)
         if wlan != "":
-            log(" ({})".format(wlan))
+            log("\t[*] {} ({})".format(iface, wlan))
         else:
-            log("")
+            log("\t[*] {}".format(iface))
     log("==========================================================================================")
 
 def main():
@@ -1305,9 +1325,6 @@ def main():
         grpcControls.grpcLogs.debug = True
         grpcControls.grpcLogs.log_file = LOG_FILE
         grpcControls.grpcLogs.lock = LOGS_LOCK
-        #grpcControls.DEBUG = True
-        #grpcControls.GRPC_DEBUG_FILE = LOG_FILE
-        #grpcControls.GRPC_LOGS_LOCK = LOGS_LOCK
     log("============\tDEVICES\t============")
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))
