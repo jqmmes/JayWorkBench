@@ -3,3 +3,12 @@ logs*
 *.cfg
 sys_logs*
 assets*
+__pycache__
+*.pdf
+*.bk
+*.html
+*.bk.1
+*.bk.2
+*.bk.3
+*.new
+*.old
