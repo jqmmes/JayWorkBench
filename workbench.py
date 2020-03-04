@@ -516,13 +516,14 @@ def runExperiment(experiment):
                 finish_barrier = Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
                 servers_finish_barrier = Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
-                startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
+
+                startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
                 producers = experiment.producers
                 workers = experiment.workers
                 i = 0
                 custom_executors_mobile = []
-                if (experiment.custom_executors.mobile != None):
+                if (experiment.custom_executors is not None and experiment.custom_executors.mobile != None):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
@@ -664,7 +665,7 @@ def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, 
     cloudlet_boot_barrier = Barrier(len(experiment.cloudlets) + 1)
     i = 0
     custom_executors_cloudlet = []
-    if (experiment.custom_executors.cloudlet != None):
+    if (experiment.custom_executors is not None and experiment.custom_executors.cloudlet is not None):
         for custom_executor in experiment.custom_executors.cloudlet:
             for i in range(custom_executor[2]):
                 custom_executors_cloudlet.append((custom_executor[0], custom_executor[1], custom_executor[3]))
@@ -799,7 +800,7 @@ def startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, fin
     cloud_boot_barrier = Barrier(len(experiment.clouds) + 1)
     i = 0
     custom_executors_cloud = []
-    if (experiment.custom_executors.cloud != None):
+    if (experiment.custom_executors is not None  and experiment.custom_executors.cloud is not None):
         for custom_executor in experiment.custom_executors.cloud:
             for i in range(custom_executor[2]):
                 custom_executors_cloud.append((custom_executor[0], custom_executor[1], custom_executor[3]))
@@ -1091,7 +1092,7 @@ def help():
                     ssd_mobilenet_v1_coco
                     ssd_mobilenet_v2_coco
                     ssdlite_mobilenet_v2_coco
-                    ssd_resnet_50_fpn_coco
+                    ssd_resnet50_v1_fpn_coco
 
                 Android:
                     ssd_mobilenet_v3_large_coco
@@ -1108,7 +1109,7 @@ def help():
                     ssd_mobilenet_v3_large_coco  (BROKEN RESULTS)
                     ssd_mobilenet_v3_small_coco
                     ssd_mobilenet_v1_fpn_coco
-                    ssd_resnet50_v1_fpn
+                    ssd_resnet50_v1_fpn_coco
                     ssd_mobilenet_v3_quantized_large_coco
 
         TaskExecutors:
