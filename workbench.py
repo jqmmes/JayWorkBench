@@ -14,6 +14,10 @@ from datetime import datetime
 import argparse
 from collections import deque
 from func_timeout import func_timeout, FunctionTimedOut, func_set_timeout
+from meross_iot.cloud.devices.power_plugs import GenericPlug
+from meross_iot.manager import MerossManager
+import json
+
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
@@ -29,6 +33,29 @@ CURSES_LOGS = None
 CURSES_LOGS_LOCK = Lock()
 LOGS_LOCK = Lock()
 REBOOT_ON_RUN_EXPERIMENT = False
+
+user_info = json.loads(open("meross.json", "r").read())
+manager = MerossManager(user_info["user"], user_info["pass"])
+manager.start()
+PLUGS = manager.get_devices_by_kind(GenericPlug)
+
+def power_on(plug=0):
+    if len(plugs) > 0:
+        PLUGS[plug].turn_on()
+        return True
+    return False
+
+def is_power_on(plug=0):
+    if len(plugs) > 0:
+        return PLUGS[plug].get_state()
+    return False
+
+def power_off(plug=0):
+    if len(plugs) > 0:
+        PLUGS[plug].turn_off()
+        return True
+    return False
+
 
 @func_set_timeout(1)
 def write_to_file(f, str, end):
@@ -449,8 +476,7 @@ def runExperiment(experiment):
     conf.close()
 
     killLocalCloudlet()
-    # Temporary for faster results
-    #stopClouds(experiment)
+    stopClouds(experiment)
 
     if REBOOT_ON_RUN_EXPERIMENT:
         reboot_barrier_size = 1
@@ -527,6 +553,24 @@ def runExperiment(experiment):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
+                if (experiment.power_devices):
+                    power_on()
+                    i = 0
+                    while ((not is_power_on()) and i < 5):
+                        sleep(1 + i)
+                        power_on()
+                        i+=1
+                        if (i == 5 and (not is_power_on())):
+                            experiment.setFail()
+                else:
+                    power_off()
+                    i = 0
+                    while (is_power_on() and i < 5):
+                        sleep(1 + i)
+                        power_off()
+                        i+=1
+                        if (i == 5 and is_power_on()):
+                            experiment.setFail()
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
                         Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
@@ -580,6 +624,13 @@ def runExperiment(experiment):
         if (repetition != experiment.repetitions - 1):
             log("Waiting 5s for next repetition")
             sleep(5)
+    if (not is_power_on()):
+        power_on()
+        i = 0
+        while ((not is_power_on()) and i < 5):
+            sleep(1 + i)
+            power_on()
+            i+=1
 
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
@@ -883,6 +934,7 @@ class Experiment:
     task_executor = "Tensorflow"
     task_executor_settings = None
     custom_executors = None
+    power_devices = True
     settings = {}
 
     def __init__(self, name):
@@ -1039,6 +1091,9 @@ def readConfig(confName):
                     else:
                         log("INVALID DEVICE_TYPE {}".format(entry))
                 experiment.custom_executors = custom_executors
+            elif option == "powerdevices":
+                if config[section][option].lower() == "false":
+                    experiment.power_devices = False
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1084,6 +1139,7 @@ def help():
                     TaskExecutor            = Task executor to use
                     TaskExecutorSettings    = Set Task Executor settings (setting: value;...) [LIST]
                     CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices/setting:value;setting:value, ... [LIST]
+                    powerDevices            = Power devices though experiment or not [BOOL] (Default True)
 
         Models:
             Tensorflow:
