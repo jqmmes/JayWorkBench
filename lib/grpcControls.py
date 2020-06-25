@@ -4,6 +4,7 @@ import lib.protobuf.Cloud_pb2 as Cloud_pb2
 import lib.protobuf.Cloud_pb2_grpc as Cloud_pb2_grpc
 import lib.protobuf.JayProto_pb2 as JayProto_pb2
 import lib.protobuf.JayProto_pb2_grpc as JayProto_pb2_grpc
+import lib.protobuf.JayTensorFlowProto_pb2 as JayTensorFlowProto_pb2
 
 import lib.protobuf.cloudlet.CloudletControl_pb2 as CloudletControl_pb2
 import lib.protobuf.cloudlet.CloudletControl_pb2_grpc as CloudletControl_pb2_grpc
@@ -437,7 +438,7 @@ class jayClient:
         models = self.callExecutorAction("listModels")
         if models == None:
             return None
-        ret_models =  JayProto_pb2.Models()
+        ret_models =  JayTensorFlowProto_pb2.Models()
         ret_models.ParseFromString(models.bytes)
         return ret_models
 
@@ -460,17 +461,17 @@ class jayClient:
         sleep(5)
         return self.setScheduler(scheduler, retries-1)
 
-    def scheduleJob(self, job):
+    def scheduleTask(self, task):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.scheduleJob(job.getProto())
+                return self.brokerStub.scheduleTask(task.getProto())
             except:
                 return False
 
-    def createJob(self, asset_id):
+    def createTask(self, asset_id):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.createJob(getProtoString(asset_id))
+                return self.brokerStub.createTask(getProtoString(asset_id))
             except:
                 return False
 
@@ -518,7 +519,7 @@ class grpcLogs:
     debug = False
     lock = None
 
-class Job:
+class Task:
     id = ""
     data = None
 
@@ -532,10 +533,10 @@ class Job:
         self.data = bytes
 
     def getProto(self):
-        job = JayProto_pb2.Job()
-        job.id = self.id
-        job.data = self.data
-        return job
+        task = JayProto_pb2.Task()
+        task.id = self.id
+        task.data = self.data
+        return task
 
 class Cloud:
     instance = ""

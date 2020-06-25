@@ -14,14 +14,15 @@ from datetime import datetime
 import argparse
 from collections import deque
 from func_timeout import func_timeout, FunctionTimedOut, func_set_timeout
-from meross_iot.cloud.devices.power_plugs import GenericPlug
+#from meross_iot.cloud.devices.power_plugs import GenericPlug
 from meross_iot.manager import MerossManager
+from meross_iot.http_api import MerossHttpClient
 import json
 
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
-PENDING_JOBS = 0
+PENDING_TASKS = 0
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
@@ -33,25 +34,30 @@ CURSES_LOGS = None
 CURSES_LOGS_LOCK = Lock()
 LOGS_LOCK = Lock()
 REBOOT_ON_RUN_EXPERIMENT = False
+USE_SMART_PLUGS = False
 
-user_info = json.loads(open("meross.json", "r").read())
-manager = MerossManager(user_info["user"], user_info["pass"])
-manager.start()
-PLUGS = manager.get_devices_by_kind(GenericPlug)
+PLUGS = []
+
+async def merros_init():
+    user_info = json.loads(open("meross.json", "r").read())
+    merross_http_manager = http_api_client = await MerossHttpClient.async_from_user_password(email=user_info["user"], password=user_info["pass"])
+    manager = MerossManager(merross_http_manager)
+    manager.start()
+    #PLUGS = manager.get_devices_by_kind(GenericPlug)
 
 def power_on(plug=0):
-    if len(plugs) > 0:
+    if len(PLUGS) > 0:
         PLUGS[plug].turn_on()
         return True
     return False
 
 def is_power_on(plug=0):
-    if len(plugs) > 0:
+    if len(PLUGS) > 0:
         return PLUGS[plug].get_state()
     return False
 
 def power_off(plug=0):
-    if len(plugs) > 0:
+    if len(PLUGS) > 0:
         PLUGS[plug].turn_off()
         return True
     return False
@@ -103,18 +109,18 @@ def pingWait(hostname):
     while(not ping(hostname)):
         sleep(2)
 
-def createJob(worker, asset_id):
-    global PENDING_JOBS
-    PENDING_JOBS += 1
-    log("{}\t{}\tJOB_SUBMIT\t{}".format(time(), asset_id, worker.name))
+def createTask(worker, asset_id):
+    global PENDING_TASKS
+    PENDING_TASKS += 1
+    log("{}\t{}\tTASK_SUBMIT\t{}".format(time(), asset_id, worker.name))
     try:
-        if not worker.createJob(asset_id):
-            log("{}\t{}\tJOB_FAILED\tFAILED_SCHEDULE\t{}".format(time(), asset_id, worker.name))
+        if not worker.createTask(asset_id):
+            log("{}\t{}\tTASK_FAILED\tFAILED_SCHEDULE\t{}".format(time(), asset_id, worker.name))
         else:
-            log("{}\t{}\tJOB_COMPLETE\t{}".format(time(), asset_id, worker.name))
-    except Exception as job_exception:
-        log("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), asset_id, worker.name))
-    PENDING_JOBS -= 1
+            log("{}\t{}\tTASK_COMPLETE\t{}".format(time(), asset_id, worker.name))
+    except Exception as task_exception:
+        log("{}\t{}\tTASK_FAILED\t{}TASK_EXCEPTION\t{}".format(time(), asset_id, worker.name))
+    PENDING_TASKS -= 1
 
 def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
     log("CALIBRATION\t{}".format(worker.name))
@@ -128,14 +134,14 @@ def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
         while (asset[-4:] not in ['.png', '.jpg']):
             asset = files_on_device[device_random.randint(0,len(files_on_device)-1)]
 
-    log("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), "CALIBRATION_JOB", asset, worker.name))
+    log("{}\t{}\tTASK_SUBMIT\t{}\t{}".format(time(), "CALIBRATION_TASK", asset, worker.name))
     try:
         if not worker.calibrateWorker(asset):
-            log("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
+            log("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), "CALIBRATION_TASK", worker.name))
         else:
-            log("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), "CALIBRATION_JOB", worker.name))
-    except Exception as job_exception:
-        log("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
+            log("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), "CALIBRATION_TASK", worker.name))
+    except Exception as task_exception:
+        log("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), "CALIBRATION_TASK", worker.name))
 
 def barrierWithTimeout(barrier, timeout=None, experiment=None, show_error=True, device=None, *skip_barriers):
     if experiment is not None:
@@ -226,6 +232,7 @@ def setTaskExecutorSettings(experiment, jay_instance, custom_settings_map):
 
 def selectModel(experiment, jay_instance, custom_model):
     models = jay_instance.listModels()
+    print(models)
     if (models is None):
         experiment.setFail()
     selected_model = custom_model if (custom_model != None) else experiment.model
@@ -238,7 +245,7 @@ def selectModel(experiment, jay_instance, custom_model):
     return False
 
 def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
-    global PENDING_JOBS, PENDING_WORKERS
+    global PENDING_TASKS, PENDING_WORKERS
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
         adb.uninstallPackage(device)
@@ -252,11 +259,11 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     device_random = random.Random()
     device_random.seed(experiment.seed+worker_seed+str(repetition))
     rate = float(experiment.request_rate)/float(experiment.request_time)
-    log('GENERATING_JOBS\tRATE: {}\t{}'.format(rate, device.name))
-    job_intervals = []
+    log('GENERATING_TASKS\tRATE: {}\t{}'.format(rate, device.name))
+    task_intervals = []
     asset_list = []
-    while(sum(job_intervals) < experiment.duration):
-        job_intervals.append(device_random.expovariate(rate))
+    while(sum(task_intervals) < experiment.duration):
+        task_intervals.append(device_random.expovariate(rate))
         asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
         while ((asset[-4:] not in ['.png', '.jpg'] and experiment.asset_type == 'image') or (asset[-4:] not in ['.mp4'] and experiment.asset_type == 'video')):
             asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
@@ -380,11 +387,11 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     log("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
     barrierWithTimeout(start_barrier)
     i = 0
-    while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
-        log("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
-        sleep(job_intervals[i])
-        if not experiment.isSequential() or PENDING_JOBS < 1:
-            Thread(target = createJob, args = (jay_instance,asset_list[i])).start()
+    while (i < (len(task_intervals) - 1)  and experiment.isOK() and is_producer):
+        log("NEXT_EVENT_IN\t{}".format(task_intervals[i]))
+        sleep(task_intervals[i])
+        if not experiment.isSequential() or PENDING_TASKS < 1:
+            Thread(target = createTask, args = (jay_instance,asset_list[i])).start()
         i = i+1
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
@@ -443,7 +450,7 @@ def cleanLogs(path):
         os.makedirs(path, exist_ok=True)
 
 def runExperiment(experiment):
-    global PENDING_JOBS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES
+    global PENDING_TASKS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES, USE_SMART_PLUGS
 
     if CURSES:
         CURSES.add_text(1,200,3,text="EXPERIMENT: {}".format(experiment.name))
@@ -543,7 +550,7 @@ def runExperiment(experiment):
                 servers_finish_barrier = Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
 
-
+                print(1)
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
                 producers = experiment.producers
                 workers = experiment.workers
@@ -553,24 +560,25 @@ def runExperiment(experiment):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
-                if (experiment.power_devices):
-                    power_on()
-                    i = 0
-                    while ((not is_power_on()) and i < 5):
-                        sleep(1 + i)
+                if USE_SMART_PLUGS:
+                    if (experiment.power_devices):
                         power_on()
-                        i+=1
-                        if (i == 5 and (not is_power_on())):
-                            experiment.setFail()
-                else:
-                    power_off()
-                    i = 0
-                    while (is_power_on() and i < 5):
-                        sleep(1 + i)
+                        i = 0
+                        while ((not is_power_on()) and i < 5):
+                            sleep(1 + i)
+                            power_on()
+                            i+=1
+                            if (i == 5 and (not is_power_on())):
+                                experiment.setFail()
+                    else:
                         power_off()
-                        i+=1
-                        if (i == 5 and is_power_on()):
-                            experiment.setFail()
+                        i = 0
+                        while (is_power_on() and i < 5):
+                            sleep(1 + i)
+                            power_off()
+                            i+=1
+                            if (i == 5 and is_power_on()):
+                                experiment.setFail()
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
                         Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
@@ -579,6 +587,7 @@ def runExperiment(experiment):
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
+                print(2)
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
                 log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN")
@@ -591,7 +600,7 @@ def runExperiment(experiment):
 
                 completetion_timeout_start = time()
                 i=0
-                while (PENDING_JOBS > 0 and experiment.isOK()) or (experiment.duration > time()-completetion_timeout_start and experiment.isOK()):
+                while (PENDING_TASKS > 0 and experiment.isOK()) or (experiment.duration > time()-completetion_timeout_start and experiment.isOK()):
                     sleep(2)
                     if (i % 20) == 0:
                         log("CURRENT_EXPERIMENT_DURATION\t{}s".format(time()-completetion_timeout_start))
@@ -928,7 +937,7 @@ class Experiment:
     calibration = False
     asset_quality = "SD"
     mcast_interface = None
-    min_battery = 20
+    min_battery = 10
     _failed_devices = {}
     _running_status = True
     task_executor = "Tensorflow"
@@ -1145,7 +1154,7 @@ def help():
             Tensorflow:
                 All:
                     ssd_mobilenet_v1_fpn_coco
-                    ssd_mobilenet_v1_coco
+                    ssd_mobilenet_v1_coco  [FUNCIONA]
                     ssd_mobilenet_v2_coco
                     ssdlite_mobilenet_v2_coco
                     ssd_resnet50_v1_fpn_coco
@@ -1163,9 +1172,9 @@ def help():
             TensorflowLite:
                 Lite:
                     ssd_mobilenet_v3_large_coco  (BROKEN RESULTS)
-                    ssd_mobilenet_v3_small_coco
-                    ssd_mobilenet_v1_fpn_coco
-                    ssd_resnet50_v1_fpn_coco
+                    ssd_mobilenet_v3_small_coco    [WORKING]
+                    ssd_mobilenet_v1_fpn_coco    [WORKING]
+                    ssd_resnet50_v1_fpn_coco  [BROKEN URL]
                     ssd_mobilenet_v3_quantized_large_coco
 
         TaskExecutors:
@@ -1313,7 +1322,7 @@ def checkInterfaces():
     log("==========================================================================================")
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -1328,6 +1337,7 @@ def main():
     argparser.add_argument('-ip', '--ip-mask', action='store', required=False)
     argparser.add_argument('-r', '--reboot-devices', default=False, action='store_true', required=False)
     argparser.add_argument('-d', '--daemon', default=False, action='store_true', required=False)
+    argparser.add_argument('-sp', '--smart-plug', default=False, action='store_true', required=False)
 
     args = argparser.parse_args()
 
@@ -1346,6 +1356,9 @@ def main():
     except:
         None
     log("Starting... Please wait")
+
+    if args.smart_plug:
+        USE_SMART_PLUGS = True
 
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")

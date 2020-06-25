@@ -12,3 +12,4 @@ __pycache__
 *.bk.3
 *.new
 *.old
+.DS_Store
