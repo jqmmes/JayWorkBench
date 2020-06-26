@@ -1142,7 +1142,7 @@ def help():
                     Calibration             = Run Jay calibration before begin [BOOL] (Default False)
                     Settings                = Set Jay settings (setting: value;...) [LIST]
                     AssetQuality            = Inform about asset quality (SD/HD/UHD) [STR] (Default SD)
-                    MultiCastInterface      = MCAST_INTERFACE: interface to use in cloudlet [STR]
+                    MultiCastInterface      = MULTICAST_INTERFACE: interface to use in cloudlet [STR]
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
                     RunBetween              = Define the experiment run interval (hour - hour)
                     TaskExecutor            = Task executor to use
@@ -1226,7 +1226,7 @@ def help():
                     RTTDelayMillisFailAttempts
                     DEVICE_ID
                     [*] BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
-                    MCAST_INTERFACE
+                    MULTICAST_INTERFACE
                     [*] BANDWIDTH_ESTIMATE_CALC_METHOD      [mean/median]  default: mean
                     [*] BANDWIDTH_SCALING_FACTOR             [Float] default: 1.0
                     [*] ADVERTISE_WORKER_STATUS: [true/false] default: true ENABLES DEVICE ADVERTISMENT Use when want LOCAL + CLOUDLET
@@ -1248,11 +1248,12 @@ def help():
                     PING_PAYLOAD_SIZE: Int = 32000 // 32Kb
                     AVERAGE_COMPUTATION_TIME_TO_SCORE: Int = 10
                     WORKING_THREADS: Int = 1
-                    WORKER_STATUS_UPDATE_INTERVAL: Long = 5000 // 5s
-                    AUTO_STATUS_UPDATE_INTERVAL_MS: Long = 5000 // 5s
-                    RTTDelayMillisFailRetry: Long = 500 // 0.5s
-                    RTTDelayMillisFailAttempts: Long = 5
-                    MCAST_INTERFACE: String? = null
+                    WORKER_STATUS_UPDATE_INTERVAL: Long = 1000 // 1s
+                    RTT_DELAY_MILLIS_FAIL_RETRY: Long = 500 // 0.5s
+                    RTT_DELAY_MILLIS_FAIL_ATTEMPTS: Long = 5
+                    MULTICAST_INTERFACE: String? = null
+                    MULTICAST_PKT_INTERVAL: Long = 500 // 0.5s
+                    READ_SERVICE_DATA_INTERVAL: Long = 500 // 0.5s
                     DEVICE_ID: String = ""
                     BANDWIDTH_ESTIMATE_TYPE = "ALL" // ACTIVE/PASSIVE/ALL
         ================================================ HELP ================================================''')
