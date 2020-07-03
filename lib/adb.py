@@ -19,6 +19,7 @@ DEBUG = False
 ADB_DEBUG_FILE = stdout
 ADB_LOGS_LOCK = None
 LOG_LEVEL = "ACTION" # "ALL", "ACTION", "COMMAND"
+FORCE_USB = False
 
 class Device:
     name = ""
@@ -57,6 +58,8 @@ def log(str, level, end="\n"):
             ADB_LOGS_LOCK.release()
 
 def adb(cmd, device=None, force_usb=False, log_command=True):
+    if (FORCE_USB):
+        force_usb = True
     selected_device = []
     if (DEBUG and log_command):
         if device is not None:
@@ -77,6 +80,7 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
         usb_connection_active, wifi_connection_active = getADBStatus(device, log_command=False)
         if (not wifi_connection_active and not device.connected_wifi and not force_usb):
             try:
+                enableWifiADB(device)
                 connectWifiADB(device)
             except:
                 pass
@@ -115,7 +119,8 @@ def getBatteryLevel(device=None, retries=3):
     return int(battery_details[:level_end])
 
 def enableWifiADB(device):
-    adb(['tcpip', '5555'], device)
+    adb(['tcpip', '5555'], device, True)
+    sleep(5)
 
 def getADBStatus(device, log_command=True):
     devices_raw = adb(['devices'], log_command=log_command).split('\n')[1:]
@@ -131,8 +136,13 @@ def getADBStatus(device, log_command=True):
     return (connected_usb, connected_wifi)
 
 def connectWifiADB(device, retries=3, force_connection=True):
-    if retries <= 0 or not match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", device.ip):
+    if retries <= 0 or FORCE_USB:
         return (device, False)
+    if (not match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", device.ip)):
+        probable_ip = getDeviceIp(new_device)
+        if (not match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", probable_ip)):
+            return (device, False)
+        device.ip = probable_ip
     log("ADB_CONNECT_WIFI_ADB\t{} ({})".format(device.name, device.ip), "ACTION")
     status = adb(['connect', "%s:5555" % device.ip])
     if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
@@ -172,7 +182,18 @@ def getWifiDeviceNameByIp(device_ip, retries=5):
         return getWifiDeviceNameByIp(device_ip, retries-1)
 
 def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", range_min=0, range_max=256):
-    devices_raw = adb(['devices']).split('\n')[1:]
+    repeats = 3
+    while(repeats > 0):
+        devices_raw = adb(['devices']).split('\n')[1:]
+        ok = False
+        for dev in devices_raw:
+            if (dev != ""):
+                ok = True
+        if (ok):
+            break
+        else:
+            close()
+            init()
     devices = []
     for dev in devices_raw:
         splitted = dev.split('\t')
@@ -405,7 +426,10 @@ def getDeviceIp(device, timeout=10):
     start_time = time()
     while time()-start_time < timeout:
         try:
-            info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device)
+            force_usb = FORCE_USB
+            if (not device.connected_wifi):
+                force_usb = True
+            info = adb(['shell', 'ip', 'addr', 'show', 'wlan0'], device, force_usb)
             info = info[info.find('inet ')+5:]
             ip = info[:info.find('/')]
         except:

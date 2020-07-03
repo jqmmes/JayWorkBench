@@ -549,8 +549,6 @@ def runExperiment(experiment):
                 finish_barrier = Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
                 servers_finish_barrier = Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
-
-                print(1)
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
                 producers = experiment.producers
                 workers = experiment.workers
@@ -587,7 +585,7 @@ def runExperiment(experiment):
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
-                print(2)
+
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
                 log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN")
@@ -1323,7 +1321,7 @@ def checkInterfaces():
     log("==========================================================================================")
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -1339,6 +1337,8 @@ def main():
     argparser.add_argument('-r', '--reboot-devices', default=False, action='store_true', required=False)
     argparser.add_argument('-d', '--daemon', default=False, action='store_true', required=False)
     argparser.add_argument('-sp', '--smart-plug', default=False, action='store_true', required=False)
+    argparser.add_argument('-u', '--force-usb', default=False, action='store_true', required=False)
+
 
     args = argparser.parse_args()
 
@@ -1378,6 +1378,8 @@ def main():
             if args.adb_log_level is not None:
                 print("# WARNING: Invalid log level ({}). Logging ALL".format(args.adb_log_level))
                 adb.LOG_LEVEL = "ALL"
+    if args.force_usb:
+        adb.FORCE_USB = True
     if args.ip_mask:
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=True, ip_mask=args.ip_mask)
     else:
