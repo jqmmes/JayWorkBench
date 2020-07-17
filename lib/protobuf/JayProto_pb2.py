@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'\n\034pt.up.fc.dcc.hyrax.jay.protoB\010JayProto',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0eJayProto.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\" \n\x04Task\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"+\n\x0bTaskDetails\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61taSize\x18\x02 \x01(\x05\"(\n\nWorkerTask\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06\x66ileId\x18\x02 \x01(\t\"#\n\x06Status\x12\x19\n\x04\x63ode\x18\x01 \x01(\x0e\x32\x0b.StatusCode\"\xa7\x04\n\x06Worker\x12\x1b\n\x06status\x18\x01 \x01(\x0e\x32\x0b.StatusCode\x12\n\n\x02id\x18\x02 \x01(\t\x12\x14\n\x0c\x62\x61tteryLevel\x18\x03 \x01(\x05\x12\x16\n\x0e\x62\x61tteryCurrent\x18\x04 \x01(\x05\x12\x16\n\x0e\x62\x61tteryVoltage\x18\x05 \x01(\x05\x12\x1a\n\x12\x62\x61tteryTemperature\x18\x06 \x01(\x02\x12\x15\n\rbatteryEnergy\x18\x07 \x01(\x03\x12\x15\n\rbatteryCharge\x18\x08 \x01(\x05\x12,\n\rbatteryStatus\x18\t \x01(\x0e\x32\x15.Worker.BatteryStatus\x12\x10\n\x08\x63puCores\x18\n \x01(\x05\x12\x11\n\tqueueSize\x18\x0b \x01(\x05\x12\x14\n\x0crunningTasks\x18\x0c \x01(\x05\x12\x13\n\x0bqueuedTasks\x18\r \x01(\x05\x12\x16\n\x0e\x61vgTimePerTask\x18\x0e \x01(\x03\x12\x1a\n\x04type\x18\x0f \x01(\x0e\x32\x0c.Worker.Type\x12\x19\n\x11\x62\x61ndwidthEstimate\x18\x10 \x01(\x02\x12\x13\n\x0btotalMemory\x18\x11 \x01(\x03\x12\x12\n\nfreeMemory\x18\x12 \x01(\x03\"D\n\rBatteryStatus\x12\x0b\n\x07\x43HARGED\x10\x00\x12\x0c\n\x08\x43HARGING\x10\x01\x12\x07\n\x03USB\x10\x02\x12\x0f\n\x0b\x44ISCHARGING\x10\x03\"(\n\x04Type\x12\t\n\x05LOCAL\x10\x00\x12\t\n\x05\x43LOUD\x10\x01\x12\n\n\x06REMOTE\x10\x02\"k\n\x13WorkerComputeStatus\x12\x11\n\tqueueSize\x18\x01 \x01(\x05\x12\x14\n\x0crunningTasks\x18\x02 \x01(\x05\x12\x13\n\x0bqueuedTasks\x18\x03 \x01(\x05\x12\x16\n\x0e\x61vgTimePerTask\x18\x04 \x01(\x03\"#\n\x04Ping\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\r\n\x05reply\x18\x02 \x01(\x08\"t\n\rServiceStatus\x12!\n\x04type\x18\x01 \x01(\x0e\x32\x13.ServiceStatus.Type\x12\x0f\n\x07running\x18\x02 \x01(\x08\"/\n\x04Type\x12\r\n\tSCHEDULER\x10\x00\x12\n\n\x06WORKER\x10\x01\x12\x0c\n\x08PROFILER\x10\x02\"%\n\tScheduler\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"+\n\nSchedulers\x12\x1d\n\tscheduler\x18\x01 \x03(\x0b\x32\n.Scheduler\")\n\x0bWorkerTypes\x12\x1a\n\x04type\x18\x01 \x03(\x0e\x32\x0c.Worker.Type\"\x86\x01\n\x11\x42\x61ndwidthEstimate\x12%\n\x04type\x18\x01 \x01(\x0e\x32\x17.BandwidthEstimate.Type\x12 \n\nworkerType\x18\x02 \x03(\x0e\x32\x0c.Worker.Type\"(\n\x04Type\x12\n\n\x06\x41\x43TIVE\x10\x00\x12\x0b\n\x07PASSIVE\x10\x01\x12\x07\n\x03\x41LL\x10\x02\"\x15\n\x06String\x12\x0b\n\x03str\x18\x01 \x01(\t\"k\n\x07Weights\x12\x13\n\x0b\x63omputeTime\x18\x01 \x01(\x02\x12\x11\n\tqueueSize\x18\x02 \x01(\x02\x12\x14\n\x0crunningTasks\x18\x03 \x01(\x02\x12\x0f\n\x07\x62\x61ttery\x18\x04 \x01(\x02\x12\x11\n\tbandwidth\x18\x05 \x01(\x02\"c\n\x08Settings\x12\'\n\x07setting\x18\x01 \x03(\x0b\x32\x16.Settings.SettingEntry\x1a.\n\x0cSettingEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"=\n\x0cTaskExecutor\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\"5\n\rTaskExecutors\x12$\n\rtaskExecutors\x18\x01 \x03(\x0b\x32\r.TaskExecutor\"(\n\x07Request\x12\x0f\n\x07request\x18\x01 \x01(\t\x12\x0c\n\x04\x61rgs\x18\x02 \x03(\x0c\">\n\x08Response\x12\x17\n\x06status\x18\x01 \x01(\x0b\x32\x07.Status\x12\r\n\x05\x62ytes\x18\x02 \x01(\x0c\x12\n\n\x02id\x18\x03 \x01(\t\"\x98\x01\n\x08JayState\x12!\n\x08jayState\x18\x01 \x01(\x0e\x32\x0f.JayState.state\"i\n\x05state\x12\x08\n\x04IDLE\x10\x00\x12\x0c\n\x08\x44\x41TA_SND\x10\x01\x12\x0c\n\x08\x44\x41TA_RCV\x10\x02\x12\x0b\n\x07\x43OMPUTE\x10\x03\x12\x17\n\x13MULTICAST_ADVERTISE\x10\x04\x12\x14\n\x10MULTICAST_LISTEN\x10\x05\"\x15\n\x04Time\x12\r\n\x05value\x18\x01 \x01(\x03\"\x8e\x02\n\x07\x42\x61ttery\x12\x14\n\x0c\x62\x61tteryLevel\x18\x01 \x01(\x05\x12\x16\n\x0e\x62\x61tteryCurrent\x18\x02 \x01(\x05\x12\x16\n\x0e\x62\x61tteryVoltage\x18\x03 \x01(\x05\x12\x1a\n\x12\x62\x61tteryTemperature\x18\x04 \x01(\x02\x12\x15\n\rbatteryEnergy\x18\x05 \x01(\x03\x12\x15\n\rbatteryCharge\x18\x06 \x01(\x05\x12-\n\rbatteryStatus\x18\x07 \x01(\x0e\x32\x16.Battery.BatteryStatus\"D\n\rBatteryStatus\x12\x0b\n\x07\x43HARGED\x10\x00\x12\x0c\n\x08\x43HARGING\x10\x01\x12\x07\n\x03USB\x10\x02\x12\x0f\n\x0b\x44ISCHARGING\x10\x03\"\xf7\x02\n\tTransport\x12!\n\x06medium\x18\x01 \x01(\x0e\x32\x11.Transport.Medium\x12\x39\n\x12\x63\x65llularTechnology\x18\x02 \x01(\x0e\x32\x1d.Transport.CellularTechnology\x12\x1b\n\x13\x64ownstreamBandwidth\x18\x03 \x01(\x05\x12\x19\n\x11upstreamBandwidth\x18\x04 \x01(\x05\"o\n\x06Medium\x12\x08\n\x04WIFI\x10\x00\x12\x0c\n\x08\x43\x45LLULAR\x10\x01\x12\r\n\tBLUETOOTH\x10\x02\x12\x0c\n\x08\x45THERNET\x10\x03\x12\x07\n\x03VPN\x10\x04\x12\x0e\n\nWIFI_AWARE\x10\x05\x12\n\n\x06LOWPAN\x10\x06\x12\x0b\n\x07UNKNOWN\x10\x07\"c\n\x12\x43\x65llularTechnology\x12\x0e\n\nSECOND_GEN\x10\x00\x12\r\n\tTHIRD_GEN\x10\x01\x12\x0e\n\nFOURTH_GEN\x10\x02\x12\r\n\tFIFTH_GEN\x10\x03\x12\x0f\n\x0bUNKNOWN_GEN\x10\x04\"\'\n\tTimeRange\x12\r\n\x05start\x18\x01 \x01(\x03\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x03\"\xee\x01\n\x10ProfileRecording\x12\x1d\n\ttimeRange\x18\x01 \x01(\x0b\x32\n.TimeRange\x12\x1b\n\x08jayState\x18\x02 \x03(\x0b\x32\t.JayState\x12\x19\n\x07\x62\x61ttery\x18\x03 \x01(\x0b\x32\x08.Battery\x12\x10\n\x08\x63puCount\x18\x04 \x01(\x05\x12\x14\n\x0c\x63puFrequency\x18\x05 \x03(\x05\x12\x1d\n\ttransport\x18\x06 \x01(\x0b\x32\n.Transport\x12\x13\n\x0bsystemUsage\x18\x07 \x03(\t\x12\x13\n\x0btotalMemory\x18\x08 \x01(\x03\x12\x12\n\nfreeMemory\x18\t \x01(\x03\"@\n\x11ProfileRecordings\x12+\n\x10profileRecording\x18\x01 \x03(\x0b\x32\x11.ProfileRecording*?\n\nStatusCode\x12\x0b\n\x07Success\x10\x00\x12\t\n\x05\x45rror\x10\x01\x12\x0b\n\x07Waiting\x10\x02\x12\x0c\n\x08Received\x10\x03\x32\x83\x0b\n\rBrokerService\x12\x16\n\x04ping\x12\x05.Ping\x1a\x05.Ping\"\x00\x12#\n\x0b\x65xecuteTask\x12\x05.Task\x1a\t.Response\"\x00\x30\x01\x12\"\n\x0cscheduleTask\x12\x05.Task\x1a\t.Response\"\x00\x12+\n\x15\x61\x64vertiseWorkerStatus\x12\x07.Worker\x1a\x07.Status\"\x00\x12)\n\x13\x64iffuseWorkerStatus\x12\x07.Worker\x1a\x07.Status\"\x00\x12\x38\n\x13requestWorkerStatus\x12\x16.google.protobuf.Empty\x1a\x07.Worker\"\x00\x12\x41\n\rupdateWorkers\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x12\x36\n\rgetSchedulers\x12\x16.google.protobuf.Empty\x1a\x0b.Schedulers\"\x00\x12%\n\x0csetScheduler\x12\n.Scheduler\x1a\x07.Status\"\x00\x12\x38\n\x0flistenMulticast\x12\x1a.google.protobuf.BoolValue\x1a\x07.Status\"\x00\x12\x36\n\x11\x61nnounceMulticast\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12*\n\x0f\x65nableHearBeats\x12\x0c.WorkerTypes\x1a\x07.Status\"\x00\x12\x39\n\x18\x65nableBandwidthEstimates\x12\x12.BandwidthEstimate\x1a\x07.Status\"\x00\x12\x35\n\x10\x64isableHearBeats\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12>\n\x19\x64isableBandwidthEstimates\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12:\n\x1f\x65nableWorkerStatusAdvertisement\x12\x0c.WorkerTypes\x1a\x07.Status\"\x00\x12\x45\n disableWorkerStatusAdvertisement\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12\x32\n\x1bupdateSmartSchedulerWeights\x12\x08.Weights\x1a\x07.Status\"\x00\x12\x32\n\x15\x61nnounceServiceStatus\x12\x0e.ServiceStatus\x1a\x07.Status\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12\x34\n\x0f\x63\x61librateWorker\x12\x07.String\x1a\x16.google.protobuf.Empty\"\x00\x12\"\n\ncreateTask\x12\x07.String\x1a\t.Response\"\x00\x12#\n\x0bsetSettings\x12\t.Settings\x1a\x07.Status\"\x00\x12=\n\x11listTaskExecutors\x12\x16.google.protobuf.Empty\x1a\x0e.TaskExecutors\"\x00\x12.\n\x12selectTaskExecutor\x12\r.TaskExecutor\x1a\x07.Status\"\x00\x12+\n\x12\x63\x61llExecutorAction\x12\x08.Request\x1a\t.Response\"\x00\x12(\n\x11runExecutorAction\x12\x08.Request\x1a\x07.Status\"\x00\x12+\n\x13setExecutorSettings\x12\t.Settings\x1a\x07.Status\"\x00\x32\xf6\x02\n\x0fProfilerService\x12 \n\x08setState\x12\t.JayState\x1a\x07.Status\"\x00\x12\"\n\nunSetState\x12\t.JayState\x1a\x07.Status\"\x00\x12\x33\n\x0estartRecording\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12=\n\rstopRecording\x12\x16.google.protobuf.Empty\x1a\x12.ProfileRecordings\"\x00\x12>\n\x0fgetDeviceStatus\x12\x16.google.protobuf.Empty\x1a\x11.ProfileRecording\"\x00\x12\x37\n\x0btestService\x12\x16.google.protobuf.Empty\x1a\x0e.ServiceStatus\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x32\xc9\x03\n\x10SchedulerService\x12#\n\x08schedule\x12\x0c.TaskDetails\x1a\x07.Worker\"\x00\x12<\n\x12notifyTaskComplete\x12\x0c.TaskDetails\x1a\x16.google.protobuf.Empty\"\x00\x12(\n\x12notifyWorkerUpdate\x12\x07.Worker\x1a\x07.Status\"\x00\x12)\n\x13notifyWorkerFailure\x12\x07.Worker\x1a\x07.Status\"\x00\x12%\n\x0csetScheduler\x12\n.Scheduler\x1a\x07.Status\"\x00\x12\x37\n\x0elistSchedulers\x12\x16.google.protobuf.Empty\x1a\x0b.Schedulers\"\x00\x12\x32\n\x1bupdateSmartSchedulerWeights\x12\x08.Weights\x1a\x07.Status\"\x00\x12\x37\n\x0btestService\x12\x16.google.protobuf.Empty\x1a\x0e.ServiceStatus\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x32\xd5\x03\n\rWorkerService\x12#\n\x07\x65xecute\x12\x0b.WorkerTask\x1a\t.Response\"\x00\x12\x37\n\x0btestService\x12\x16.google.protobuf.Empty\x1a\x0e.ServiceStatus\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12=\n\x11listTaskExecutors\x12\x16.google.protobuf.Empty\x1a\x0e.TaskExecutors\"\x00\x12.\n\x12selectTaskExecutor\x12\r.TaskExecutor\x1a\x07.Status\"\x00\x12+\n\x12\x63\x61llExecutorAction\x12\x08.Request\x1a\t.Response\"\x00\x12(\n\x11runExecutorAction\x12\x08.Request\x1a\x07.Status\"\x00\x12+\n\x13setExecutorSettings\x12\t.Settings\x1a\x07.Status\"\x00\x12\x41\n\x0fgetWorkerStatus\x12\x16.google.protobuf.Empty\x1a\x14.WorkerComputeStatus\"\x00\x42(\n\x1cpt.up.fc.dcc.hyrax.jay.protoB\x08JayProtob\x06proto3'
+  serialized_pb=b'\n\x0eJayProto.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\xc5\x01\n\x04Task\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\x12\x11\n\tlocalTask\x18\x03 \x01(\x08\x12\x1c\n\x06status\x18\x04 \x01(\x0e\x32\x0c.Task.Status\x12\x19\n\x11\x63reationTimeStamp\x18\x05 \x01(\x03\x12\x19\n\x11\x64\x65\x61\x64lineTimeStamp\x18\x06 \x01(\x03\"<\n\x06Status\x12\x12\n\x0e\x42\x45GIN_TRANSFER\x10\x00\x12\x0c\n\x08TRANSFER\x10\x01\x12\x10\n\x0c\x45ND_TRANSFER\x10\x02\"+\n\x0bTaskDetails\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08\x64\x61taSize\x18\x02 \x01(\x05\"(\n\nWorkerTask\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06\x66ileId\x18\x02 \x01(\t\"#\n\x06Status\x12\x19\n\x04\x63ode\x18\x01 \x01(\x0e\x32\x0b.StatusCode\"z\n\x12\x43urrentEstimations\x12\x0c\n\x04idle\x18\x01 \x01(\x05\x12\x0f\n\x07\x63ompute\x18\x02 \x01(\x05\x12\n\n\x02rx\x18\x03 \x01(\x05\x12\n\n\x02tx\x18\x04 \x01(\x05\x12\x14\n\x0c\x62\x61tteryLevel\x18\x05 \x01(\x05\x12\x17\n\x0f\x62\x61tteryCapacity\x18\x06 \x01(\x05\"\x90\x03\n\x06Worker\x12\x1b\n\x06status\x18\x01 \x01(\x0e\x32\x0b.StatusCode\x12\n\n\x02id\x18\x02 \x01(\t\x12\x14\n\x0c\x62\x61tteryLevel\x18\x03 \x01(\x05\x12\x17\n\x0f\x62\x61tteryCapacity\x18\x04 \x01(\x05\x12%\n\rbatteryStatus\x18\x05 \x01(\x0e\x32\x0e.BatteryStatus\x12\x10\n\x08\x63puCores\x18\x06 \x01(\x05\x12\x11\n\tqueueSize\x18\x07 \x01(\x05\x12\x14\n\x0crunningTasks\x18\x08 \x01(\x05\x12\x13\n\x0bqueuedTasks\x18\t \x01(\x05\x12\x16\n\x0e\x61vgTimePerTask\x18\n \x01(\x03\x12\x1a\n\x04type\x18\x0b \x01(\x0e\x32\x0c.Worker.Type\x12\x19\n\x11\x62\x61ndwidthEstimate\x18\x0c \x01(\x02\x12\x13\n\x0btotalMemory\x18\r \x01(\x03\x12\x12\n\nfreeMemory\x18\x0e \x01(\x03\x12\x15\n\ravgResultSize\x18\x0f \x01(\x03\"(\n\x04Type\x12\t\n\x05LOCAL\x10\x00\x12\t\n\x05\x43LOUD\x10\x01\x12\n\n\x06REMOTE\x10\x02\"k\n\x13WorkerComputeStatus\x12\x11\n\tqueueSize\x18\x01 \x01(\x05\x12\x14\n\x0crunningTasks\x18\x02 \x01(\x05\x12\x13\n\x0bqueuedTasks\x18\x03 \x01(\x05\x12\x16\n\x0e\x61vgTimePerTask\x18\x04 \x01(\x03\"#\n\x04Ping\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\r\n\x05reply\x18\x02 \x01(\x08\"t\n\rServiceStatus\x12!\n\x04type\x18\x01 \x01(\x0e\x32\x13.ServiceStatus.Type\x12\x0f\n\x07running\x18\x02 \x01(\x08\"/\n\x04Type\x12\r\n\tSCHEDULER\x10\x00\x12\n\n\x06WORKER\x10\x01\x12\x0c\n\x08PROFILER\x10\x02\"%\n\tScheduler\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"+\n\nSchedulers\x12\x1d\n\tscheduler\x18\x01 \x03(\x0b\x32\n.Scheduler\")\n\x0bWorkerTypes\x12\x1a\n\x04type\x18\x01 \x03(\x0e\x32\x0c.Worker.Type\"\x86\x01\n\x11\x42\x61ndwidthEstimate\x12%\n\x04type\x18\x01 \x01(\x0e\x32\x17.BandwidthEstimate.Type\x12 \n\nworkerType\x18\x02 \x03(\x0e\x32\x0c.Worker.Type\"(\n\x04Type\x12\n\n\x06\x41\x43TIVE\x10\x00\x12\x0b\n\x07PASSIVE\x10\x01\x12\x07\n\x03\x41LL\x10\x02\"\x15\n\x06String\x12\x0b\n\x03str\x18\x01 \x01(\t\"k\n\x07Weights\x12\x13\n\x0b\x63omputeTime\x18\x01 \x01(\x02\x12\x11\n\tqueueSize\x18\x02 \x01(\x02\x12\x14\n\x0crunningTasks\x18\x03 \x01(\x02\x12\x0f\n\x07\x62\x61ttery\x18\x04 \x01(\x02\x12\x11\n\tbandwidth\x18\x05 \x01(\x02\"c\n\x08Settings\x12\'\n\x07setting\x18\x01 \x03(\x0b\x32\x16.Settings.SettingEntry\x1a.\n\x0cSettingEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"=\n\x0cTaskExecutor\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\"5\n\rTaskExecutors\x12$\n\rtaskExecutors\x18\x01 \x03(\x0b\x32\r.TaskExecutor\"(\n\x07Request\x12\x0f\n\x07request\x18\x01 \x01(\t\x12\x0c\n\x04\x61rgs\x18\x02 \x03(\x0c\">\n\x08Response\x12\x17\n\x06status\x18\x01 \x01(\x0b\x32\x07.Status\x12\r\n\x05\x62ytes\x18\x02 \x01(\x0c\x12\n\n\x02id\x18\x03 \x01(\t\"\x98\x01\n\x08JayState\x12!\n\x08jayState\x18\x01 \x01(\x0e\x32\x0f.JayState.state\"i\n\x05state\x12\x08\n\x04IDLE\x10\x00\x12\x0c\n\x08\x44\x41TA_SND\x10\x01\x12\x0c\n\x08\x44\x41TA_RCV\x10\x02\x12\x0b\n\x07\x43OMPUTE\x10\x03\x12\x17\n\x13MULTICAST_ADVERTISE\x10\x04\x12\x14\n\x10MULTICAST_LISTEN\x10\x05\"\x15\n\x04Time\x12\r\n\x05value\x18\x01 \x01(\x03\"\xd9\x01\n\x07\x42\x61ttery\x12\x14\n\x0c\x62\x61tteryLevel\x18\x01 \x01(\x05\x12\x16\n\x0e\x62\x61tteryCurrent\x18\x02 \x01(\x05\x12\x16\n\x0e\x62\x61tteryVoltage\x18\x03 \x01(\x05\x12\x1a\n\x12\x62\x61tteryTemperature\x18\x04 \x01(\x02\x12\x15\n\rbatteryEnergy\x18\x05 \x01(\x03\x12\x15\n\rbatteryCharge\x18\x06 \x01(\x05\x12\x17\n\x0f\x62\x61tteryCapacity\x18\x07 \x01(\x05\x12%\n\rbatteryStatus\x18\x08 \x01(\x0e\x32\x0e.BatteryStatus\"\xf7\x02\n\tTransport\x12!\n\x06medium\x18\x01 \x01(\x0e\x32\x11.Transport.Medium\x12\x39\n\x12\x63\x65llularTechnology\x18\x02 \x01(\x0e\x32\x1d.Transport.CellularTechnology\x12\x1b\n\x13\x64ownstreamBandwidth\x18\x03 \x01(\x05\x12\x19\n\x11upstreamBandwidth\x18\x04 \x01(\x05\"o\n\x06Medium\x12\x08\n\x04WIFI\x10\x00\x12\x0c\n\x08\x43\x45LLULAR\x10\x01\x12\r\n\tBLUETOOTH\x10\x02\x12\x0c\n\x08\x45THERNET\x10\x03\x12\x07\n\x03VPN\x10\x04\x12\x0e\n\nWIFI_AWARE\x10\x05\x12\n\n\x06LOWPAN\x10\x06\x12\x0b\n\x07UNKNOWN\x10\x07\"c\n\x12\x43\x65llularTechnology\x12\x0e\n\nSECOND_GEN\x10\x00\x12\r\n\tTHIRD_GEN\x10\x01\x12\x0e\n\nFOURTH_GEN\x10\x02\x12\r\n\tFIFTH_GEN\x10\x03\x12\x0f\n\x0bUNKNOWN_GEN\x10\x04\"\'\n\tTimeRange\x12\r\n\x05start\x18\x01 \x01(\x03\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x03\"\xff\x01\n\x10ProfileRecording\x12\x1d\n\ttimeRange\x18\x01 \x01(\x0b\x32\n.TimeRange\x12\x1b\n\x08jayState\x18\x02 \x03(\x0b\x32\t.JayState\x12\x19\n\x07\x62\x61ttery\x18\x03 \x01(\x0b\x32\x08.Battery\x12\x10\n\x08\x63puCount\x18\x04 \x01(\x05\x12\x14\n\x0c\x63puFrequency\x18\x05 \x03(\x03\x12\x1d\n\ttransport\x18\x06 \x01(\x0b\x32\n.Transport\x12\x13\n\x0bsystemUsage\x18\x07 \x03(\t\x12\x13\n\x0btotalMemory\x18\x08 \x01(\x03\x12\x12\n\nfreeMemory\x18\t \x01(\x03\x12\x0f\n\x07sensors\x18\n \x03(\t\"@\n\x11ProfileRecordings\x12+\n\x10profileRecording\x18\x01 \x03(\x0b\x32\x11.ProfileRecording\"*\n\x08TaskInfo\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x10\n\x08\x64\x65\x61\x64line\x18\x02 \x01(\x03*a\n\nStatusCode\x12\x0b\n\x07Success\x10\x00\x12\t\n\x05\x45rror\x10\x01\x12\x0b\n\x07Waiting\x10\x02\x12\x0c\n\x08Received\x10\x03\x12\t\n\x05Ready\x10\x04\x12\x07\n\x03\x45nd\x10\x05\x12\x0c\n\x08TimedOut\x10\x06*y\n\rBatteryStatus\x12\x08\n\x04\x46ULL\x10\x00\x12\x0f\n\x0b\x41\x43_CHARGING\x10\x01\x12\x10\n\x0cUSB_CHARGING\x10\x02\x12\x0f\n\x0bQI_CHARGING\x10\x03\x12\x0c\n\x08\x43HARGING\x10\x04\x12\x0f\n\x0b\x44ISCHARGING\x10\x05\x12\x0b\n\x07UNKNOWN\x10\x06\x32\xcd\x0b\n\rBrokerService\x12\x16\n\x04ping\x12\x05.Ping\x1a\x05.Ping\"\x00\x12%\n\x0b\x65xecuteTask\x12\x05.Task\x1a\t.Response\"\x00(\x01\x30\x01\x12\"\n\x0cscheduleTask\x12\x05.Task\x1a\t.Response\"\x00\x12\x38\n\x13requestWorkerStatus\x12\x16.google.protobuf.Empty\x1a\x07.Worker\"\x00\x12V\n\"notifySchedulerForAvailableWorkers\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x12\x36\n\rgetSchedulers\x12\x16.google.protobuf.Empty\x1a\x0b.Schedulers\"\x00\x12%\n\x0csetScheduler\x12\n.Scheduler\x1a\x07.Status\"\x00\x12,\n\x14setSchedulerSettings\x12\t.Settings\x1a\x07.Status\"\x00\x12\x38\n\x0flistenMulticast\x12\x1a.google.protobuf.BoolValue\x1a\x07.Status\"\x00\x12\x36\n\x11\x61nnounceMulticast\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12*\n\x0f\x65nableHearBeats\x12\x0c.WorkerTypes\x1a\x07.Status\"\x00\x12\x39\n\x18\x65nableBandwidthEstimates\x12\x12.BandwidthEstimate\x1a\x07.Status\"\x00\x12\x35\n\x10\x64isableHearBeats\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12>\n\x19\x64isableBandwidthEstimates\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12\x44\n\x1f\x65nableWorkerStatusAdvertisement\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12\x45\n disableWorkerStatusAdvertisement\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12\x32\n\x15\x61nnounceServiceStatus\x12\x0e.ServiceStatus\x1a\x07.Status\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12\x34\n\x0f\x63\x61librateWorker\x12\x07.String\x1a\x16.google.protobuf.Empty\"\x00\x12$\n\ncreateTask\x12\t.TaskInfo\x1a\t.Response\"\x00\x12#\n\x0bsetSettings\x12\t.Settings\x1a\x07.Status\"\x00\x12=\n\x11listTaskExecutors\x12\x16.google.protobuf.Empty\x1a\x0e.TaskExecutors\"\x00\x12.\n\x12selectTaskExecutor\x12\r.TaskExecutor\x1a\x07.Status\"\x00\x12+\n\x12\x63\x61llExecutorAction\x12\x08.Request\x1a\t.Response\"\x00\x12(\n\x11runExecutorAction\x12\x08.Request\x1a\x07.Status\"\x00\x12+\n\x13setExecutorSettings\x12\t.Settings\x1a\x07.Status\"\x00\x12\x43\n\x12getExpectedCurrent\x12\x16.google.protobuf.Empty\x1a\x13.CurrentEstimations\"\x00\x12>\n\x1cgetExpectedCurrentFromRemote\x12\x07.Worker\x1a\x13.CurrentEstimations\"\x00\x32\xbb\x03\n\x0fProfilerService\x12 \n\x08setState\x12\t.JayState\x1a\x07.Status\"\x00\x12\"\n\nunSetState\x12\t.JayState\x1a\x07.Status\"\x00\x12\x33\n\x0estartRecording\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12=\n\rstopRecording\x12\x16.google.protobuf.Empty\x1a\x12.ProfileRecordings\"\x00\x12>\n\x0fgetDeviceStatus\x12\x16.google.protobuf.Empty\x1a\x11.ProfileRecording\"\x00\x12\x43\n\x12getExpectedCurrent\x12\x16.google.protobuf.Empty\x1a\x13.CurrentEstimations\"\x00\x12\x37\n\x0btestService\x12\x16.google.protobuf.Empty\x1a\x0e.ServiceStatus\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x32\xc3\x03\n\x10SchedulerService\x12#\n\x08schedule\x12\x0c.TaskDetails\x1a\x07.Worker\"\x00\x12<\n\x12notifyTaskComplete\x12\x0c.TaskDetails\x1a\x16.google.protobuf.Empty\"\x00\x12(\n\x12notifyWorkerUpdate\x12\x07.Worker\x1a\x07.Status\"\x00\x12)\n\x13notifyWorkerFailure\x12\x07.Worker\x1a\x07.Status\"\x00\x12%\n\x0csetScheduler\x12\n.Scheduler\x1a\x07.Status\"\x00\x12\x37\n\x0elistSchedulers\x12\x16.google.protobuf.Empty\x1a\x0b.Schedulers\"\x00\x12\x37\n\x0btestService\x12\x16.google.protobuf.Empty\x1a\x0e.ServiceStatus\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12,\n\x14setSchedulerSettings\x12\t.Settings\x1a\x07.Status\"\x00\x32\xd5\x03\n\rWorkerService\x12#\n\x07\x65xecute\x12\x0b.WorkerTask\x1a\t.Response\"\x00\x12\x37\n\x0btestService\x12\x16.google.protobuf.Empty\x1a\x0e.ServiceStatus\"\x00\x12\x30\n\x0bstopService\x12\x16.google.protobuf.Empty\x1a\x07.Status\"\x00\x12=\n\x11listTaskExecutors\x12\x16.google.protobuf.Empty\x1a\x0e.TaskExecutors\"\x00\x12.\n\x12selectTaskExecutor\x12\r.TaskExecutor\x1a\x07.Status\"\x00\x12+\n\x12\x63\x61llExecutorAction\x12\x08.Request\x1a\t.Response\"\x00\x12(\n\x11runExecutorAction\x12\x08.Request\x1a\x07.Status\"\x00\x12+\n\x13setExecutorSettings\x12\t.Settings\x1a\x07.Status\"\x00\x12\x41\n\x0fgetWorkerStatus\x12\x16.google.protobuf.Empty\x1a\x14.WorkerComputeStatus\"\x00\x42(\n\x1cpt.up.fc.dcc.hyrax.jay.protoB\x08JayProtob\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,google_dot_protobuf_dot_wrappers__pb2.DESCRIPTOR,])
 
@@ -53,55 +53,126 @@ _STATUSCODE = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Ready', index=4, number=4,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='End', index=5, number=5,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='TimedOut', index=6, number=6,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2953,
-  serialized_end=3016,
+  serialized_start=3100,
+  serialized_end=3197,
 )
 _sym_db.RegisterEnumDescriptor(_STATUSCODE)
 
 StatusCode = enum_type_wrapper.EnumTypeWrapper(_STATUSCODE)
-Success = 0
-Error = 1
-Waiting = 2
-Received = 3
-
-
-_WORKER_BATTERYSTATUS = _descriptor.EnumDescriptor(
+_BATTERYSTATUS = _descriptor.EnumDescriptor(
   name='BatteryStatus',
-  full_name='Worker.BatteryStatus',
+  full_name='BatteryStatus',
   filename=None,
   file=DESCRIPTOR,
   create_key=_descriptor._internal_create_key,
   values=[
     _descriptor.EnumValueDescriptor(
-      name='CHARGED', index=0, number=0,
+      name='FULL', index=0, number=0,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='CHARGING', index=1, number=1,
+      name='AC_CHARGING', index=1, number=1,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='USB', index=2, number=2,
+      name='USB_CHARGING', index=2, number=2,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='DISCHARGING', index=3, number=3,
+      name='QI_CHARGING', index=3, number=3,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='CHARGING', index=4, number=4,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='DISCHARGING', index=5, number=5,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='UNKNOWN', index=6, number=6,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=679,
-  serialized_end=747,
+  serialized_start=3199,
+  serialized_end=3320,
 )
-_sym_db.RegisterEnumDescriptor(_WORKER_BATTERYSTATUS)
+_sym_db.RegisterEnumDescriptor(_BATTERYSTATUS)
+
+BatteryStatus = enum_type_wrapper.EnumTypeWrapper(_BATTERYSTATUS)
+Success = 0
+Error = 1
+Waiting = 2
+Received = 3
+Ready = 4
+End = 5
+TimedOut = 6
+FULL = 0
+AC_CHARGING = 1
+USB_CHARGING = 2
+QI_CHARGING = 3
+CHARGING = 4
+DISCHARGING = 5
+UNKNOWN = 6
+
+
+_TASK_STATUS = _descriptor.EnumDescriptor(
+  name='Status',
+  full_name='Task.Status',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='BEGIN_TRANSFER', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='TRANSFER', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='END_TRANSFER', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=217,
+  serialized_end=277,
+)
+_sym_db.RegisterEnumDescriptor(_TASK_STATUS)
 
 _WORKER_TYPE = _descriptor.EnumDescriptor(
   name='Type',
@@ -128,8 +199,8 @@ _WORKER_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=749,
-  serialized_end=789,
+  serialized_start=888,
+  serialized_end=928,
 )
 _sym_db.RegisterEnumDescriptor(_WORKER_TYPE)
 
@@ -158,8 +229,8 @@ _SERVICESTATUS_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1006,
-  serialized_end=1053,
+  serialized_start=1145,
+  serialized_end=1192,
 )
 _sym_db.RegisterEnumDescriptor(_SERVICESTATUS_TYPE)
 
@@ -188,8 +259,8 @@ _BANDWIDTHESTIMATE_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1277,
-  serialized_end=1317,
+  serialized_start=1416,
+  serialized_end=1456,
 )
 _sym_db.RegisterEnumDescriptor(_BANDWIDTHESTIMATE_TYPE)
 
@@ -233,45 +304,10 @@ _JAYSTATE_STATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1824,
-  serialized_end=1929,
+  serialized_start=1963,
+  serialized_end=2068,
 )
 _sym_db.RegisterEnumDescriptor(_JAYSTATE_STATE)
-
-_BATTERY_BATTERYSTATUS = _descriptor.EnumDescriptor(
-  name='BatteryStatus',
-  full_name='Battery.BatteryStatus',
-  filename=None,
-  file=DESCRIPTOR,
-  create_key=_descriptor._internal_create_key,
-  values=[
-    _descriptor.EnumValueDescriptor(
-      name='CHARGED', index=0, number=0,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='CHARGING', index=1, number=1,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='USB', index=2, number=2,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='DISCHARGING', index=3, number=3,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-  ],
-  containing_type=None,
-  serialized_options=None,
-  serialized_start=679,
-  serialized_end=747,
-)
-_sym_db.RegisterEnumDescriptor(_BATTERY_BATTERYSTATUS)
 
 _TRANSPORT_MEDIUM = _descriptor.EnumDescriptor(
   name='Medium',
@@ -323,8 +359,8 @@ _TRANSPORT_MEDIUM = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2391,
-  serialized_end=2502,
+  serialized_start=2477,
+  serialized_end=2588,
 )
 _sym_db.RegisterEnumDescriptor(_TRANSPORT_MEDIUM)
 
@@ -363,8 +399,8 @@ _TRANSPORT_CELLULARTECHNOLOGY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2504,
-  serialized_end=2603,
+  serialized_start=2590,
+  serialized_end=2689,
 )
 _sym_db.RegisterEnumDescriptor(_TRANSPORT_CELLULARTECHNOLOGY)
 
@@ -391,11 +427,40 @@ _TASK = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='localTask', full_name='Task.localTask', index=2,
+      number=3, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='status', full_name='Task.status', index=3,
+      number=4, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='creationTimeStamp', full_name='Task.creationTimeStamp', index=4,
+      number=5, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='deadlineTimeStamp', full_name='Task.deadlineTimeStamp', index=5,
+      number=6, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
+    _TASK_STATUS,
   ],
   serialized_options=None,
   is_extendable=False,
@@ -403,8 +468,8 @@ _TASK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=79,
-  serialized_end=111,
+  serialized_start=80,
+  serialized_end=277,
 )
 
 
@@ -442,8 +507,8 @@ _TASKDETAILS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=113,
-  serialized_end=156,
+  serialized_start=279,
+  serialized_end=322,
 )
 
 
@@ -481,8 +546,8 @@ _WORKERTASK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=158,
-  serialized_end=198,
+  serialized_start=324,
+  serialized_end=364,
 )
 
 
@@ -513,8 +578,75 @@ _STATUS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=200,
-  serialized_end=235,
+  serialized_start=366,
+  serialized_end=401,
+)
+
+
+_CURRENTESTIMATIONS = _descriptor.Descriptor(
+  name='CurrentEstimations',
+  full_name='CurrentEstimations',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='idle', full_name='CurrentEstimations.idle', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='compute', full_name='CurrentEstimations.compute', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rx', full_name='CurrentEstimations.rx', index=2,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='tx', full_name='CurrentEstimations.tx', index=3,
+      number=4, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='batteryLevel', full_name='CurrentEstimations.batteryLevel', index=4,
+      number=5, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='batteryCapacity', full_name='CurrentEstimations.batteryCapacity', index=5,
+      number=6, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=403,
+  serialized_end=525,
 )
 
 
@@ -548,106 +680,85 @@ _WORKER = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='batteryCurrent', full_name='Worker.batteryCurrent', index=3,
+      name='batteryCapacity', full_name='Worker.batteryCapacity', index=3,
       number=4, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='batteryVoltage', full_name='Worker.batteryVoltage', index=4,
-      number=5, type=5, cpp_type=1, label=1,
+      name='batteryStatus', full_name='Worker.batteryStatus', index=4,
+      number=5, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='batteryTemperature', full_name='Worker.batteryTemperature', index=5,
-      number=6, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='batteryEnergy', full_name='Worker.batteryEnergy', index=6,
-      number=7, type=3, cpp_type=2, label=1,
+      name='cpuCores', full_name='Worker.cpuCores', index=5,
+      number=6, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='batteryCharge', full_name='Worker.batteryCharge', index=7,
+      name='queueSize', full_name='Worker.queueSize', index=6,
+      number=7, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='runningTasks', full_name='Worker.runningTasks', index=7,
       number=8, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='batteryStatus', full_name='Worker.batteryStatus', index=8,
-      number=9, type=14, cpp_type=8, label=1,
+      name='queuedTasks', full_name='Worker.queuedTasks', index=8,
+      number=9, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='cpuCores', full_name='Worker.cpuCores', index=9,
-      number=10, type=5, cpp_type=1, label=1,
+      name='avgTimePerTask', full_name='Worker.avgTimePerTask', index=9,
+      number=10, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='queueSize', full_name='Worker.queueSize', index=10,
-      number=11, type=5, cpp_type=1, label=1,
+      name='type', full_name='Worker.type', index=10,
+      number=11, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='runningTasks', full_name='Worker.runningTasks', index=11,
-      number=12, type=5, cpp_type=1, label=1,
+      name='bandwidthEstimate', full_name='Worker.bandwidthEstimate', index=11,
+      number=12, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='totalMemory', full_name='Worker.totalMemory', index=12,
+      number=13, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='queuedTasks', full_name='Worker.queuedTasks', index=12,
-      number=13, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='avgTimePerTask', full_name='Worker.avgTimePerTask', index=13,
+      name='freeMemory', full_name='Worker.freeMemory', index=13,
       number=14, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='type', full_name='Worker.type', index=14,
-      number=15, type=14, cpp_type=8, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='bandwidthEstimate', full_name='Worker.bandwidthEstimate', index=15,
-      number=16, type=2, cpp_type=6, label=1,
-      has_default_value=False, default_value=float(0),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='totalMemory', full_name='Worker.totalMemory', index=16,
-      number=17, type=3, cpp_type=2, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='freeMemory', full_name='Worker.freeMemory', index=17,
-      number=18, type=3, cpp_type=2, label=1,
+      name='avgResultSize', full_name='Worker.avgResultSize', index=14,
+      number=15, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -657,7 +768,6 @@ _WORKER = _descriptor.Descriptor(
   ],
   nested_types=[],
   enum_types=[
-    _WORKER_BATTERYSTATUS,
     _WORKER_TYPE,
   ],
   serialized_options=None,
@@ -666,8 +776,8 @@ _WORKER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=238,
-  serialized_end=789,
+  serialized_start=528,
+  serialized_end=928,
 )
 
 
@@ -719,8 +829,8 @@ _WORKERCOMPUTESTATUS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=791,
-  serialized_end=898,
+  serialized_start=930,
+  serialized_end=1037,
 )
 
 
@@ -758,8 +868,8 @@ _PING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=900,
-  serialized_end=935,
+  serialized_start=1039,
+  serialized_end=1074,
 )
 
 
@@ -798,8 +908,8 @@ _SERVICESTATUS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=937,
-  serialized_end=1053,
+  serialized_start=1076,
+  serialized_end=1192,
 )
 
 
@@ -837,8 +947,8 @@ _SCHEDULER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1055,
-  serialized_end=1092,
+  serialized_start=1194,
+  serialized_end=1231,
 )
 
 
@@ -869,8 +979,8 @@ _SCHEDULERS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1094,
-  serialized_end=1137,
+  serialized_start=1233,
+  serialized_end=1276,
 )
 
 
@@ -901,8 +1011,8 @@ _WORKERTYPES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1139,
-  serialized_end=1180,
+  serialized_start=1278,
+  serialized_end=1319,
 )
 
 
@@ -941,8 +1051,8 @@ _BANDWIDTHESTIMATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1183,
-  serialized_end=1317,
+  serialized_start=1322,
+  serialized_end=1456,
 )
 
 
@@ -973,8 +1083,8 @@ _STRING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1319,
-  serialized_end=1340,
+  serialized_start=1458,
+  serialized_end=1479,
 )
 
 
@@ -1033,8 +1143,8 @@ _WEIGHTS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1342,
-  serialized_end=1449,
+  serialized_start=1481,
+  serialized_end=1588,
 )
 
 
@@ -1072,8 +1182,8 @@ _SETTINGS_SETTINGENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1504,
-  serialized_end=1550,
+  serialized_start=1643,
+  serialized_end=1689,
 )
 
 _SETTINGS = _descriptor.Descriptor(
@@ -1103,8 +1213,8 @@ _SETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1451,
-  serialized_end=1550,
+  serialized_start=1590,
+  serialized_end=1689,
 )
 
 
@@ -1149,8 +1259,8 @@ _TASKEXECUTOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1552,
-  serialized_end=1613,
+  serialized_start=1691,
+  serialized_end=1752,
 )
 
 
@@ -1181,8 +1291,8 @@ _TASKEXECUTORS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1615,
-  serialized_end=1668,
+  serialized_start=1754,
+  serialized_end=1807,
 )
 
 
@@ -1220,8 +1330,8 @@ _REQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1670,
-  serialized_end=1710,
+  serialized_start=1809,
+  serialized_end=1849,
 )
 
 
@@ -1266,8 +1376,8 @@ _RESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1712,
-  serialized_end=1774,
+  serialized_start=1851,
+  serialized_end=1913,
 )
 
 
@@ -1299,8 +1409,8 @@ _JAYSTATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1777,
-  serialized_end=1929,
+  serialized_start=1916,
+  serialized_end=2068,
 )
 
 
@@ -1331,8 +1441,8 @@ _TIME = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1931,
-  serialized_end=1952,
+  serialized_start=2070,
+  serialized_end=2091,
 )
 
 
@@ -1387,8 +1497,15 @@ _BATTERY = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='batteryStatus', full_name='Battery.batteryStatus', index=6,
-      number=7, type=14, cpp_type=8, label=1,
+      name='batteryCapacity', full_name='Battery.batteryCapacity', index=6,
+      number=7, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='batteryStatus', full_name='Battery.batteryStatus', index=7,
+      number=8, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -1398,7 +1515,6 @@ _BATTERY = _descriptor.Descriptor(
   ],
   nested_types=[],
   enum_types=[
-    _BATTERY_BATTERYSTATUS,
   ],
   serialized_options=None,
   is_extendable=False,
@@ -1406,8 +1522,8 @@ _BATTERY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1955,
-  serialized_end=2225,
+  serialized_start=2094,
+  serialized_end=2311,
 )
 
 
@@ -1461,8 +1577,8 @@ _TRANSPORT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2228,
-  serialized_end=2603,
+  serialized_start=2314,
+  serialized_end=2689,
 )
 
 
@@ -1500,8 +1616,8 @@ _TIMERANGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2605,
-  serialized_end=2644,
+  serialized_start=2691,
+  serialized_end=2730,
 )
 
 
@@ -1543,7 +1659,7 @@ _PROFILERECORDING = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='cpuFrequency', full_name='ProfileRecording.cpuFrequency', index=4,
-      number=5, type=5, cpp_type=1, label=3,
+      number=5, type=3, cpp_type=2, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -1576,6 +1692,13 @@ _PROFILERECORDING = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sensors', full_name='ProfileRecording.sensors', index=9,
+      number=10, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1588,8 +1711,8 @@ _PROFILERECORDING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2647,
-  serialized_end=2885,
+  serialized_start=2733,
+  serialized_end=2988,
 )
 
 
@@ -1620,15 +1743,55 @@ _PROFILERECORDINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2887,
-  serialized_end=2951,
+  serialized_start=2990,
+  serialized_end=3054,
 )
 
+
+_TASKINFO = _descriptor.Descriptor(
+  name='TaskInfo',
+  full_name='TaskInfo',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='path', full_name='TaskInfo.path', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='deadline', full_name='TaskInfo.deadline', index=1,
+      number=2, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=3056,
+  serialized_end=3098,
+)
+
+_TASK.fields_by_name['status'].enum_type = _TASK_STATUS
+_TASK_STATUS.containing_type = _TASK
 _STATUS.fields_by_name['code'].enum_type = _STATUSCODE
 _WORKER.fields_by_name['status'].enum_type = _STATUSCODE
-_WORKER.fields_by_name['batteryStatus'].enum_type = _WORKER_BATTERYSTATUS
+_WORKER.fields_by_name['batteryStatus'].enum_type = _BATTERYSTATUS
 _WORKER.fields_by_name['type'].enum_type = _WORKER_TYPE
-_WORKER_BATTERYSTATUS.containing_type = _WORKER
 _WORKER_TYPE.containing_type = _WORKER
 _SERVICESTATUS.fields_by_name['type'].enum_type = _SERVICESTATUS_TYPE
 _SERVICESTATUS_TYPE.containing_type = _SERVICESTATUS
@@ -1643,8 +1806,7 @@ _TASKEXECUTORS.fields_by_name['taskExecutors'].message_type = _TASKEXECUTOR
 _RESPONSE.fields_by_name['status'].message_type = _STATUS
 _JAYSTATE.fields_by_name['jayState'].enum_type = _JAYSTATE_STATE
 _JAYSTATE_STATE.containing_type = _JAYSTATE
-_BATTERY.fields_by_name['batteryStatus'].enum_type = _BATTERY_BATTERYSTATUS
-_BATTERY_BATTERYSTATUS.containing_type = _BATTERY
+_BATTERY.fields_by_name['batteryStatus'].enum_type = _BATTERYSTATUS
 _TRANSPORT.fields_by_name['medium'].enum_type = _TRANSPORT_MEDIUM
 _TRANSPORT.fields_by_name['cellularTechnology'].enum_type = _TRANSPORT_CELLULARTECHNOLOGY
 _TRANSPORT_MEDIUM.containing_type = _TRANSPORT
@@ -1658,6 +1820,7 @@ DESCRIPTOR.message_types_by_name['Task'] = _TASK
 DESCRIPTOR.message_types_by_name['TaskDetails'] = _TASKDETAILS
 DESCRIPTOR.message_types_by_name['WorkerTask'] = _WORKERTASK
 DESCRIPTOR.message_types_by_name['Status'] = _STATUS
+DESCRIPTOR.message_types_by_name['CurrentEstimations'] = _CURRENTESTIMATIONS
 DESCRIPTOR.message_types_by_name['Worker'] = _WORKER
 DESCRIPTOR.message_types_by_name['WorkerComputeStatus'] = _WORKERCOMPUTESTATUS
 DESCRIPTOR.message_types_by_name['Ping'] = _PING
@@ -1680,7 +1843,9 @@ DESCRIPTOR.message_types_by_name['Transport'] = _TRANSPORT
 DESCRIPTOR.message_types_by_name['TimeRange'] = _TIMERANGE
 DESCRIPTOR.message_types_by_name['ProfileRecording'] = _PROFILERECORDING
 DESCRIPTOR.message_types_by_name['ProfileRecordings'] = _PROFILERECORDINGS
+DESCRIPTOR.message_types_by_name['TaskInfo'] = _TASKINFO
 DESCRIPTOR.enum_types_by_name['StatusCode'] = _STATUSCODE
+DESCRIPTOR.enum_types_by_name['BatteryStatus'] = _BATTERYSTATUS
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Task = _reflection.GeneratedProtocolMessageType('Task', (_message.Message,), {
@@ -1710,6 +1875,13 @@ Status = _reflection.GeneratedProtocolMessageType('Status', (_message.Message,),
   # @@protoc_insertion_point(class_scope:Status)
   })
 _sym_db.RegisterMessage(Status)
+
+CurrentEstimations = _reflection.GeneratedProtocolMessageType('CurrentEstimations', (_message.Message,), {
+  'DESCRIPTOR' : _CURRENTESTIMATIONS,
+  '__module__' : 'JayProto_pb2'
+  # @@protoc_insertion_point(class_scope:CurrentEstimations)
+  })
+_sym_db.RegisterMessage(CurrentEstimations)
 
 Worker = _reflection.GeneratedProtocolMessageType('Worker', (_message.Message,), {
   'DESCRIPTOR' : _WORKER,
@@ -1873,6 +2045,13 @@ ProfileRecordings = _reflection.GeneratedProtocolMessageType('ProfileRecordings'
   })
 _sym_db.RegisterMessage(ProfileRecordings)
 
+TaskInfo = _reflection.GeneratedProtocolMessageType('TaskInfo', (_message.Message,), {
+  'DESCRIPTOR' : _TASKINFO,
+  '__module__' : 'JayProto_pb2'
+  # @@protoc_insertion_point(class_scope:TaskInfo)
+  })
+_sym_db.RegisterMessage(TaskInfo)
+
 
 DESCRIPTOR._options = None
 _SETTINGS_SETTINGENTRY._options = None
@@ -1884,8 +2063,8 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=3019,
-  serialized_end=4430,
+  serialized_start=3323,
+  serialized_end=4808,
   methods=[
   _descriptor.MethodDescriptor(
     name='ping',
@@ -1918,29 +2097,9 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
-    name='advertiseWorkerStatus',
-    full_name='BrokerService.advertiseWorkerStatus',
-    index=3,
-    containing_service=None,
-    input_type=_WORKER,
-    output_type=_STATUS,
-    serialized_options=None,
-    create_key=_descriptor._internal_create_key,
-  ),
-  _descriptor.MethodDescriptor(
-    name='diffuseWorkerStatus',
-    full_name='BrokerService.diffuseWorkerStatus',
-    index=4,
-    containing_service=None,
-    input_type=_WORKER,
-    output_type=_STATUS,
-    serialized_options=None,
-    create_key=_descriptor._internal_create_key,
-  ),
-  _descriptor.MethodDescriptor(
     name='requestWorkerStatus',
     full_name='BrokerService.requestWorkerStatus',
-    index=5,
+    index=3,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_WORKER,
@@ -1948,9 +2107,9 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
-    name='updateWorkers',
-    full_name='BrokerService.updateWorkers',
-    index=6,
+    name='notifySchedulerForAvailableWorkers',
+    full_name='BrokerService.notifySchedulerForAvailableWorkers',
+    index=4,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
@@ -1960,7 +2119,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='getSchedulers',
     full_name='BrokerService.getSchedulers',
-    index=7,
+    index=5,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_SCHEDULERS,
@@ -1970,7 +2129,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='setScheduler',
     full_name='BrokerService.setScheduler',
-    index=8,
+    index=6,
     containing_service=None,
     input_type=_SCHEDULER,
     output_type=_STATUS,
@@ -1978,9 +2137,19 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
+    name='setSchedulerSettings',
+    full_name='BrokerService.setSchedulerSettings',
+    index=7,
+    containing_service=None,
+    input_type=_SETTINGS,
+    output_type=_STATUS,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
     name='listenMulticast',
     full_name='BrokerService.listenMulticast',
-    index=9,
+    index=8,
     containing_service=None,
     input_type=google_dot_protobuf_dot_wrappers__pb2._BOOLVALUE,
     output_type=_STATUS,
@@ -1990,7 +2159,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='announceMulticast',
     full_name='BrokerService.announceMulticast',
-    index=10,
+    index=9,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
@@ -2000,7 +2169,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='enableHearBeats',
     full_name='BrokerService.enableHearBeats',
-    index=11,
+    index=10,
     containing_service=None,
     input_type=_WORKERTYPES,
     output_type=_STATUS,
@@ -2010,7 +2179,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='enableBandwidthEstimates',
     full_name='BrokerService.enableBandwidthEstimates',
-    index=12,
+    index=11,
     containing_service=None,
     input_type=_BANDWIDTHESTIMATE,
     output_type=_STATUS,
@@ -2020,7 +2189,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='disableHearBeats',
     full_name='BrokerService.disableHearBeats',
-    index=13,
+    index=12,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
@@ -2030,7 +2199,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='disableBandwidthEstimates',
     full_name='BrokerService.disableBandwidthEstimates',
-    index=14,
+    index=13,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
@@ -2040,17 +2209,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='enableWorkerStatusAdvertisement',
     full_name='BrokerService.enableWorkerStatusAdvertisement',
-    index=15,
-    containing_service=None,
-    input_type=_WORKERTYPES,
-    output_type=_STATUS,
-    serialized_options=None,
-    create_key=_descriptor._internal_create_key,
-  ),
-  _descriptor.MethodDescriptor(
-    name='disableWorkerStatusAdvertisement',
-    full_name='BrokerService.disableWorkerStatusAdvertisement',
-    index=16,
+    index=14,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
@@ -2058,11 +2217,11 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
-    name='updateSmartSchedulerWeights',
-    full_name='BrokerService.updateSmartSchedulerWeights',
-    index=17,
+    name='disableWorkerStatusAdvertisement',
+    full_name='BrokerService.disableWorkerStatusAdvertisement',
+    index=15,
     containing_service=None,
-    input_type=_WEIGHTS,
+    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
@@ -2070,7 +2229,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='announceServiceStatus',
     full_name='BrokerService.announceServiceStatus',
-    index=18,
+    index=16,
     containing_service=None,
     input_type=_SERVICESTATUS,
     output_type=_STATUS,
@@ -2080,7 +2239,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='stopService',
     full_name='BrokerService.stopService',
-    index=19,
+    index=17,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
@@ -2090,7 +2249,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='calibrateWorker',
     full_name='BrokerService.calibrateWorker',
-    index=20,
+    index=18,
     containing_service=None,
     input_type=_STRING,
     output_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
@@ -2100,9 +2259,9 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='createTask',
     full_name='BrokerService.createTask',
-    index=21,
+    index=19,
     containing_service=None,
-    input_type=_STRING,
+    input_type=_TASKINFO,
     output_type=_RESPONSE,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
@@ -2110,7 +2269,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='setSettings',
     full_name='BrokerService.setSettings',
-    index=22,
+    index=20,
     containing_service=None,
     input_type=_SETTINGS,
     output_type=_STATUS,
@@ -2120,7 +2279,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='listTaskExecutors',
     full_name='BrokerService.listTaskExecutors',
-    index=23,
+    index=21,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_TASKEXECUTORS,
@@ -2130,7 +2289,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='selectTaskExecutor',
     full_name='BrokerService.selectTaskExecutor',
-    index=24,
+    index=22,
     containing_service=None,
     input_type=_TASKEXECUTOR,
     output_type=_STATUS,
@@ -2140,7 +2299,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='callExecutorAction',
     full_name='BrokerService.callExecutorAction',
-    index=25,
+    index=23,
     containing_service=None,
     input_type=_REQUEST,
     output_type=_RESPONSE,
@@ -2150,7 +2309,7 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='runExecutorAction',
     full_name='BrokerService.runExecutorAction',
-    index=26,
+    index=24,
     containing_service=None,
     input_type=_REQUEST,
     output_type=_STATUS,
@@ -2160,10 +2319,30 @@ _BROKERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='setExecutorSettings',
     full_name='BrokerService.setExecutorSettings',
-    index=27,
+    index=25,
     containing_service=None,
     input_type=_SETTINGS,
     output_type=_STATUS,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='getExpectedCurrent',
+    full_name='BrokerService.getExpectedCurrent',
+    index=26,
+    containing_service=None,
+    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+    output_type=_CURRENTESTIMATIONS,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='getExpectedCurrentFromRemote',
+    full_name='BrokerService.getExpectedCurrentFromRemote',
+    index=27,
+    containing_service=None,
+    input_type=_WORKER,
+    output_type=_CURRENTESTIMATIONS,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),
@@ -2180,8 +2359,8 @@ _PROFILERSERVICE = _descriptor.ServiceDescriptor(
   index=1,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=4433,
-  serialized_end=4807,
+  serialized_start=4811,
+  serialized_end=5254,
   methods=[
   _descriptor.MethodDescriptor(
     name='setState',
@@ -2234,9 +2413,19 @@ _PROFILERSERVICE = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
+    name='getExpectedCurrent',
+    full_name='ProfilerService.getExpectedCurrent',
+    index=5,
+    containing_service=None,
+    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+    output_type=_CURRENTESTIMATIONS,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
     name='testService',
     full_name='ProfilerService.testService',
-    index=5,
+    index=6,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_SERVICESTATUS,
@@ -2246,7 +2435,7 @@ _PROFILERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='stopService',
     full_name='ProfilerService.stopService',
-    index=6,
+    index=7,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_STATUS,
@@ -2266,8 +2455,8 @@ _SCHEDULERSERVICE = _descriptor.ServiceDescriptor(
   index=2,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=4810,
-  serialized_end=5267,
+  serialized_start=5257,
+  serialized_end=5708,
   methods=[
   _descriptor.MethodDescriptor(
     name='schedule',
@@ -2330,19 +2519,9 @@ _SCHEDULERSERVICE = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
-    name='updateSmartSchedulerWeights',
-    full_name='SchedulerService.updateSmartSchedulerWeights',
-    index=6,
-    containing_service=None,
-    input_type=_WEIGHTS,
-    output_type=_STATUS,
-    serialized_options=None,
-    create_key=_descriptor._internal_create_key,
-  ),
-  _descriptor.MethodDescriptor(
     name='testService',
     full_name='SchedulerService.testService',
-    index=7,
+    index=6,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_SERVICESTATUS,
@@ -2352,9 +2531,19 @@ _SCHEDULERSERVICE = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='stopService',
     full_name='SchedulerService.stopService',
-    index=8,
+    index=7,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+    output_type=_STATUS,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='setSchedulerSettings',
+    full_name='SchedulerService.setSchedulerSettings',
+    index=8,
+    containing_service=None,
+    input_type=_SETTINGS,
     output_type=_STATUS,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
@@ -2372,8 +2561,8 @@ _WORKERSERVICE = _descriptor.ServiceDescriptor(
   index=3,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=5270,
-  serialized_end=5739,
+  serialized_start=5711,
+  serialized_end=6180,
   methods=[
   _descriptor.MethodDescriptor(
     name='execute',

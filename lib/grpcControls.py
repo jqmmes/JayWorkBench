@@ -468,10 +468,14 @@ class jayClient:
             except:
                 return False
 
-    def createTask(self, asset_id):
+    def createTask(self, asset_id, deadline=None):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.createTask(getProtoString(asset_id))
+                taskInfo = JayProto_pb2.TaskInfo()
+                taskInfo.path = asset_id
+                if (deadline):
+                    taskInfo.deadline = deadline
+                return self.brokerStub.createTask(taskInfo)
             except:
                 return False
 

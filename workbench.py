@@ -35,6 +35,7 @@ CURSES_LOGS_LOCK = Lock()
 LOGS_LOCK = Lock()
 REBOOT_ON_RUN_EXPERIMENT = False
 USE_SMART_PLUGS = False
+SCREEN_BRIGHTNESS = 0
 
 PLUGS = []
 
@@ -232,7 +233,6 @@ def setTaskExecutorSettings(experiment, jay_instance, custom_settings_map):
 
 def selectModel(experiment, jay_instance, custom_model):
     models = jay_instance.listModels()
-    print(models)
     if (models is None):
         experiment.setFail()
     selected_model = custom_model if (custom_model != None) else experiment.model
@@ -245,7 +245,7 @@ def selectModel(experiment, jay_instance, custom_model):
     return False
 
 def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
-    global PENDING_TASKS, PENDING_WORKERS
+    global PENDING_TASKS, PENDING_WORKERS, SCREEN_BRIGHTNESS
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
         adb.uninstallPackage(device)
@@ -297,7 +297,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             adb.pushFile(experiment.assets, asset, device=device)
             files_on_device.append(asset)
     adb.screenOn(device)
-    adb.setBrightness(device, 0)
+    adb.setBrightness(device, SCREEN_BRIGHTNESS)
     adb.clearSystemLog(device)
     log("STOP_ALL_SERVICE\t%s" % device.name)
     adb.stopAll(device)
@@ -1209,6 +1209,15 @@ def help():
 
                     ComputationEstimateScheduler            (Same as estimate but witout Bandwidth Estimate)
 
+                    EAScheduler [LOCAL]
+                    EAScheduler [REMOTE]
+                    EAScheduler [CLOUD]
+                    EAScheduler [LOCAL, CLOUD]
+                    EAScheduler [LOCAL, REMOTE]
+                    EAScheduler [REMOTE, CLOUD]
+                    EAScheduler [LOCAL, REMOTE, CLOUD]
+
+
             Settings:
                     CLOUD_IP
                     GRPC_MAX_MESSAGE_SIZE
@@ -1254,6 +1263,19 @@ def help():
                     READ_SERVICE_DATA_INTERVAL: Long = 500 // 0.5s
                     DEVICE_ID: String = ""
                     BANDWIDTH_ESTIMATE_TYPE = "ALL" // ACTIVE/PASSIVE/ALL
+
+
+
+            OS Specific Problems/Fixes:
+                MacOS:
+                    Too Many Open Files:
+                        sysctl kern.maxfiles
+                        sysctl kern.maxfilesperproc
+
+                        sysctl -w kern.maxfiles=40480
+                        sysctl -w kern.maxfilesperproc=30000
+
+                        ulimit -S -n 30048
         ================================================ HELP ================================================''')
 
 def logExperiment(conf, experiment):
@@ -1321,7 +1343,7 @@ def checkInterfaces():
     log("==========================================================================================")
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -1338,6 +1360,7 @@ def main():
     argparser.add_argument('-d', '--daemon', default=False, action='store_true', required=False)
     argparser.add_argument('-sp', '--smart-plug', default=False, action='store_true', required=False)
     argparser.add_argument('-u', '--force-usb', default=False, action='store_true', required=False)
+    argparser.add_argument('-b', '--brightness', action='store', required=False)
 
 
     args = argparser.parse_args()
@@ -1360,6 +1383,12 @@ def main():
 
     if args.smart_plug:
         USE_SMART_PLUGS = True
+
+    if args.brightness != None:
+        try:
+            SCREEN_BRIGHTNESS = int(args.brightness)
+        except:
+            SCREEN_BRIGHTNESS = 0
 
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")

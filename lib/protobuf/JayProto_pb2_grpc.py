@@ -22,7 +22,7 @@ class BrokerServiceStub(object):
                 request_serializer=JayProto__pb2.Ping.SerializeToString,
                 response_deserializer=JayProto__pb2.Ping.FromString,
                 )
-        self.executeTask = channel.unary_stream(
+        self.executeTask = channel.stream_stream(
                 '/BrokerService/executeTask',
                 request_serializer=JayProto__pb2.Task.SerializeToString,
                 response_deserializer=JayProto__pb2.Response.FromString,
@@ -32,23 +32,13 @@ class BrokerServiceStub(object):
                 request_serializer=JayProto__pb2.Task.SerializeToString,
                 response_deserializer=JayProto__pb2.Response.FromString,
                 )
-        self.advertiseWorkerStatus = channel.unary_unary(
-                '/BrokerService/advertiseWorkerStatus',
-                request_serializer=JayProto__pb2.Worker.SerializeToString,
-                response_deserializer=JayProto__pb2.Status.FromString,
-                )
-        self.diffuseWorkerStatus = channel.unary_unary(
-                '/BrokerService/diffuseWorkerStatus',
-                request_serializer=JayProto__pb2.Worker.SerializeToString,
-                response_deserializer=JayProto__pb2.Status.FromString,
-                )
         self.requestWorkerStatus = channel.unary_unary(
                 '/BrokerService/requestWorkerStatus',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=JayProto__pb2.Worker.FromString,
                 )
-        self.updateWorkers = channel.unary_unary(
-                '/BrokerService/updateWorkers',
+        self.notifySchedulerForAvailableWorkers = channel.unary_unary(
+                '/BrokerService/notifySchedulerForAvailableWorkers',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 )
@@ -60,6 +50,11 @@ class BrokerServiceStub(object):
         self.setScheduler = channel.unary_unary(
                 '/BrokerService/setScheduler',
                 request_serializer=JayProto__pb2.Scheduler.SerializeToString,
+                response_deserializer=JayProto__pb2.Status.FromString,
+                )
+        self.setSchedulerSettings = channel.unary_unary(
+                '/BrokerService/setSchedulerSettings',
+                request_serializer=JayProto__pb2.Settings.SerializeToString,
                 response_deserializer=JayProto__pb2.Status.FromString,
                 )
         self.listenMulticast = channel.unary_unary(
@@ -94,17 +89,12 @@ class BrokerServiceStub(object):
                 )
         self.enableWorkerStatusAdvertisement = channel.unary_unary(
                 '/BrokerService/enableWorkerStatusAdvertisement',
-                request_serializer=JayProto__pb2.WorkerTypes.SerializeToString,
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=JayProto__pb2.Status.FromString,
                 )
         self.disableWorkerStatusAdvertisement = channel.unary_unary(
                 '/BrokerService/disableWorkerStatusAdvertisement',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=JayProto__pb2.Status.FromString,
-                )
-        self.updateSmartSchedulerWeights = channel.unary_unary(
-                '/BrokerService/updateSmartSchedulerWeights',
-                request_serializer=JayProto__pb2.Weights.SerializeToString,
                 response_deserializer=JayProto__pb2.Status.FromString,
                 )
         self.announceServiceStatus = channel.unary_unary(
@@ -124,7 +114,7 @@ class BrokerServiceStub(object):
                 )
         self.createTask = channel.unary_unary(
                 '/BrokerService/createTask',
-                request_serializer=JayProto__pb2.String.SerializeToString,
+                request_serializer=JayProto__pb2.TaskInfo.SerializeToString,
                 response_deserializer=JayProto__pb2.Response.FromString,
                 )
         self.setSettings = channel.unary_unary(
@@ -157,6 +147,16 @@ class BrokerServiceStub(object):
                 request_serializer=JayProto__pb2.Settings.SerializeToString,
                 response_deserializer=JayProto__pb2.Status.FromString,
                 )
+        self.getExpectedCurrent = channel.unary_unary(
+                '/BrokerService/getExpectedCurrent',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=JayProto__pb2.CurrentEstimations.FromString,
+                )
+        self.getExpectedCurrentFromRemote = channel.unary_unary(
+                '/BrokerService/getExpectedCurrentFromRemote',
+                request_serializer=JayProto__pb2.Worker.SerializeToString,
+                response_deserializer=JayProto__pb2.CurrentEstimations.FromString,
+                )
 
 
 class BrokerServiceServicer(object):
@@ -169,7 +169,7 @@ class BrokerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def executeTask(self, request, context):
+    def executeTask(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -181,27 +181,14 @@ class BrokerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def advertiseWorkerStatus(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def diffuseWorkerStatus(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def requestWorkerStatus(self, request, context):
-        """ExternalBroker::diffuseWorkerStatus
-        SchedulerService::notifyWorkerUpdate
+        """SchedulerService::notifyWorkerUpdate
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def updateWorkers(self, request, context):
+    def notifySchedulerForAvailableWorkers(self, request, context):
         """SchedulerService::notifyWorkerUpdate
 
         """
@@ -216,6 +203,12 @@ class BrokerServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def setScheduler(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def setSchedulerSettings(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -264,12 +257,6 @@ class BrokerServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def disableWorkerStatusAdvertisement(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def updateSmartSchedulerWeights(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -335,6 +322,18 @@ class BrokerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def getExpectedCurrent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def getExpectedCurrentFromRemote(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_BrokerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -343,7 +342,7 @@ def add_BrokerServiceServicer_to_server(servicer, server):
                     request_deserializer=JayProto__pb2.Ping.FromString,
                     response_serializer=JayProto__pb2.Ping.SerializeToString,
             ),
-            'executeTask': grpc.unary_stream_rpc_method_handler(
+            'executeTask': grpc.stream_stream_rpc_method_handler(
                     servicer.executeTask,
                     request_deserializer=JayProto__pb2.Task.FromString,
                     response_serializer=JayProto__pb2.Response.SerializeToString,
@@ -353,23 +352,13 @@ def add_BrokerServiceServicer_to_server(servicer, server):
                     request_deserializer=JayProto__pb2.Task.FromString,
                     response_serializer=JayProto__pb2.Response.SerializeToString,
             ),
-            'advertiseWorkerStatus': grpc.unary_unary_rpc_method_handler(
-                    servicer.advertiseWorkerStatus,
-                    request_deserializer=JayProto__pb2.Worker.FromString,
-                    response_serializer=JayProto__pb2.Status.SerializeToString,
-            ),
-            'diffuseWorkerStatus': grpc.unary_unary_rpc_method_handler(
-                    servicer.diffuseWorkerStatus,
-                    request_deserializer=JayProto__pb2.Worker.FromString,
-                    response_serializer=JayProto__pb2.Status.SerializeToString,
-            ),
             'requestWorkerStatus': grpc.unary_unary_rpc_method_handler(
                     servicer.requestWorkerStatus,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=JayProto__pb2.Worker.SerializeToString,
             ),
-            'updateWorkers': grpc.unary_unary_rpc_method_handler(
-                    servicer.updateWorkers,
+            'notifySchedulerForAvailableWorkers': grpc.unary_unary_rpc_method_handler(
+                    servicer.notifySchedulerForAvailableWorkers,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
@@ -381,6 +370,11 @@ def add_BrokerServiceServicer_to_server(servicer, server):
             'setScheduler': grpc.unary_unary_rpc_method_handler(
                     servicer.setScheduler,
                     request_deserializer=JayProto__pb2.Scheduler.FromString,
+                    response_serializer=JayProto__pb2.Status.SerializeToString,
+            ),
+            'setSchedulerSettings': grpc.unary_unary_rpc_method_handler(
+                    servicer.setSchedulerSettings,
+                    request_deserializer=JayProto__pb2.Settings.FromString,
                     response_serializer=JayProto__pb2.Status.SerializeToString,
             ),
             'listenMulticast': grpc.unary_unary_rpc_method_handler(
@@ -415,17 +409,12 @@ def add_BrokerServiceServicer_to_server(servicer, server):
             ),
             'enableWorkerStatusAdvertisement': grpc.unary_unary_rpc_method_handler(
                     servicer.enableWorkerStatusAdvertisement,
-                    request_deserializer=JayProto__pb2.WorkerTypes.FromString,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=JayProto__pb2.Status.SerializeToString,
             ),
             'disableWorkerStatusAdvertisement': grpc.unary_unary_rpc_method_handler(
                     servicer.disableWorkerStatusAdvertisement,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=JayProto__pb2.Status.SerializeToString,
-            ),
-            'updateSmartSchedulerWeights': grpc.unary_unary_rpc_method_handler(
-                    servicer.updateSmartSchedulerWeights,
-                    request_deserializer=JayProto__pb2.Weights.FromString,
                     response_serializer=JayProto__pb2.Status.SerializeToString,
             ),
             'announceServiceStatus': grpc.unary_unary_rpc_method_handler(
@@ -445,7 +434,7 @@ def add_BrokerServiceServicer_to_server(servicer, server):
             ),
             'createTask': grpc.unary_unary_rpc_method_handler(
                     servicer.createTask,
-                    request_deserializer=JayProto__pb2.String.FromString,
+                    request_deserializer=JayProto__pb2.TaskInfo.FromString,
                     response_serializer=JayProto__pb2.Response.SerializeToString,
             ),
             'setSettings': grpc.unary_unary_rpc_method_handler(
@@ -478,6 +467,16 @@ def add_BrokerServiceServicer_to_server(servicer, server):
                     request_deserializer=JayProto__pb2.Settings.FromString,
                     response_serializer=JayProto__pb2.Status.SerializeToString,
             ),
+            'getExpectedCurrent': grpc.unary_unary_rpc_method_handler(
+                    servicer.getExpectedCurrent,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=JayProto__pb2.CurrentEstimations.SerializeToString,
+            ),
+            'getExpectedCurrentFromRemote': grpc.unary_unary_rpc_method_handler(
+                    servicer.getExpectedCurrentFromRemote,
+                    request_deserializer=JayProto__pb2.Worker.FromString,
+                    response_serializer=JayProto__pb2.CurrentEstimations.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'BrokerService', rpc_method_handlers)
@@ -506,7 +505,7 @@ class BrokerService(object):
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def executeTask(request,
+    def executeTask(request_iterator,
             target,
             options=(),
             channel_credentials=None,
@@ -515,7 +514,7 @@ class BrokerService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/BrokerService/executeTask',
+        return grpc.experimental.stream_stream(request_iterator, target, '/BrokerService/executeTask',
             JayProto__pb2.Task.SerializeToString,
             JayProto__pb2.Response.FromString,
             options, channel_credentials,
@@ -538,38 +537,6 @@ class BrokerService(object):
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def advertiseWorkerStatus(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/BrokerService/advertiseWorkerStatus',
-            JayProto__pb2.Worker.SerializeToString,
-            JayProto__pb2.Status.FromString,
-            options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def diffuseWorkerStatus(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/BrokerService/diffuseWorkerStatus',
-            JayProto__pb2.Worker.SerializeToString,
-            JayProto__pb2.Status.FromString,
-            options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
     def requestWorkerStatus(request,
             target,
             options=(),
@@ -586,7 +553,7 @@ class BrokerService(object):
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def updateWorkers(request,
+    def notifySchedulerForAvailableWorkers(request,
             target,
             options=(),
             channel_credentials=None,
@@ -595,7 +562,7 @@ class BrokerService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/BrokerService/updateWorkers',
+        return grpc.experimental.unary_unary(request, target, '/BrokerService/notifySchedulerForAvailableWorkers',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options, channel_credentials,
@@ -629,6 +596,22 @@ class BrokerService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/BrokerService/setScheduler',
             JayProto__pb2.Scheduler.SerializeToString,
+            JayProto__pb2.Status.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def setSchedulerSettings(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/BrokerService/setSchedulerSettings',
+            JayProto__pb2.Settings.SerializeToString,
             JayProto__pb2.Status.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -740,7 +723,7 @@ class BrokerService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/BrokerService/enableWorkerStatusAdvertisement',
-            JayProto__pb2.WorkerTypes.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             JayProto__pb2.Status.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -757,22 +740,6 @@ class BrokerService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/BrokerService/disableWorkerStatusAdvertisement',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            JayProto__pb2.Status.FromString,
-            options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def updateSmartSchedulerWeights(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/BrokerService/updateSmartSchedulerWeights',
-            JayProto__pb2.Weights.SerializeToString,
             JayProto__pb2.Status.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -836,7 +803,7 @@ class BrokerService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/BrokerService/createTask',
-            JayProto__pb2.String.SerializeToString,
+            JayProto__pb2.TaskInfo.SerializeToString,
             JayProto__pb2.Response.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -937,6 +904,38 @@ class BrokerService(object):
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
+    @staticmethod
+    def getExpectedCurrent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/BrokerService/getExpectedCurrent',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            JayProto__pb2.CurrentEstimations.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def getExpectedCurrentFromRemote(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/BrokerService/getExpectedCurrentFromRemote',
+            JayProto__pb2.Worker.SerializeToString,
+            JayProto__pb2.CurrentEstimations.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
 
 class ProfilerServiceStub(object):
     """Missing associated documentation comment in .proto file."""
@@ -971,6 +970,11 @@ class ProfilerServiceStub(object):
                 '/ProfilerService/getDeviceStatus',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=JayProto__pb2.ProfileRecording.FromString,
+                )
+        self.getExpectedCurrent = channel.unary_unary(
+                '/ProfilerService/getExpectedCurrent',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=JayProto__pb2.CurrentEstimations.FromString,
                 )
         self.testService = channel.unary_unary(
                 '/ProfilerService/testService',
@@ -1022,6 +1026,12 @@ class ProfilerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def getExpectedCurrent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def testService(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1061,6 +1071,11 @@ def add_ProfilerServiceServicer_to_server(servicer, server):
                     servicer.getDeviceStatus,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=JayProto__pb2.ProfileRecording.SerializeToString,
+            ),
+            'getExpectedCurrent': grpc.unary_unary_rpc_method_handler(
+                    servicer.getExpectedCurrent,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=JayProto__pb2.CurrentEstimations.SerializeToString,
             ),
             'testService': grpc.unary_unary_rpc_method_handler(
                     servicer.testService,
@@ -1163,6 +1178,22 @@ class ProfilerService(object):
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def getExpectedCurrent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/ProfilerService/getExpectedCurrent',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            JayProto__pb2.CurrentEstimations.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def testService(request,
             target,
             options=(),
@@ -1235,11 +1266,6 @@ class SchedulerServiceStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=JayProto__pb2.Schedulers.FromString,
                 )
-        self.updateSmartSchedulerWeights = channel.unary_unary(
-                '/SchedulerService/updateSmartSchedulerWeights',
-                request_serializer=JayProto__pb2.Weights.SerializeToString,
-                response_deserializer=JayProto__pb2.Status.FromString,
-                )
         self.testService = channel.unary_unary(
                 '/SchedulerService/testService',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -1248,6 +1274,11 @@ class SchedulerServiceStub(object):
         self.stopService = channel.unary_unary(
                 '/SchedulerService/stopService',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=JayProto__pb2.Status.FromString,
+                )
+        self.setSchedulerSettings = channel.unary_unary(
+                '/SchedulerService/setSchedulerSettings',
+                request_serializer=JayProto__pb2.Settings.SerializeToString,
                 response_deserializer=JayProto__pb2.Status.FromString,
                 )
 
@@ -1292,12 +1323,6 @@ class SchedulerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def updateSmartSchedulerWeights(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def testService(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1305,6 +1330,12 @@ class SchedulerServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def stopService(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def setSchedulerSettings(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1343,11 +1374,6 @@ def add_SchedulerServiceServicer_to_server(servicer, server):
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=JayProto__pb2.Schedulers.SerializeToString,
             ),
-            'updateSmartSchedulerWeights': grpc.unary_unary_rpc_method_handler(
-                    servicer.updateSmartSchedulerWeights,
-                    request_deserializer=JayProto__pb2.Weights.FromString,
-                    response_serializer=JayProto__pb2.Status.SerializeToString,
-            ),
             'testService': grpc.unary_unary_rpc_method_handler(
                     servicer.testService,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
@@ -1356,6 +1382,11 @@ def add_SchedulerServiceServicer_to_server(servicer, server):
             'stopService': grpc.unary_unary_rpc_method_handler(
                     servicer.stopService,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=JayProto__pb2.Status.SerializeToString,
+            ),
+            'setSchedulerSettings': grpc.unary_unary_rpc_method_handler(
+                    servicer.setSchedulerSettings,
+                    request_deserializer=JayProto__pb2.Settings.FromString,
                     response_serializer=JayProto__pb2.Status.SerializeToString,
             ),
     }
@@ -1466,22 +1497,6 @@ class SchedulerService(object):
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def updateSmartSchedulerWeights(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/SchedulerService/updateSmartSchedulerWeights',
-            JayProto__pb2.Weights.SerializeToString,
-            JayProto__pb2.Status.FromString,
-            options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
     def testService(request,
             target,
             options=(),
@@ -1509,6 +1524,22 @@ class SchedulerService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/SchedulerService/stopService',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            JayProto__pb2.Status.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def setSchedulerSettings(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/SchedulerService/setSchedulerSettings',
+            JayProto__pb2.Settings.SerializeToString,
             JayProto__pb2.Status.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
