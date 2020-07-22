@@ -1342,7 +1342,7 @@ def installPackage(device):
     "android.permission.FOREGROUND_SERVICE", "android.permission.PACKAGE_USAGE_STATS",
     "android.permission.ACCESS_NETWORK_STATE", "android.permission.BLUETOOTH",
     "android.permission.ACCESS_FINE_LOCATION"]
-    for perminssion in permissions:
+    for permission in permissions:
         if permission not in adb.grantedPermissions(device=device):
             adb.grantPermission(permission, device=device)
             if permission in adb.grantedPermissions(device=device):

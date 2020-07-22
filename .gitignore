@@ -13,3 +13,5 @@ __pycache__
 *.new
 *.old
 .DS_Store
+ifttt.key
+device.ignore

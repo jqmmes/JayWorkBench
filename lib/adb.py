@@ -4,6 +4,7 @@ import subprocess
 from time import sleep, time, ctime
 from re import match, findall
 import os
+import platform
 import threading
 import concurrent.futures
 from sys import stdout
@@ -21,6 +22,16 @@ ADB_LOGS_LOCK = None
 LOG_LEVEL = "ACTION" # "ALL", "ACTION", "COMMAND"
 FORCE_USB = False
 
+def getOs():
+    if platform.system() == "Darwin":
+        return "mac"
+    if platform.system() == "Linux":
+        return "linux"
+    else:
+        return ""
+
+ADB_BIN = "{}/lib/adb/{}/adb".format(os.getcwd(), getOs())
+
 class Device:
     name = ""
     ip = ""
@@ -36,6 +47,8 @@ class Device:
         self.status = status
         self.connected_wifi = wifi
         self.connected_usb = usb
+
+
 
 FNULL = open(os.devnull, "w")
 
@@ -92,7 +105,7 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
             selected_device = ['-s', device.name]
         else:
             return "FAILED_TO_RUN_ADB_PLEASE_CANCEL"
-    result = subprocess.run(['adb'] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
+    result = subprocess.run([ADB_BIN] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 
 def setBrightness(device=None, brightness=0):
@@ -135,6 +148,15 @@ def getADBStatus(device, log_command=True):
                 connected_usb = True
     return (connected_usb, connected_wifi)
 
+def isADBWiFiOffline(device, log_command=True):
+    devices_raw = adb(['devices'], log_command=log_command).split('\n')[1:]
+    for raw_device in devices_raw:
+        splitted = raw_device.split('\t')
+        if len(splitted) > 1:
+            if splitted[0] == "%s:5555" % device.ip and splitted[1] == 'offline':
+                return True
+    return False
+
 def connectWifiADB(device, retries=3, force_connection=True):
     if retries <= 0 or FORCE_USB:
         return (device, False)
@@ -154,10 +176,17 @@ def connectWifiADB(device, retries=3, force_connection=True):
     else:
         if device.connected_wifi:
             for x in range(3):
-                sleep(5)
                 force_usb, connected = getADBStatus(device, log_command=False)
                 if connected:
                     return (device, True)
+                else:
+                    if isADBWiFiOffline(device, log_command=False):
+                        disconnectWifiADB(device)
+                        sleep(2)
+                        status = adb(['connect', "%s:5555" % device.ip])
+                        if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
+                            device.connected_wifi = True
+                sleep(5)
         force_usb, _ = getADBStatus(device, log_command=False)
         if force_usb:
             if rebootAndWait(device, connectWifi=True, force_usb=True):
@@ -174,7 +203,7 @@ def disconnectWifiADB(device):
 def getWifiDeviceNameByIp(device_ip, retries=5):
     if retries <= 0:
         return "unknown_device_{}".format(device_ip)
-    result = subprocess.run(["adb", "-s", "{}:5555".format(device_ip), "shell", "getprop ro.serialno"], stdout=subprocess.PIPE, stderr=FNULL)
+    result = subprocess.run([ADB_BIN, "-s", "{}:5555".format(device_ip), "shell", "getprop ro.serialno"], stdout=subprocess.PIPE, stderr=FNULL)
     if result.returncode == 0:
         return result.stdout.decode('UTF-8').rstrip("\n")
     else:
@@ -235,7 +264,6 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                 if not new_device.connected_usb:
                     new_device.connected_usb = getADBStatus(new_device)[0]
                 devices.append(new_device)
-                screenOn(new_device)
                 log("NEW_DEVICE\t{} ({})\tUSB: {}\tWIFI: {}".format(new_device.name, new_device.ip, new_device.connected_usb, new_device.connected_wifi), "ACTION")
     if discover_wifi:
         log("DISCOVERING_WIFI_DEVICES", "ACTION")
@@ -244,7 +272,6 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
         for ip in network_devices:
             new_device = Device(getWifiDeviceNameByIp(ip), ip=ip, status=True, wifi=True, usb=False)
             new_device.connected_usb = getADBStatus(new_device)[0]
-            screenOn(new_device)
             log("NEW_DEVICE\t{} ({})\tUSB: {}\tWIFI: {}".format(new_device.name, new_device.ip, new_device.connected_usb, new_device.connected_wifi), "ACTION")
             if (getBatteryLevel(new_device) >= minBattery):
                 devices.append(new_device)
@@ -274,10 +301,16 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
     devices = []
     network_devices = []
     ignored = getIgnoredIps()
-    response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "-T3"], stdout=subprocess.PIPE, stderr=FNULL)
-    network_devices = findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8"))
+    reps = 3
+    while (reps > 0):
+        response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "20"], stdout=subprocess.PIPE, stderr=FNULL)
+        for entry in findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8")):
+            if entry not in network_devices:
+                network_devices.append(entry)
+        reps -= 1
+        sleep(3)
     for host in network_devices:
-        if host in ignored:
+        if host in ignored + ignore_list:
             continue
         add_host = True
         for ignore in ignore_list:
@@ -286,9 +319,19 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
                 continue
         if not add_host:
             continue
-        status = adb(['connect', "{}:5555".format(host)])
-        if (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
-            devices.append(host)
+        response = subprocess.run(['nmap', '-p', "5555", host], stdout=subprocess.PIPE, stderr=FNULL)
+        port_open = findall("5555/tcp\s+open", response.stdout.decode("UTF-8"))
+        if len(port_open) == 0:
+            continue
+        retries = 3
+        while retries > 0:
+            status = adb(['connect', "{}:5555".format(host)])
+            if (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
+                devices.append(host)
+                break
+            else:
+                sleep(2)
+            retries -= 1
     return devices
 
 def mkdir(path='Android/data/'+LAUNCHER_APP+'/files/', basepath='/sdcard/', device=None):
@@ -397,10 +440,10 @@ def removePackage(package=LAUNCHER_APP, device=None):
     uninstallPackage(device)
 
 def grantPermission(permission, package=LAUNCHER_APP, device=None):
-    adb(['shell', 'pm', 'grant', package, permission], None)
+    adb(['shell', 'pm', 'grant', package, permission], device)
 
 def grantedPermissions(package=LAUNCHER_APP, device=None):
-    result = adb(['shell', 'dumpsys', 'package', package])
+    result = adb(['shell', 'dumpsys', 'package', package], device)
     return findall("\s+(\w+\.\w+\.\w+): granted=true", result)
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
