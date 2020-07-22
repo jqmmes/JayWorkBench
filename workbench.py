@@ -248,12 +248,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     global PENDING_TASKS, PENDING_WORKERS, SCREEN_BRIGHTNESS
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
-        adb.uninstallPackage(device)
-        log('PACKAGE_UNINSTALLED\t%s' % device.name)
-        adb.pushFile('apps', 'Jay-Android\ Launcher-release.apk', path='', device=device)
-        log('PACKAGE_PUSHED\t%s' % device.name)
-        adb.pmInstallPackage('apps', 'Jay-Android\ Launcher-release.apk', device)
-        log('PACKAGE_INSTALLED\t%s' % device.name)
+        installPackage(device)
     adb.connectWifiADB(device)
     log("START_DEVICE\t%s" % device.name)
     device_random = random.Random()
@@ -1330,12 +1325,15 @@ def checkInterfaces():
     log("==========================================================================================")
 
 def installPackage(device):
+    adb.screenOn(device)
     log('CLEANING_SYSTEM\t%s' % device.name)
     adb.uninstallPackage(device=device)
     log('PACKAGE_UNINSTALLED\t%s' % device.name)
     adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
     log('PACKAGE_PUSHED\t%s' % device.name)
     adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
+    if not adb.checkPackageInstalled(device=device):
+        adb.installPackage('apps','Jay-Android Launcher-release.apk', device=device)
     log('PACKAGE_INSTALLED\t%s' % device.name)
     permissions = ["android.permission.INTERNET", "android.permission.READ_PHONE_STATE",
     "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -1351,6 +1349,7 @@ def installPackage(device):
                 log('GRANT_PERMISSION_FAIL: ' + permission + '\t%s' % device.name)
         else:
             log('ALREADY_GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
+    adb.screenOff(device)
 
 def main():
     global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS
@@ -1439,7 +1438,7 @@ def main():
         log("{} ({})".format(device.name, device.ip))
     log("===================================")
     for device in ALL_DEVICES:
-        adb.screenOff(device)
+        log("CHECKING_PACKAGE\t%s" % device.name)
         if not adb.checkPackageInstalled(device=device):
             log('PACKAGE_MISSING\t%s' % device.name)
             installPackage(device)

@@ -70,7 +70,7 @@ def log(str, level, end="\n"):
         if lock_acquired:
             ADB_LOGS_LOCK.release()
 
-def adb(cmd, device=None, force_usb=False, log_command=True):
+def adb(cmd, device=None, force_usb=False, log_command=True, timeout=None):
     if (FORCE_USB):
         force_usb = True
     selected_device = []
@@ -105,7 +105,13 @@ def adb(cmd, device=None, force_usb=False, log_command=True):
             selected_device = ['-s', device.name]
         else:
             return "FAILED_TO_RUN_ADB_PLEASE_CANCEL"
-    result = subprocess.run([ADB_BIN] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
+    if timeout != None:
+        try:
+            result = subprocess.run([ADB_BIN] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL, timeout=timeout)
+        except:
+            return True
+    else:
+        result = subprocess.run([ADB_BIN] + selected_device + cmd, stdout=subprocess.PIPE, stderr=FNULL)
     return result.stdout.decode('UTF-8')
 
 def setBrightness(device=None, brightness=0):
@@ -301,9 +307,9 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
     devices = []
     network_devices = []
     ignored = getIgnoredIps()
-    reps = 3
+    reps = 2
     while (reps > 0):
-        response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "20"], stdout=subprocess.PIPE, stderr=FNULL)
+        response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
         for entry in findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8")):
             if entry not in network_devices:
                 network_devices.append(entry)
@@ -325,6 +331,7 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
             continue
         retries = 3
         while retries > 0:
+            log("CONNECTING_TO_DEVICE\t%s" % host, "ACTION")
             status = adb(['connect', "{}:5555".format(host)])
             if (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
                 devices.append(host)
@@ -379,11 +386,17 @@ def pullSystemLog(device=None, path=""):
         log.write(adb(['logcat', '-d'], device))
         log.close()
 
-def screenOn(device = None):
+def screenOn(device = None, retries = 10):
     #adb(['shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'], device)
+    if retries <= 0:
+        return
     status = adb(['shell', 'dumpsys', 'power'], device)
     if (status.find('Display Power: state=OFF') != -1):
-        adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
+        timed_out = adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device, timeout = 3)
+        if timed_out:
+            sleep(2)
+            return screenOn(device, retries - 1)
+
 
 def screenOff(device = None):
     status = adb(['shell', 'dumpsys', 'power'], device)
@@ -425,8 +438,8 @@ def close():
 def checkPackageInstalled(package=LAUNCHER_APP, device=None):
     return (package in adb(['shell', 'pm', 'list', 'packages'], device))
 
-def installPackage(package, device=None):
-    adb(['install', package], device)
+def installPackage(path, package, device=None):
+    adb(['install', "%s/%s" % (path, package)], device)
 
 def pmInstallPackage(packagePath, package, device=None):
     adb(['shell', 'pm', 'install', '/sdcard/%s' % package.replace(" ", "\ ")], device)
