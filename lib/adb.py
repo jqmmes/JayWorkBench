@@ -2,7 +2,7 @@
 #!/usr/bin/python3
 import subprocess
 from time import sleep, time, ctime
-from re import match
+from re import match, findall
 import os
 import threading
 import concurrent.futures
@@ -181,7 +181,7 @@ def getWifiDeviceNameByIp(device_ip, retries=5):
         sleep(1)
         return getWifiDeviceNameByIp(device_ip, retries-1)
 
-def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", range_min=0, range_max=256):
+def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", range_min=2, range_max=256):
     repeats = 3
     while(repeats > 0):
         devices_raw = adb(['devices']).split('\n')[1:]
@@ -194,6 +194,7 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
         else:
             close()
             init()
+        repeats -= 1
     devices = []
     for dev in devices_raw:
         splitted = dev.split('\t')
@@ -234,6 +235,7 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
                 if not new_device.connected_usb:
                     new_device.connected_usb = getADBStatus(new_device)[0]
                 devices.append(new_device)
+                screenOn(new_device)
                 log("NEW_DEVICE\t{} ({})\tUSB: {}\tWIFI: {}".format(new_device.name, new_device.ip, new_device.connected_usb, new_device.connected_wifi), "ACTION")
     if discover_wifi:
         log("DISCOVERING_WIFI_DEVICES", "ACTION")
@@ -242,6 +244,7 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", ra
         for ip in network_devices:
             new_device = Device(getWifiDeviceNameByIp(ip), ip=ip, status=True, wifi=True, usb=False)
             new_device.connected_usb = getADBStatus(new_device)[0]
+            screenOn(new_device)
             log("NEW_DEVICE\t{} ({})\tUSB: {}\tWIFI: {}".format(new_device.name, new_device.ip, new_device.connected_usb, new_device.connected_wifi), "ACTION")
             if (getBatteryLevel(new_device) >= minBattery):
                 devices.append(new_device)
@@ -251,7 +254,7 @@ COUNTER = 0
 
 def ping_thread(hostname, network_devices=[], lock=None):
     global COUNTER
-    response = subprocess.run(['ping', '-t 1', '-c 5', hostname], stdout=FNULL, stderr=FNULL)
+    response = subprocess.run(['ping', '-t 5', '-c 5', hostname], stdout=FNULL, stderr=FNULL)
     #and then check the response..
     if response.returncode == 0 and lock.acquire(timeout=2):
         network_devices.append(hostname)
@@ -260,18 +263,22 @@ def ping_thread(hostname, network_devices=[], lock=None):
         COUNTER -= 1
         lock.release()
 
+def getIgnoredIps():
+    try:
+        return open("device.ignore", "r").read().split("\n")
+    except:
+        return []
+
 def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, ignore_list=[]):
     global COUNTER
     devices = []
-    COUNTER = range_max - range_min
     network_devices = []
-    ping_lock = threading.Lock()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=40) as executor:
-        for n in range(range_min, range_max):
-            executor.submit(ping_thread, ip_mask.format(n), network_devices, ping_lock)
-        while COUNTER > 0:
-            sleep(1)
+    ignored = getIgnoredIps()
+    response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "-T3"], stdout=subprocess.PIPE, stderr=FNULL)
+    network_devices = findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8"))
     for host in network_devices:
+        if host in ignored:
+            continue
         add_host = True
         for ignore in ignore_list:
             if host == ignore.ip:
@@ -388,6 +395,13 @@ def removePackage(package=LAUNCHER_APP, device=None):
     adb(['shell', 'pm', 'clear', package], device)
     adb(['shell', 'pm', 'reset-permissions', package], device)
     uninstallPackage(device)
+
+def grantPermission(permission, package=LAUNCHER_APP, device=None):
+    adb(['shell', 'pm', 'grant', package, permission], None)
+
+def grantedPermissions(package=LAUNCHER_APP, device=None):
+    result = adb(['shell', 'dumpsys', 'package', package])
+    return findall("\s+(\w+\.\w+\.\w+): granted=true", result)
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
     instances = gcloud(['compute', 'instances', 'list']).split('\n')

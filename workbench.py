@@ -14,7 +14,6 @@ from datetime import datetime
 import argparse
 from collections import deque
 from func_timeout import func_timeout, FunctionTimedOut, func_set_timeout
-#from meross_iot.cloud.devices.power_plugs import GenericPlug
 from meross_iot.manager import MerossManager
 from meross_iot.http_api import MerossHttpClient
 import json
@@ -44,25 +43,26 @@ async def merros_init():
     merross_http_manager = http_api_client = await MerossHttpClient.async_from_user_password(email=user_info["user"], password=user_info["pass"])
     manager = MerossManager(merross_http_manager)
     manager.start()
-    #PLUGS = manager.get_devices_by_kind(GenericPlug)
 
-def power_on(plug=0):
-    if len(PLUGS) > 0:
-        PLUGS[plug].turn_on()
-        return True
-    return False
+def readIFTTTKey():
+    try:
+        return open("ifttt.key", "r").read().strip("\n")
+    except:
+        return ""
 
-def is_power_on(plug=0):
-    if len(PLUGS) > 0:
-        return PLUGS[plug].get_state()
-    return False
+def power_on(smart_plug):
+    ifttt_key = readIFTTTKey()
+    if (ifttt_key == ""):
+        return False
+    subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20on/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
+    return True
 
-def power_off(plug=0):
-    if len(PLUGS) > 0:
-        PLUGS[plug].turn_off()
-        return True
-    return False
-
+def power_off(smart_plug):
+    ifttt_key = readIFTTTKey()
+    if (ifttt_key == ""):
+        return False
+    subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20off/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
+    return True
 
 @func_set_timeout(1)
 def write_to_file(f, str, end):
@@ -560,23 +560,11 @@ def runExperiment(experiment):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
                 if USE_SMART_PLUGS:
                     if (experiment.power_devices):
-                        power_on()
-                        i = 0
-                        while ((not is_power_on()) and i < 5):
-                            sleep(1 + i)
-                            power_on()
-                            i+=1
-                            if (i == 5 and (not is_power_on())):
-                                experiment.setFail()
+                        if (not power_on(experiment.smart_plug)):
+                            experiment.setFail()
                     else:
-                        power_off()
-                        i = 0
-                        while (is_power_on() and i < 5):
-                            sleep(1 + i)
-                            power_off()
-                            i+=1
-                            if (i == 5 and is_power_on()):
-                                experiment.setFail()
+                        if (not power_off(experiment.smart_plug)):
+                            experiment.setFail()
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
                         Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
@@ -631,13 +619,8 @@ def runExperiment(experiment):
         if (repetition != experiment.repetitions - 1):
             log("Waiting 5s for next repetition")
             sleep(5)
-    if (not is_power_on()):
-        power_on()
-        i = 0
-        while ((not is_power_on()) and i < 5):
-            sleep(1 + i)
-            power_on()
-            i+=1
+    if USE_SMART_PLUGS:
+        power_on(experiment.smart_plug)
 
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
@@ -942,6 +925,7 @@ class Experiment:
     task_executor_settings = None
     custom_executors = None
     power_devices = True
+    smart_plug = "SHP7"
     settings = {}
 
     def __init__(self, name):
@@ -1101,6 +1085,8 @@ def readConfig(confName):
             elif option == "powerdevices":
                 if config[section][option].lower() == "false":
                     experiment.power_devices = False
+            elif option == "smartplug":
+                experiment.smart_plug = config[section][option]
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1147,6 +1133,7 @@ def help():
                     TaskExecutorSettings    = Set Task Executor settings (setting: value;...) [LIST]
                     CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices/setting:value;setting:value, ... [LIST]
                     powerDevices            = Power devices though experiment or not [BOOL] (Default True)
+                    SmartPlug               = Name of smart plug SHP7/Meross [STR] (Default SHP7)
 
         Models:
             Tensorflow:
@@ -1342,6 +1329,29 @@ def checkInterfaces():
             log("\t[*] {}".format(iface))
     log("==========================================================================================")
 
+def installPackage(device):
+    log('CLEANING_SYSTEM\t%s' % device.name)
+    adb.uninstallPackage(device=device)
+    log('PACKAGE_UNINSTALLED\t%s' % device.name)
+    adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
+    log('PACKAGE_PUSHED\t%s' % device.name)
+    adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
+    log('PACKAGE_INSTALLED\t%s' % device.name)
+    permissions = ["android.permission.INTERNET", "android.permission.READ_PHONE_STATE",
+    "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.FOREGROUND_SERVICE", "android.permission.PACKAGE_USAGE_STATS",
+    "android.permission.ACCESS_NETWORK_STATE", "android.permission.BLUETOOTH",
+    "android.permission.ACCESS_FINE_LOCATION"]
+    for perminssion in permissions:
+        if permission not in adb.grantedPermissions(device=device):
+            adb.grantPermission(permission, device=device)
+            if permission in adb.grantedPermissions(device=device):
+                log('GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
+            else:
+                log('GRANT_PERMISSION_FAIL: ' + permission + '\t%s' % device.name)
+        else:
+            log('ALREADY_GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
+
 def main():
     global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS
 
@@ -1419,12 +1429,7 @@ def main():
     if args.install:
         log('INSTALLING_APKS')
         for device in ALL_DEVICES:
-            adb.uninstallPackage(device=device)
-            log('PACKAGE_UNINSTALLED\t%s' % device.name)
-            adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
-            log('PACKAGE_PUSHED\t%s' % device.name)
-            adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
-            log('PACKAGE_INSTALLED\t%s' % device.name)
+            installPackage(device)
     if args.debug_grpc:
         grpcControls.grpcLogs.debug = True
         grpcControls.grpcLogs.log_file = LOG_FILE
@@ -1437,13 +1442,7 @@ def main():
         adb.screenOff(device)
         if not adb.checkPackageInstalled(device=device):
             log('PACKAGE_MISSING\t%s' % device.name)
-            log('CLEANING_SYSTEM\t%s' % device.name)
-            adb.uninstallPackage(device=device)
-            log('PUSHING_PACKAGE\t%s' % device.name)
-            adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
-            log('INSTALLING_PACKAGE\t%s' % device.name)
-            adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
-            log('PACKAGE_INSTALLED\t%s' % device.name)
+            installPackage(device)
         if args.reboot_devices:
             adb.rebootAndWait(device)
     for cfg in args.configs:
