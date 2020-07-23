@@ -8,6 +8,7 @@ import platform
 import threading
 import concurrent.futures
 from sys import stdout
+import socket
 
 JAY_SERVICE_PACKAGE = 'pt.up.fc.dcc.hyrax.jay'
 LAUNCHER_APP = 'pt.up.fc.dcc.hyrax.jay_droid_launcher'
@@ -154,6 +155,15 @@ def getADBStatus(device, log_command=True):
                 connected_usb = True
     return (connected_usb, connected_wifi)
 
+def isADBWiFiHostOffline(host, log_command=True):
+    devices_raw = adb(['devices'], log_command=log_command).split('\n')[1:]
+    for raw_device in devices_raw:
+        splitted = raw_device.split('\t')
+        if len(splitted) > 1:
+            if splitted[0] == "%s:5555" % host and splitted[1] == 'offline':
+                return True
+    return False
+
 def isADBWiFiOffline(device, log_command=True):
     devices_raw = adb(['devices'], log_command=log_command).split('\n')[1:]
     for raw_device in devices_raw:
@@ -216,7 +226,14 @@ def getWifiDeviceNameByIp(device_ip, retries=5):
         sleep(1)
         return getWifiDeviceNameByIp(device_ip, retries-1)
 
-def listDevices(minBattery = 15, discover_wifi=False, ip_mask="192.168.1.{}", range_min=2, range_max=256):
+def getLocalIpMask():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    local_ip = s.getsockname()[0]
+    s.close()
+    return "%s.{}" % local_ip[:local_ip.rfind('.')]
+
+def listDevices(minBattery = 15, discover_wifi=False, ip_mask=getLocalIpMask(), range_min=2, range_max=256):
     repeats = 3
     while(repeats > 0):
         devices_raw = adb(['devices']).split('\n')[1:]
@@ -302,7 +319,7 @@ def getIgnoredIps():
     except:
         return []
 
-def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, ignore_list=[]):
+def discoverWifiADBDevices(ip_mask=getLocalIpMask(), range_min=0, range_max=256, ignore_list=[]):
     global COUNTER
     devices = []
     network_devices = []
@@ -331,14 +348,15 @@ def discoverWifiADBDevices(ip_mask="192.168.1.{}", range_min=0, range_max=256, i
             continue
         retries = 3
         while retries > 0:
+            retries -= 1
             log("CONNECTING_TO_DEVICE\t%s" % host, "ACTION")
             status = adb(['connect', "{}:5555".format(host)])
-            if (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
+            if isADBWiFiHostOffline(host) and retries > 0:
+                adb(['disconnect', "{}:5555".format(host)])
+            elif (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
                 devices.append(host)
                 break
-            else:
-                sleep(2)
-            retries -= 1
+            sleep(2)
     return devices
 
 def mkdir(path='Android/data/'+LAUNCHER_APP+'/files/', basepath='/sdcard/', device=None):
@@ -386,15 +404,18 @@ def pullSystemLog(device=None, path=""):
         log.write(adb(['logcat', '-d'], device))
         log.close()
 
+def hasScreenOn(device = None):
+    status = adb(['shell', 'dumpsys', 'power'], device)
+    return (status.find('Display Power: state=OFF') == -1)
+
 def screenOn(device = None, retries = 10):
     #adb(['shell', 'input', 'keyevent', 'KEYCODE_WAKEUP'], device)
     if retries <= 0:
         return
     status = adb(['shell', 'dumpsys', 'power'], device)
     if (status.find('Display Power: state=OFF') != -1):
-        timed_out = adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device, timeout = 3)
+        timed_out = adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device, timeout = 2)
         if timed_out:
-            sleep(2)
             return screenOn(device, retries - 1)
 
 
@@ -434,6 +455,14 @@ def init():
 
 def close():
     adb(['kill-server'])
+
+def killAll():
+    result = subprocess.run(["pgrep", "adb"], stdout=subprocess.PIPE, stderr=FNULL)
+    for proc in result.stdout.decode("UTF-8").split("\n"):
+        try:
+            subprocess.run(["kill", "-9", proc], stdout=FNULL, stderr=FNULL)
+        except:
+            continue
 
 def checkPackageInstalled(package=LAUNCHER_APP, device=None):
     return (package in adb(['shell', 'pm', 'list', 'packages'], device))

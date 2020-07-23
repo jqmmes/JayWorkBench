@@ -50,14 +50,14 @@ def readIFTTTKey():
     except:
         return ""
 
-def power_on(smart_plug):
+def power_on(smart_plug="SHP7"):
     ifttt_key = readIFTTTKey()
     if (ifttt_key == ""):
         return False
     subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20on/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
     return True
 
-def power_off(smart_plug):
+def power_off(smart_plug="SHP7"):
     ifttt_key = readIFTTTKey()
     if (ifttt_key == ""):
         return False
@@ -291,7 +291,6 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         if (asset not in files_on_device):
             adb.pushFile(experiment.assets, asset, device=device)
             files_on_device.append(asset)
-    adb.screenOn(device)
     adb.setBrightness(device, SCREEN_BRIGHTNESS)
     adb.clearSystemLog(device)
     log("STOP_ALL_SERVICE\t%s" % device.name)
@@ -553,13 +552,9 @@ def runExperiment(experiment):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
-                if USE_SMART_PLUGS:
-                    if (experiment.power_devices):
-                        if (not power_on(experiment.smart_plug)):
-                            experiment.setFail()
-                    else:
-                        if (not power_off(experiment.smart_plug)):
-                            experiment.setFail()
+
+                for device in ALL_DEVICES:
+                    forceScreenOnViaPower(device)
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
                         Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
@@ -568,6 +563,16 @@ def runExperiment(experiment):
                     producers -= 1 # Os primeiros n devices é que produzem conteudo
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
+                if USE_SMART_PLUGS:
+                    if (experiment.power_devices):
+                        if (not power_on(experiment.smart_plug)):
+                            experiment.setFail()
+                    else:
+                        if (not power_off(experiment.smart_plug)):
+                            experiment.setFail()
+                for device in ALL_DEVICES:
+                    if device not in experiment_devices[:experiment.devices]:
+                        adb.screenOff(device)
 
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
@@ -1064,7 +1069,7 @@ def readConfig(confName):
                 experiment.task_executor = config[section][option]
             elif option == "customexecutors":
                 custom_executors = CustomExecutors()
-                for entry in config[section][option].split(','):
+                for entry in config[section][option].split(';'):
                     executor_model_device_number = entry.split("/")
                     if len(executor_model_device_number) != 5:
                         log("INVALID CUSTOM_EXECUTOR {}".format(entry))
@@ -1325,7 +1330,7 @@ def checkInterfaces():
     log("==========================================================================================")
 
 def installPackage(device):
-    adb.screenOn(device)
+    forceScreenOnViaPower(device)
     log('CLEANING_SYSTEM\t%s' % device.name)
     adb.uninstallPackage(device=device)
     log('PACKAGE_UNINSTALLED\t%s' % device.name)
@@ -1351,6 +1356,14 @@ def installPackage(device):
             log('ALREADY_GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
     adb.screenOff(device)
 
+def forceScreenOnViaPower(device=None):
+    if USE_SMART_PLUGS  and not adb.hasScreenOn(device) and not device.connected_usb and device.connected_wifi:
+        power_off()
+        sleep(2)
+        power_on()
+        sleep(1)
+    adb.screenOn(device)
+
 def main():
     global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS
 
@@ -1370,9 +1383,14 @@ def main():
     argparser.add_argument('-sp', '--smart-plug', default=False, action='store_true', required=False)
     argparser.add_argument('-u', '--force-usb', default=False, action='store_true', required=False)
     argparser.add_argument('-b', '--brightness', action='store', required=False)
-
+    argparser.add_argument('-on', '--screen-on', default=False, action='store_true', required=False)
+    argparser.add_argument('-off', '--screen-off', default=False, action='store_true', required=False)
 
     args = argparser.parse_args()
+
+    if args.show_help:
+        help()
+        return
 
     now = datetime.now()
     experiment_name = "exp_{}{:02d}{:02d}_{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
@@ -1418,13 +1436,39 @@ def main():
                 adb.LOG_LEVEL = "ALL"
     if args.force_usb:
         adb.FORCE_USB = True
+
+    adb.close()
+    adb.killAll()
+    adb.init()
+    sleep(2)
+
+    if args.wifi or args.ip_mask:
+        power_off()
+        sleep(2)
+        power_on()
+        sleep(2)
     if args.ip_mask:
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=True, ip_mask=args.ip_mask)
     else:
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=args.wifi)
-    if args.show_help:
-        help()
-        return
+    log("============\tDEVICES\t============")
+    for device in ALL_DEVICES:
+        log("{} ({})".format(device.name, device.ip))
+    if args.reboot_devices:
+        for device in ALL_DEVICES:
+            forceScreenOnViaPower(device)
+            sleep(1)
+            adb.rebootAndWait(device)
+    if args.screen_off:
+        for device in ALL_DEVICES:
+            adb.screenOff(device)
+    if args.screen_on:
+        for device in ALL_DEVICES:
+            forceScreenOnViaPower(device)
+    devices_with_screen_off = []
+    for device in ALL_DEVICES:
+        if not adb.hasScreenOn(device):
+            devices_with_screen_off.append(device)
     if args.install:
         log('INSTALLING_APKS')
         for device in ALL_DEVICES:
@@ -1433,20 +1477,21 @@ def main():
         grpcControls.grpcLogs.debug = True
         grpcControls.grpcLogs.log_file = LOG_FILE
         grpcControls.grpcLogs.lock = LOGS_LOCK
-    log("============\tDEVICES\t============")
-    for device in ALL_DEVICES:
-        log("{} ({})".format(device.name, device.ip))
-    log("===================================")
-    for device in ALL_DEVICES:
-        log("CHECKING_PACKAGE\t%s" % device.name)
-        if not adb.checkPackageInstalled(device=device):
-            log('PACKAGE_MISSING\t%s' % device.name)
-            installPackage(device)
-        if args.reboot_devices:
-            adb.rebootAndWait(device)
     for cfg in args.configs:
         readConfig(cfg)
         shutil.copy(cfg, "{}/{}.loaded".format(loaded_experiments,cfg.split("/")[-1]))
+    if len(EXPERIMENTS) > 0 or len(SCHEDULED_EXPERIMENTS) > 0:
+        log("===================================")
+        for device in ALL_DEVICES:
+            log("CHECKING_PACKAGE\t%s\t" % device.name, end="")
+            forceScreenOnViaPower(device)
+            if not adb.checkPackageInstalled(device=device):
+                log('MISSING')
+                installPackage(device)
+            else:
+                log('FOUND')
+    for device in devices_with_screen_off:
+        adb.screenOff(device)
     #EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
 
     if args.use_curses and not args.use_stdout:
