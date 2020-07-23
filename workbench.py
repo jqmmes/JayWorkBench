@@ -392,7 +392,6 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
-    adb.screenOff(device)
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
         log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
