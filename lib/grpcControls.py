@@ -311,13 +311,13 @@ class jayClient:
         self.brokerStubStatus = status
 
     @func_set_timeout(15)
-    def connectBrokerService(self, retries=5):
+    def connectBrokerService(self, port="45923", retries=5):
         try:
-            self.brokerChannel = grpc.insecure_channel('%s:50051' % self.ip)
+            self.brokerChannel = grpc.insecure_channel('%s:%s' % (self.ip, port))
             self.brokerStub = JayProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
             sleep(1)
             self.brokerStubReady()
-            log("%s (%s) connectBrokerService" % (self.name, self.ip))
+            log("%s (%s) connectBrokerService(port=%s)" % (self.name, self.ip, port))
         except:
             sleep(5)
             if (retries-1 > 0):

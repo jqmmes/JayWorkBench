@@ -31,7 +31,8 @@ def getOs():
     else:
         return ""
 
-ADB_BIN = "{}/lib/adb/{}/adb".format(os.getcwd(), getOs())
+#ADB_BIN = "{}/lib/adb/{}/adb".format(os.getcwd(), getOs())
+ADB_BIN = "adb"
 
 class Device:
     name = ""
@@ -181,15 +182,20 @@ def connectWifiADB(device, retries=3, force_connection=True):
         if (not match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", probable_ip)):
             return (device, False)
         device.ip = probable_ip
-    log("ADB_CONNECT_WIFI_ADB\t{} ({})".format(device.name, device.ip), "ACTION")
-    status = adb(['connect', "%s:5555" % device.ip])
-    if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
-        device.connected_wifi = True
+    log("CONECTING_ADB_WIFI\t{} ({})".format(device.name, device.ip), "ACTION")
+    _, device.connected_wifi = getADBStatus(device, log_command=False)
+    if not device.connected_wifi:
+        status = adb(['connect', "%s:5555" % device.ip])
+        if (status == "connected to %s:5555\n" % device.ip) or (status == "already connected to %s:5555\n" % device.ip):
+            device.connected_wifi = True
     if not force_connection:
         if device.connected_wifi:
+            log("ADB_WIFI_CONECTED\t{} ({})".format(device.name, device.ip), "ACTION")
             return (device, True)
+        log("ADB_WIFI_CONECTION_FAILED\t{} ({})".format(device.name, device.ip), "ACTION")
         return (device, False)
     else:
+
         if device.connected_wifi:
             for x in range(3):
                 force_usb, connected = getADBStatus(device, log_command=False)
@@ -326,7 +332,8 @@ def discoverWifiADBDevices(ip_mask=getLocalIpMask(), range_min=0, range_max=256,
     ignored = getIgnoredIps()
     reps = 2
     while (reps > 0):
-        response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
+        #response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
+        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
         for entry in findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8")):
             if entry not in network_devices:
                 network_devices.append(entry)

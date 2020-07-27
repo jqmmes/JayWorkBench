@@ -9,6 +9,8 @@ import shutil
 import configparser
 from sys import argv, stdout
 import sys
+import socket
+import struct
 import subprocess
 from datetime import datetime
 import argparse
@@ -318,24 +320,49 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         jay_instance = grpcControls.jayClient(worker_ip, device.name)
         droid_launcher.connectLauncherService()
         droid_launcher.setLogName(experiment.name)
+        log("CONECTED_TO_LAUNCHER\t%s" % device.name)
+        sleep(10)
         if is_worker:
             droid_launcher.startWorker()
         droid_launcher.startScheduler()
-        jay_instance.connectBrokerService()
-        sleep(2)
     except FunctionTimedOut:
        log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
        error = True
     except Exception:
        log("Error Starting Worker %s" % device.name)
        error = True
+    '''
+    multicast_group = '224.0.0.1'
+    server_address = (multicast_group, 50000)
+    # Create the socket
+    addrinfo = socket.getaddrinfo(multicast_group, None)[0]
+    s = socket.socket(addrinfo[0], socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(('', 50000))
+    group_bin = socket.inet_pton(addrinfo[0], addrinfo[4][0])
+    if addrinfo[0] == socket.AF_INET: # IPv4
+        mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
+        s.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    while True:
+        print("waiting")
+        data, sender = s.recvfrom(1500)
+        while data[-1:] == '\0': data = data[:-1] # Strip trailing \0's
+        print (str(sender) + '  ' + repr(data))
+    '''
+    jay_instance.connectBrokerService()
+    sleep(2)
+    '''except FunctionTimedOut:
+       log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
+       error = True
+    except Exception:
+       log("Error Starting Worker %s" % device.name)
+       error = True'''
     if error:
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
         if jay_instance is not None:
             destroyWorker(jay_instance, droid_launcher, device)
         return
-
 
     jay_instance.setSettings(experiment.settings) if experiment.settings else None
     selectTaskExecutor(experiment, jay_instance, custom_task_executor) if is_worker else None
@@ -1255,13 +1282,13 @@ def help():
             OS Specific Problems/Fixes:
                 MacOS:
                     Too Many Open Files:
+                        ulimit -n 10240
+                        
                         sysctl kern.maxfiles
                         sysctl kern.maxfilesperproc
 
                         sysctl -w kern.maxfiles=40480
                         sysctl -w kern.maxfilesperproc=30000
-
-                        ulimit -S -n 30048
         ================================================ HELP ================================================''')
 
 def logExperiment(conf, experiment):
