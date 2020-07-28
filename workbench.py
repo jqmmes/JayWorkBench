@@ -1283,7 +1283,7 @@ def help():
                 MacOS:
                     Too Many Open Files:
                         ulimit -n 10240
-                        
+
                         sysctl kern.maxfiles
                         sysctl kern.maxfilesperproc
 
@@ -1390,6 +1390,21 @@ def forceScreenOnViaPower(device=None):
         sleep(1)
     adb.screenOn(device)
 
+def fixULimit():
+    if adb.getOs() == "mac":
+        result = subprocess.run(["ulimit", "-n"], stdout=subprocess.PIPE, stderr=FNULL)
+        log("CURRENT_ULIMIT:\t%s" % result.stdout.decode('UTF-8').strip("\n"))
+        if int(result.stdout.decode('UTF-8')) < 10240:
+            log("SETTING_ULIMIT:\t10240")
+            subprocess.run(["ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
+            subprocess.run(["sudo", "ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
+
+def shutdownDevice(device=None, barrier=None):
+    log("SHUTING_DOWN:\t%s (%s)" % (device.name, device.ip))
+    adb.shutdown(device)
+    log("SHUT_DOWN_COMPLETE:\t%s (%s)" % (device.name, device.ip))
+    barrier.wait()
+
 def main():
     global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS
 
@@ -1411,6 +1426,9 @@ def main():
     argparser.add_argument('-b', '--brightness', action='store', required=False)
     argparser.add_argument('-on', '--screen-on', default=False, action='store_true', required=False)
     argparser.add_argument('-off', '--screen-off', default=False, action='store_true', required=False)
+    argparser.add_argument('-sd', '--shutdown', default=False, action='store_true', required=False)
+    argparser.add_argument('-po', '--power-on', default=False, action='store_true', required=False)
+    argparser.add_argument('-poff', '--power-off', default=False, action='store_true', required=False)
 
     args = argparser.parse_args()
 
@@ -1446,6 +1464,13 @@ def main():
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
 
+    if args.power_on:
+        power_on()
+        return
+    if args.power_off:
+        power_off()
+        return
+
     if args.wifi:
         log("Searching for devices [USB/WIFI]...")
     else:
@@ -1477,9 +1502,20 @@ def main():
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=True, ip_mask=args.ip_mask)
     else:
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=args.wifi)
-    log("============\tDEVICES\t============")
+    log("============\t%d DEVICES\t============" % len(ALL_DEVICES))
     for device in ALL_DEVICES:
         log("{} ({})".format(device.name, device.ip))
+    if args.shutdown:
+        for device in ALL_DEVICES:
+            forceScreenOnViaPower(device)
+            sleep(1)
+        power_off()
+        shutdownBarrier = Barrier(len(ALL_DEVICES)+1)
+        for device in ALL_DEVICES:
+            Thread(target = shutdownDevice, args=(device,shutdownBarrier)).start()
+            sleep(5)
+        shutdownBarrier.wait()
+        return
     if args.reboot_devices:
         for device in ALL_DEVICES:
             forceScreenOnViaPower(device)
@@ -1507,6 +1543,7 @@ def main():
         readConfig(cfg)
         shutil.copy(cfg, "{}/{}.loaded".format(loaded_experiments,cfg.split("/")[-1]))
     if len(EXPERIMENTS) > 0 or len(SCHEDULED_EXPERIMENTS) > 0:
+        fixULimit()
         log("===================================")
         for device in ALL_DEVICES:
             log("CHECKING_PACKAGE\t%s\t" % device.name, end="")

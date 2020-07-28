@@ -333,13 +333,14 @@ def discoverWifiADBDevices(ip_mask=getLocalIpMask(), range_min=0, range_max=256,
     reps = 2
     while (reps > 0):
         #response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
-        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
+        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(2) + "-60"], stdout=subprocess.PIPE, stderr=FNULL)
         for entry in findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8")):
             if entry not in network_devices:
                 network_devices.append(entry)
         reps -= 1
-        sleep(3)
+        sleep(2)
     for host in network_devices:
+        log("NETWORK_DEVICE:\t%s" % host, "ACTION")
         if host in ignored + ignore_list:
             continue
         add_host = True
@@ -359,7 +360,7 @@ def discoverWifiADBDevices(ip_mask=getLocalIpMask(), range_min=0, range_max=256,
             log("CONNECTING_TO_DEVICE\t%s" % host, "ACTION")
             status = adb(['connect', "{}:5555".format(host)])
             if isADBWiFiHostOffline(host) and retries > 0:
-                adb(['disconnect', "{}:5555".format(host)])
+                adb(['reconnect', 'offline'])
             elif (status == "connected to {}:5555\n".format(host)) or (status == "already connected to {}:5555\n".format(host)):
                 devices.append(host)
                 break
@@ -544,6 +545,9 @@ def getDeviceIp(device, timeout=10):
             return ip
         sleep(2)
     return ""
+
+def shutdown(device=None, force_usb=False):
+    adb(['shell', 'reboot', '-p'], device, force_usb)
 
 def rebootAndWait(device, timeout=300, connectWifi=False, force_usb=False):
     start_time = time()
