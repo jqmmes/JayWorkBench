@@ -37,7 +37,8 @@ LOGS_LOCK = Lock()
 REBOOT_ON_RUN_EXPERIMENT = False
 USE_SMART_PLUGS = False
 SCREEN_BRIGHTNESS = 0
-
+LOG_PULL_LOCK = Lock()
+SYS_LOG_PULL_LOCK = Lock()
 PLUGS = []
 
 async def merros_init():
@@ -426,19 +427,29 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         return
     try:
         if (experiment.isOK()):
-            log("PULLING_LOG\t%s\tLOG" % device.name)
-            adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
-            log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
+            global LOG_PULL_LOCK
+            LOG_PULL_LOCK.acquire()
+            try:
+                log("PULLING_LOG\t%s\tLOG" % device.name)
+                adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+                log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
+            finally:
+                LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
         experiment.setFail()
         experiment.deviceFail(device.name)
     try:
-        log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
-        system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
-        os.makedirs(system_log_path, exist_ok=True)
-        adb.pullSystemLog(device, system_log_path)
-        log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
+        global SYS_LOG_PULL_LOCK
+        SYS_LOG_PULL_LOCK.acquire()
+        try:
+            log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
+            system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
+            os.makedirs(system_log_path, exist_ok=True)
+            adb.pullSystemLog(device, system_log_path)
+            log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
+        finally:
+            SYS_LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tSYS_LOG\tERROR" % device.name)
         experiment.deviceFail(device.name)
@@ -645,8 +656,12 @@ def runExperiment(experiment):
         if (repetition != experiment.repetitions - 1):
             log("Waiting 5s for next repetition")
             sleep(5)
+    log("FINISHING_EXPERIMENT\t%s" % experiment.name)
     if USE_SMART_PLUGS:
         power_on(experiment.smart_plug)
+        sleep(2)
+        for device in ALL_DEVICES:
+            adb.screenOff(device)
 
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
