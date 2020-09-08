@@ -9,6 +9,7 @@ import threading
 import concurrent.futures
 from sys import stdout
 import socket
+from func_timeout import func_set_timeout
 
 JAY_SERVICE_PACKAGE = 'pt.up.fc.dcc.hyrax.jay'
 LAUNCHER_APP = 'pt.up.fc.dcc.hyrax.jay_droid_launcher'
@@ -17,6 +18,7 @@ LAUNCHER_SERVICE = 'pt.up.fc.dcc.hyrax.droid_jay_app.DroidJayLauncherService'
 BROKER = '.services.BrokerAndroidService'
 SCHEDULER = '.services.SchedulerAndroidService'
 WORKER = '.services.WorkerAndroidService'
+PROFILER = '.services.ProfilerAndroidService'
 DEBUG = False
 ADB_DEBUG_FILE = stdout
 ADB_LOGS_LOCK = None
@@ -256,7 +258,21 @@ def listDevices(minBattery = 15, discover_wifi=False, ip_mask=getLocalIpMask(), 
     devices = []
     for dev in devices_raw:
         splitted = dev.split('\t')
-        if (len(splitted) > 1 and splitted[1] == 'device'):
+        if (len(splitted) > 1 and (splitted[1] == 'device' or splitted[1] == 'authorizing' or splitted[1] == 'offline')):
+            if splitted[1] == 'authorizing':
+                sleep(2)
+                skip = False
+                for sdev in adb(['devices']).split('\n')[1:]:
+                    if sdev.split('\t')[0] == splitted[0]:
+                        if sdev.split('\t')[1] == "offline":
+                            splitted[1] = "offline"
+                        if sdev.split('\t')[1] != "device":
+                            skip = True
+                        break
+                if skip:
+                    continue
+            if splitted[1] == 'offline':
+                adb(["reconnect", "offline"])
             # Test if its an ip address
             is_ip = False
             name = splitted[0]
@@ -426,11 +442,13 @@ def screenOn(device = None, retries = 10):
         if timed_out:
             return screenOn(device, retries - 1)
 
-
 def screenOff(device = None):
     status = adb(['shell', 'dumpsys', 'power'], device)
     if (status.find('Display Power: state=ON') != -1):
         adb(['shell', 'input', 'keyevent', 'KEYCODE_POWER'], device)
+
+def tapScreen(device = None):
+    adb(['shell', 'input', 'tap', '300', '300'], device)
 
 def startService(service, package=JAY_SERVICE_PACKAGE, device=None, wait=False, timeout=120): # 2mins timeout
     adb(['shell', 'am', 'startservice', "%s/%s" % (package, service)], device)
@@ -456,11 +474,13 @@ def stopAll(device=None):
     forceStopApplication(LAUNCHER_APP, device=device)
     stopService("%s%s" % (JAY_SERVICE_PACKAGE, WORKER), JAY_SERVICE_PACKAGE, device)
     stopService("%s%s" % (JAY_SERVICE_PACKAGE, SCHEDULER), JAY_SERVICE_PACKAGE, device)
+    stopService("%s%s" % (JAY_SERVICE_PACKAGE, PROFILER), JAY_SERVICE_PACKAGE, device)
     stopService("%s%s" % (JAY_SERVICE_PACKAGE, BROKER), JAY_SERVICE_PACKAGE, device)
 
 def init():
     adb(['start-server'])
 
+@func_set_timeout(5)
 def close():
     adb(['kill-server'])
 

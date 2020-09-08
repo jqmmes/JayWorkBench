@@ -37,8 +37,16 @@ LOGS_LOCK = Lock()
 REBOOT_ON_RUN_EXPERIMENT = False
 USE_SMART_PLUGS = False
 SCREEN_BRIGHTNESS = 0
-
+LOG_PULL_LOCK = Lock()
+SYS_LOG_PULL_LOCK = Lock()
+LOG_PULL_SCREEN_ON_FLAG = True
+LOG_PULL_SCREEN_ON_LOCK = Lock()
+TAP_TO_KEEP_SCREEN_ON_FLAG = True
+TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS = 120
 PLUGS = []
+IDLE_BENCHMARK = False
+IDLE_BENCHMARK_DURATION = 1200 # 20mins
+
 
 async def merros_init():
     user_info = json.loads(open("meross.json", "r").read())
@@ -67,21 +75,27 @@ def power_off(smart_plug="SHP7"):
     return True
 
 @func_set_timeout(1)
-def write_to_file(f, str, end):
-    f.write(ctime()+"\t"+str+end)
+def write_to_file(f, str, end, show_date=True):
+    if show_date:
+        f.write(ctime()+"\t"+str+end)
+    else:
+        f.write(str+end)
     f.flush()
 
-def log(str, end="\n"):
+def log(str, end="\n", show_date=True):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
     try:
-        write_to_file(LOG_FILE,str,end)
+        write_to_file(LOG_FILE,str,end,show_date)
     except:
         pass
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
     elif LOG_FILE.name != "<stdout>":
-        print(ctime()+"\t"+str, end=end)
+        if show_date:
+            print(ctime()+"\t"+str, end=end)
+        else:
+            print(str, end=end)
 
 def write_curses_logs():
     global CURSES_LOGS, CURSES_LOGS_LOCK
@@ -246,8 +260,16 @@ def selectModel(experiment, jay_instance, custom_model):
             return True
     return False
 
+def keepScreenOn(device=None):
+    global TAP_TO_KEEP_SCREEN_ON_FLAG, TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS
+    sleep(TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS)
+    while TAP_TO_KEEP_SCREEN_ON_FLAG:
+        log("TAP_SCREEN\t%s" % device.name)
+        adb.tapScreen(device)
+        sleep(TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS)
+
 def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
-    global PENDING_TASKS, PENDING_WORKERS, SCREEN_BRIGHTNESS
+    global PENDING_TASKS, PENDING_WORKERS, SCREEN_BRIGHTNESS, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
         installPackage(device)
@@ -349,6 +371,13 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         while data[-1:] == '\0': data = data[:-1] # Strip trailing \0's
         print (str(sender) + '  ' + repr(data))
     '''
+    try:
+        forceScreenOnViaPower(device)
+        sleep(2)
+    except:
+        pass
+    Thread(target=keepScreenOn, args=(device,)).start()
+
     jay_instance.connectBrokerService()
     sleep(2)
     '''except FunctionTimedOut:
@@ -399,7 +428,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             destroyWorker(jay_instance, droid_launcher, device)
 
     log("WAIT_ON_BARRIER\tBOOT_BARRIER\t%s" % device.name)
-    if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, device.name, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+    if not barrierWithTimeout(boot_barrier, 500*experiment.devices, experiment, True, device.name, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
@@ -407,38 +436,69 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         calibrateWorkerThread(jay_instance, worker_seed, device)
     log("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
     barrierWithTimeout(start_barrier)
-    i = 0
-    while (i < (len(task_intervals) - 1)  and experiment.isOK() and is_producer):
-        log("NEXT_EVENT_IN\t{}".format(task_intervals[i]))
-        sleep(task_intervals[i])
-        if not experiment.isSequential() or PENDING_TASKS < 1:
-            Thread(target = createTask, args = (jay_instance,asset_list[i])).start()
-        i = i+1
+
+    if is_producer:
+        if experiment.benchmark and len(asset_list) > 0:
+            sleep(2)
+            Thread(target = createTask, args = (jay_instance,asset_list[0])).start()
+        else:
+            i = 0
+            print(IDLE_BENCHMARK)
+            while (i < (len(task_intervals) - 1)  and experiment.isOK() and not IDLE_BENCHMARK):
+                log("NEXT_EVENT_IN\t{}".format(task_intervals[i]))
+                sleep(task_intervals[i])
+                if not experiment.isSequential() or PENDING_TASKS < 1:
+                    Thread(target = createTask, args = (jay_instance,asset_list[i])).start()
+                    i = i+1
+    if experiment.benchmark:
+        sleep(experiment.benchmark_duration)
+    if (IDLE_BENCHMARK):
+        sleep(IDLE_BENCHMARK_DURATION)
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
+    TAP_TO_KEEP_SCREEN_ON_FLAG = False
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
         log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
+    global LOG_PULL_SCREEN_ON_FLAG, LOG_PULL_SCREEN_ON_LOCK
+    LOG_PULL_SCREEN_ON_LOCK.acquire()
+    try:
+        if LOG_PULL_SCREEN_ON_FLAG:
+            forceScreenOnViaPower(device)
+            sleep(2)
+            LOG_PULL_SCREEN_ON_FLAG = False
+    finally:
+        LOG_PULL_SCREEN_ON_LOCK.release()
     try:
         if (experiment.isOK()):
-            log("PULLING_LOG\t%s\tLOG" % device.name)
-            adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
-            log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
+            global LOG_PULL_LOCK
+            LOG_PULL_LOCK.acquire()
+            try:
+                log("PULLING_LOG\t%s\tLOG" % device.name)
+                adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+                log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
+            finally:
+                LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
         experiment.setFail()
         experiment.deviceFail(device.name)
     try:
-        log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
-        system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
-        os.makedirs(system_log_path, exist_ok=True)
-        adb.pullSystemLog(device, system_log_path)
-        log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
+        global SYS_LOG_PULL_LOCK
+        SYS_LOG_PULL_LOCK.acquire()
+        try:
+            log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
+            system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
+            os.makedirs(system_log_path, exist_ok=True)
+            adb.pullSystemLog(device, system_log_path)
+            log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
+        finally:
+            SYS_LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tSYS_LOG\tERROR" % device.name)
         experiment.deviceFail(device.name)
@@ -470,7 +530,7 @@ def cleanLogs(path):
         os.makedirs(path, exist_ok=True)
 
 def runExperiment(experiment):
-    global PENDING_TASKS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES, USE_SMART_PLUGS
+    global PENDING_TASKS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES, USE_SMART_PLUGS, LOG_PULL_SCREEN_ON_FLAG, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
 
     if CURSES:
         CURSES.add_text(1,200,3,text="EXPERIMENT: {}".format(experiment.name))
@@ -485,15 +545,29 @@ def runExperiment(experiment):
     cleanLogs("logs/sys/%s/" % experiment.name)
     ASSETS=os.listdir(experiment.assets)
 
-    #devices = ALL_DEVICES
-    if len(ALL_DEVICES) - len(DEVICE_BLACKLIST) >= experiment.devices:
-        devices_to_test = []
+    log("STOPPING ALL RUNNING INSTANCES IN NETWORK")
+    for dev in ALL_DEVICES:
+        forceScreenOnViaPower(dev)
+        try:
+            adb.stopAll(dev)
+        except:
+            pass
+
+    filtered_devices = []
+    if len(experiment.devices_filter) != 0:
         for dev in ALL_DEVICES:
+            if dev.name in experiment.devices_filter:
+                filtered_devices.append(dev)
+    else:
+        filtered_devices = ALL_DEVICES
+    if len(filtered_devices) - len(DEVICE_BLACKLIST) >= experiment.devices:
+        devices_to_test = []
+        for dev in filtered_devices:
             if dev.name not in DEVICE_BLACKLIST:
                 devices_to_test.append(dev)
         devices = getNeededDevicesAvailable(experiment, devices_to_test)
     else:
-        devices = getNeededDevicesAvailable(experiment, ALL_DEVICES)
+        devices = getNeededDevicesAvailable(experiment, filtered_devices)
     if (len(devices) < experiment.devices):
         os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
@@ -524,6 +598,8 @@ def runExperiment(experiment):
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.repeat_seed):
+            TAP_TO_KEEP_SCREEN_ON_FLAG = True
+            LOG_PULL_SCREEN_ON_FLAG = True
             if CURSES:
                 progressBar_0.updateProgress(int(100*(seed_repeat/experiment.repeat_seed)))
             repeat_tries = 0
@@ -570,23 +646,27 @@ def runExperiment(experiment):
                 servers_finish_barrier = Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
-                producers = experiment.producers
                 workers = experiment.workers
-                i = 0
                 custom_executors_mobile = []
+                i = 0
                 if (experiment.custom_executors is not None and experiment.custom_executors.mobile != None):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
-
                 for device in ALL_DEVICES:
                     forceScreenOnViaPower(device)
+                filtered_producers = []
+                for device in experiment_devices:
+                    if len(filtered_producers) >= experiment.producers:
+                        break
+                    if (device.name in experiment.producers_filter) or (len(experiment.producers_filter) == 0):
+                        filtered_producers.append(device)
+                i = 0
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
                     else:
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
-                    producers -= 1 # Os primeiros n devices é que produzem conteudo
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
                 if USE_SMART_PLUGS:
@@ -603,7 +683,7 @@ def runExperiment(experiment):
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
                 log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN")
-                if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, "MAIN"): # 15m
+                if not barrierWithTimeout(boot_barrier, 500*experiment.devices, experiment, True, "MAIN"): # 15m
                     log("BROKEN_BARRIER\tBOOT_BARRIER\tMAIN")
                 sleep(1)
                 log("WAIT_ON_BARRIER\tSTART_BARRIER\tMAIN")
@@ -622,9 +702,15 @@ def runExperiment(experiment):
                         break
                     i+=1
                 sleep(2)
+                if (IDLE_BENCHMARK):
+                    sleep(IDLE_BENCHMARK_DURATION)
                 log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
-                if not barrierWithTimeout(complete_barrier, 240, experiment, True, "MAIN"):
-                    log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
+                if (experiment.benchmark):
+                    if not barrierWithTimeout(complete_barrier, 240+experiment.benchmark_duration, experiment, True, "MAIN"):
+                        log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
+                else:
+                    if not barrierWithTimeout(complete_barrier, 240, experiment, True, "MAIN"):
+                        log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
                 sleep(1)
                 log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(log_pull_barrier, 60, experiment, True, "MAIN")
@@ -634,7 +720,7 @@ def runExperiment(experiment):
                 log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(servers_finish_barrier, 60, experiment, True, "MAIN", servers_finish_barrier, finish_barrier)
                 log("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(finish_barrier, 240, experiment, True, "MAIN", finish_barrier)
+                barrierWithTimeout(finish_barrier, 3000, experiment, True, "MAIN", finish_barrier)
 
                 if (experiment.isOK()):
                     break
@@ -645,8 +731,12 @@ def runExperiment(experiment):
         if (repetition != experiment.repetitions - 1):
             log("Waiting 5s for next repetition")
             sleep(5)
+    log("FINISHING_EXPERIMENT\t%s" % experiment.name)
     if USE_SMART_PLUGS:
         power_on(experiment.smart_plug)
+        sleep(2)
+        for device in ALL_DEVICES:
+            adb.screenOff(device)
 
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
@@ -953,6 +1043,10 @@ class Experiment:
     power_devices = True
     smart_plug = "SHP7"
     settings = {}
+    devices_filter = []
+    producers_filter = []
+    benchmark = False
+    benchmark_duration = 0
 
     def __init__(self, name):
         self.name = name
@@ -997,9 +1091,10 @@ def processSettingsMap(raw_settings):
     map = {}
     for setting in raw_settings.split(";"):
         key_val = setting.strip().split(":")
-        if (len(key_val) != 2):
-            continue
-        map[key_val[0].strip()] = key_val[1].strip()
+        if (len(key_val) >= 2):
+            map[key_val[0].strip()] = key_val[1].strip()
+        if (len(key_val) == 1):
+            map[key_val[0].strip()] = ""
     return map
 
 def readConfig(confName):
@@ -1010,7 +1105,8 @@ def readConfig(confName):
         startTime = None
         endTime = None
         experiment = Experiment(section)
-        log("{}".format(experiment.settings))
+        experiment.devices_filter = []
+        experiment.producers_filter = []
         for option in config.options(section):
             if option == "strategy":
                 experiment.scheduler = config[section][option]
@@ -1070,13 +1166,11 @@ def readConfig(confName):
                     setting = ""
                     setting = entry.split(':')
                     experiment.setSetting(setting[0].strip(), setting[1].strip())
-                    log("READING_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
             elif option == "taskexecutorsettings":
                 for entry in config[section][option].split(';'):
                     setting = ""
                     setting = entry.split(':')
                     experiment.setTaskExecutorSetting(setting[0].strip(), setting[1].strip())
-                    log("READING_TASK_EXECUTOR_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
             elif option == "multicastinterface":
                 experiment.mcast_interface = config[section][option]
             elif option == "minbattery":
@@ -1113,6 +1207,17 @@ def readConfig(confName):
                     experiment.power_devices = False
             elif option == "smartplug":
                 experiment.smart_plug = config[section][option]
+            elif option == "filterdevices":
+                for dev in config[section][option].split(","):
+                    experiment.devices_filter.append(dev.strip())
+            elif option == "filterproducers":
+                for dev in config[section][option].split(","):
+                    experiment.producers_filter.append(dev.strip())
+            elif option == "benchmark":
+                if config[section][option].lower() == "true":
+                    experiment.benchmark = True
+            elif option == "benchmarkduration":
+                experiment.benchmark_duration = int(config[section][option])
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1160,6 +1265,10 @@ def help():
                     CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices/setting:value;setting:value, ... [LIST]
                     powerDevices            = Power devices though experiment or not [BOOL] (Default True)
                     SmartPlug               = Name of smart plug SHP7/Meross [STR] (Default SHP7)
+                    FilterDevices           = Filter Devices to be used in experiment (dev_1, dev_2, ..., dev_n) [LIST]
+                    FilterProducers         = Filter Producers to be used in experiment (dev_1, dev_2, ..., dev_n) [LIST]
+                    Benchmark               = Wether this experiment is a benchmark [BOOL] (Default False)
+                    BenchmarkDuration       = Set benchmark Duration [INT]
 
         Models:
             Tensorflow:
@@ -1277,7 +1386,10 @@ def help():
                     DEVICE_ID: String = ""
                     BANDWIDTH_ESTIMATE_TYPE = "ALL" // ACTIVE/PASSIVE/ALL
 
-
+                    ---> BENCHMARKS
+                    COMPUTATION_BASELINE_DURATION_FLAG = false
+                    COMPUTATION_BASELINE_DURATION = 600 // 10 minutess
+                    TRANSFER_BASELINE_FLAG = false
 
             OS Specific Problems/Fixes:
                 MacOS:
@@ -1406,7 +1518,7 @@ def shutdownDevice(device=None, barrier=None):
     barrier.wait()
 
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -1429,6 +1541,8 @@ def main():
     argparser.add_argument('-sd', '--shutdown', default=False, action='store_true', required=False)
     argparser.add_argument('-po', '--power-on', default=False, action='store_true', required=False)
     argparser.add_argument('-poff', '--power-off', default=False, action='store_true', required=False)
+    argparser.add_argument('-idle', '--idle-benchmark', default=False, action='store_true', required=False)
+    argparser.add_argument('-idled', '--idle-benchmark-duration', default=IDLE_BENCHMARK_DURATION, action='store', required=False)
 
     args = argparser.parse_args()
 
@@ -1471,10 +1585,23 @@ def main():
         power_off()
         return
 
+
+    log("KILLING_ADB...", end="\t")
+    try:
+        adb.close()
+    except:
+        pass
+    adb.killAll()
+    log("KILLED", "\n", False)
+    log("RESTART_ADB", end="\t")
+    adb.init()
+    sleep(5)
+    log("STARTED", "\n", False)
+
     if args.wifi:
-        log("Searching for devices [USB/WIFI]...")
+        log("SEARCHING_DEVICES [USB/WIFI]")
     else:
-        log("Searching for devices [USB]...")
+        log("SEARCHING_DEVICES [USB]")
     if args.debug_adb:
         adb.DEBUG = True
         adb.ADB_DEBUG_FILE = LOG_FILE
@@ -1488,10 +1615,10 @@ def main():
     if args.force_usb:
         adb.FORCE_USB = True
 
-    adb.close()
-    adb.killAll()
-    adb.init()
-    sleep(2)
+    if args.idle_benchmark:
+        IDLE_BENCHMARK = True
+        if args.idle_benchmark_duration:
+            IDLE_BENCHMARK_DURATION = int(args.idle_benchmark_duration)
 
     if args.wifi or args.ip_mask:
         power_off()
@@ -1549,10 +1676,10 @@ def main():
             log("CHECKING_PACKAGE\t%s\t" % device.name, end="")
             forceScreenOnViaPower(device)
             if not adb.checkPackageInstalled(device=device):
-                log('MISSING')
+                log('MISSING', "\n", False)
                 installPackage(device)
             else:
-                log('FOUND')
+                log('FOUND', "\n", False)
     for device in devices_with_screen_off:
         adb.screenOff(device)
     #EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
@@ -1612,7 +1739,6 @@ def main():
     if args.use_curses:
         progressBar_0.updateProgress(100)
         complete_progress.updateText("")
-
 
 if __name__ == '__main__':
     main()
