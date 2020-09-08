@@ -9,19 +9,21 @@ import shutil
 import configparser
 from sys import argv, stdout
 import sys
+import socket
+import struct
 import subprocess
 from datetime import datetime
 import argparse
 from collections import deque
 from func_timeout import func_timeout, FunctionTimedOut, func_set_timeout
-from meross_iot.cloud.devices.power_plugs import GenericPlug
 from meross_iot.manager import MerossManager
+from meross_iot.http_api import MerossHttpClient
 import json
 
 
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
-PENDING_JOBS = 0
+PENDING_TASKS = 0
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
@@ -33,46 +35,67 @@ CURSES_LOGS = None
 CURSES_LOGS_LOCK = Lock()
 LOGS_LOCK = Lock()
 REBOOT_ON_RUN_EXPERIMENT = False
+USE_SMART_PLUGS = False
+SCREEN_BRIGHTNESS = 0
+LOG_PULL_LOCK = Lock()
+SYS_LOG_PULL_LOCK = Lock()
+LOG_PULL_SCREEN_ON_FLAG = True
+LOG_PULL_SCREEN_ON_LOCK = Lock()
+TAP_TO_KEEP_SCREEN_ON_FLAG = True
+TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS = 120
+PLUGS = []
+IDLE_BENCHMARK = False
+IDLE_BENCHMARK_DURATION = 1200 # 20mins
 
-user_info = json.loads(open("meross.json", "r").read())
-manager = MerossManager(user_info["user"], user_info["pass"])
-manager.start()
-PLUGS = manager.get_devices_by_kind(GenericPlug)
 
-def power_on(plug=0):
-    if len(plugs) > 0:
-        PLUGS[plug].turn_on()
-        return True
-    return False
+async def merros_init():
+    user_info = json.loads(open("meross.json", "r").read())
+    merross_http_manager = http_api_client = await MerossHttpClient.async_from_user_password(email=user_info["user"], password=user_info["pass"])
+    manager = MerossManager(merross_http_manager)
+    manager.start()
 
-def is_power_on(plug=0):
-    if len(plugs) > 0:
-        return PLUGS[plug].get_state()
-    return False
+def readIFTTTKey():
+    try:
+        return open("ifttt.key", "r").read().strip("\n")
+    except:
+        return ""
 
-def power_off(plug=0):
-    if len(plugs) > 0:
-        PLUGS[plug].turn_off()
-        return True
-    return False
+def power_on(smart_plug="SHP7"):
+    ifttt_key = readIFTTTKey()
+    if (ifttt_key == ""):
+        return False
+    subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20on/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
+    return True
 
+def power_off(smart_plug="SHP7"):
+    ifttt_key = readIFTTTKey()
+    if (ifttt_key == ""):
+        return False
+    subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20off/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
+    return True
 
 @func_set_timeout(1)
-def write_to_file(f, str, end):
-    f.write(ctime()+"\t"+str+end)
+def write_to_file(f, str, end, show_date=True):
+    if show_date:
+        f.write(ctime()+"\t"+str+end)
+    else:
+        f.write(str+end)
     f.flush()
 
-def log(str, end="\n"):
+def log(str, end="\n", show_date=True):
     global LOG_FILE, CURSES_LOGS, LOGS_LOCK
     try:
-        write_to_file(LOG_FILE,str,end)
+        write_to_file(LOG_FILE,str,end,show_date)
     except:
         pass
     if CURSES:
         CURSES_LOGS.append(str)
         write_curses_logs()
     elif LOG_FILE.name != "<stdout>":
-        print(ctime()+"\t"+str, end=end)
+        if show_date:
+            print(ctime()+"\t"+str, end=end)
+        else:
+            print(str, end=end)
 
 def write_curses_logs():
     global CURSES_LOGS, CURSES_LOGS_LOCK
@@ -103,18 +126,18 @@ def pingWait(hostname):
     while(not ping(hostname)):
         sleep(2)
 
-def createJob(worker, asset_id):
-    global PENDING_JOBS
-    PENDING_JOBS += 1
-    log("{}\t{}\tJOB_SUBMIT\t{}".format(time(), asset_id, worker.name))
+def createTask(worker, asset_id):
+    global PENDING_TASKS
+    PENDING_TASKS += 1
+    log("{}\t{}\tTASK_SUBMIT\t{}".format(time(), asset_id, worker.name))
     try:
-        if not worker.createJob(asset_id):
-            log("{}\t{}\tJOB_FAILED\tFAILED_SCHEDULE\t{}".format(time(), asset_id, worker.name))
+        if not worker.createTask(asset_id):
+            log("{}\t{}\tTASK_FAILED\tFAILED_SCHEDULE\t{}".format(time(), asset_id, worker.name))
         else:
-            log("{}\t{}\tJOB_COMPLETE\t{}".format(time(), asset_id, worker.name))
-    except Exception as job_exception:
-        log("{}\t{}\tJOB_FAILED\t{}JOB_EXCEPTION\t{}".format(time(), asset_id, worker.name))
-    PENDING_JOBS -= 1
+            log("{}\t{}\tTASK_COMPLETE\t{}".format(time(), asset_id, worker.name))
+    except Exception as task_exception:
+        log("{}\t{}\tTASK_FAILED\t{}TASK_EXCEPTION\t{}".format(time(), asset_id, worker.name))
+    PENDING_TASKS -= 1
 
 def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
     log("CALIBRATION\t{}".format(worker.name))
@@ -128,14 +151,14 @@ def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
         while (asset[-4:] not in ['.png', '.jpg']):
             asset = files_on_device[device_random.randint(0,len(files_on_device)-1)]
 
-    log("{}\t{}\tJOB_SUBMIT\t{}\t{}".format(time(), "CALIBRATION_JOB", asset, worker.name))
+    log("{}\t{}\tTASK_SUBMIT\t{}\t{}".format(time(), "CALIBRATION_TASK", asset, worker.name))
     try:
         if not worker.calibrateWorker(asset):
-            log("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
+            log("{}\t{}\tCALIBRATION_FAILED\tFAILED_CALIBRATION\t{}".format(time(), "CALIBRATION_TASK", worker.name))
         else:
-            log("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), "CALIBRATION_JOB", worker.name))
-    except Exception as job_exception:
-        log("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), "CALIBRATION_JOB", worker.name))
+            log("{}\t{}\tCALIBRATION_COMPLETE\t{}".format(time(), "CALIBRATION_TASK", worker.name))
+    except Exception as task_exception:
+        log("{}\t{}\tCALIBRATION_FAILED\t{}CALIBRATION_EXCEPTION\t{}".format(time(), "CALIBRATION_TASK", worker.name))
 
 def barrierWithTimeout(barrier, timeout=None, experiment=None, show_error=True, device=None, *skip_barriers):
     if experiment is not None:
@@ -237,26 +260,29 @@ def selectModel(experiment, jay_instance, custom_model):
             return True
     return False
 
+def keepScreenOn(device=None):
+    global TAP_TO_KEEP_SCREEN_ON_FLAG, TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS
+    sleep(TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS)
+    while TAP_TO_KEEP_SCREEN_ON_FLAG:
+        log("TAP_SCREEN\t%s" % device.name)
+        adb.tapScreen(device)
+        sleep(TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS)
+
 def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_producer, is_worker, device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
-    global PENDING_JOBS, PENDING_WORKERS
+    global PENDING_TASKS, PENDING_WORKERS, SCREEN_BRIGHTNESS, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
-        adb.uninstallPackage(device)
-        log('PACKAGE_UNINSTALLED\t%s' % device.name)
-        adb.pushFile('apps', 'Jay-Android\ Launcher-release.apk', path='', device=device)
-        log('PACKAGE_PUSHED\t%s' % device.name)
-        adb.pmInstallPackage('apps', 'Jay-Android\ Launcher-release.apk', device)
-        log('PACKAGE_INSTALLED\t%s' % device.name)
+        installPackage(device)
     adb.connectWifiADB(device)
     log("START_DEVICE\t%s" % device.name)
     device_random = random.Random()
     device_random.seed(experiment.seed+worker_seed+str(repetition))
     rate = float(experiment.request_rate)/float(experiment.request_time)
-    log('GENERATING_JOBS\tRATE: {}\t{}'.format(rate, device.name))
-    job_intervals = []
+    log('GENERATING_TASKS\tRATE: {}\t{}'.format(rate, device.name))
+    task_intervals = []
     asset_list = []
-    while(sum(job_intervals) < experiment.duration):
-        job_intervals.append(device_random.expovariate(rate))
+    while(sum(task_intervals) < experiment.duration):
+        task_intervals.append(device_random.expovariate(rate))
         asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
         while ((asset[-4:] not in ['.png', '.jpg'] and experiment.asset_type == 'image') or (asset[-4:] not in ['.mp4'] and experiment.asset_type == 'video')):
             asset = ASSETS[device_random.randint(0,len(ASSETS)-1)]
@@ -289,8 +315,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         if (asset not in files_on_device):
             adb.pushFile(experiment.assets, asset, device=device)
             files_on_device.append(asset)
-    adb.screenOn(device)
-    adb.setBrightness(device, 0)
+    adb.setBrightness(device, SCREEN_BRIGHTNESS)
     adb.clearSystemLog(device)
     log("STOP_ALL_SERVICE\t%s" % device.name)
     adb.stopAll(device)
@@ -317,24 +342,56 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         jay_instance = grpcControls.jayClient(worker_ip, device.name)
         droid_launcher.connectLauncherService()
         droid_launcher.setLogName(experiment.name)
+        log("CONECTED_TO_LAUNCHER\t%s" % device.name)
+        sleep(10)
         if is_worker:
             droid_launcher.startWorker()
         droid_launcher.startScheduler()
-        jay_instance.connectBrokerService()
-        sleep(2)
     except FunctionTimedOut:
        log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
        error = True
     except Exception:
        log("Error Starting Worker %s" % device.name)
        error = True
+    '''
+    multicast_group = '224.0.0.1'
+    server_address = (multicast_group, 50000)
+    # Create the socket
+    addrinfo = socket.getaddrinfo(multicast_group, None)[0]
+    s = socket.socket(addrinfo[0], socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(('', 50000))
+    group_bin = socket.inet_pton(addrinfo[0], addrinfo[4][0])
+    if addrinfo[0] == socket.AF_INET: # IPv4
+        mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
+        s.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    while True:
+        print("waiting")
+        data, sender = s.recvfrom(1500)
+        while data[-1:] == '\0': data = data[:-1] # Strip trailing \0's
+        print (str(sender) + '  ' + repr(data))
+    '''
+    try:
+        forceScreenOnViaPower(device)
+        sleep(2)
+    except:
+        pass
+    Thread(target=keepScreenOn, args=(device,)).start()
+
+    jay_instance.connectBrokerService()
+    sleep(2)
+    '''except FunctionTimedOut:
+       log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
+       error = True
+    except Exception:
+       log("Error Starting Worker %s" % device.name)
+       error = True'''
     if error:
         skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
         experiment.deviceFail(device.name)
         if jay_instance is not None:
             destroyWorker(jay_instance, droid_launcher, device)
         return
-
 
     jay_instance.setSettings(experiment.settings) if experiment.settings else None
     selectTaskExecutor(experiment, jay_instance, custom_task_executor) if is_worker else None
@@ -371,7 +428,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             destroyWorker(jay_instance, droid_launcher, device)
 
     log("WAIT_ON_BARRIER\tBOOT_BARRIER\t%s" % device.name)
-    if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, device.name, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
+    if not barrierWithTimeout(boot_barrier, 500*experiment.devices, experiment, True, device.name, start_barrier, complete_barrier, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tBOOT_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
@@ -379,39 +436,69 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         calibrateWorkerThread(jay_instance, worker_seed, device)
     log("WAIT_ON_BARRIER\tSTART_BARRIER\t%s" % device.name)
     barrierWithTimeout(start_barrier)
-    i = 0
-    while (i < (len(job_intervals) - 1)  and experiment.isOK() and is_producer):
-        log("NEXT_EVENT_IN\t{}".format(job_intervals[i]))
-        sleep(job_intervals[i])
-        if not experiment.isSequential() or PENDING_JOBS < 1:
-            Thread(target = createJob, args = (jay_instance,asset_list[i])).start()
-        i = i+1
+
+    if is_producer:
+        if experiment.benchmark and len(asset_list) > 0:
+            sleep(2)
+            Thread(target = createTask, args = (jay_instance,asset_list[0])).start()
+        else:
+            i = 0
+            print(IDLE_BENCHMARK)
+            while (i < (len(task_intervals) - 1)  and experiment.isOK() and not IDLE_BENCHMARK):
+                log("NEXT_EVENT_IN\t{}".format(task_intervals[i]))
+                sleep(task_intervals[i])
+                if not experiment.isSequential() or PENDING_TASKS < 1:
+                    Thread(target = createTask, args = (jay_instance,asset_list[i])).start()
+                    i = i+1
+    if experiment.benchmark:
+        sleep(experiment.benchmark_duration)
+    if (IDLE_BENCHMARK):
+        sleep(IDLE_BENCHMARK_DURATION)
     log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(complete_barrier, experiment.duration+experiment.timeout+240 + (0 if is_producer else experiment.duration), experiment, True, device.name, log_pull_barrier, finish_barrier):
         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
-    adb.screenOff(device)
+    TAP_TO_KEEP_SCREEN_ON_FLAG = False
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
     if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
         log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
+    global LOG_PULL_SCREEN_ON_FLAG, LOG_PULL_SCREEN_ON_LOCK
+    LOG_PULL_SCREEN_ON_LOCK.acquire()
+    try:
+        if LOG_PULL_SCREEN_ON_FLAG:
+            forceScreenOnViaPower(device)
+            sleep(2)
+            LOG_PULL_SCREEN_ON_FLAG = False
+    finally:
+        LOG_PULL_SCREEN_ON_LOCK.release()
     try:
         if (experiment.isOK()):
-            log("PULLING_LOG\t%s\tLOG" % device.name)
-            adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
-            log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
+            global LOG_PULL_LOCK
+            LOG_PULL_LOCK.acquire()
+            try:
+                log("PULLING_LOG\t%s\tLOG" % device.name)
+                adb.pullLog(path='files/%s' % experiment.name, destination='logs/experiment/%s/%d/%d/%s.csv' % (experiment.name, repetition, seed_repeat, device.name), device=device)
+                log("PULLING_LOG\t%s\tLOG\tOK" % device.name)
+            finally:
+                LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
         experiment.setFail()
         experiment.deviceFail(device.name)
     try:
-        log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
-        system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
-        os.makedirs(system_log_path, exist_ok=True)
-        adb.pullSystemLog(device, system_log_path)
-        log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
+        global SYS_LOG_PULL_LOCK
+        SYS_LOG_PULL_LOCK.acquire()
+        try:
+            log("PULLING_LOG\t%s\tSYS_LOG" % device.name)
+            system_log_path = "logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat)
+            os.makedirs(system_log_path, exist_ok=True)
+            adb.pullSystemLog(device, system_log_path)
+            log("PULLING_LOG\t%s\tSYS_LOG\tOK" % device.name)
+        finally:
+            SYS_LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tSYS_LOG\tERROR" % device.name)
         experiment.deviceFail(device.name)
@@ -443,7 +530,7 @@ def cleanLogs(path):
         os.makedirs(path, exist_ok=True)
 
 def runExperiment(experiment):
-    global PENDING_JOBS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES
+    global PENDING_TASKS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES, USE_SMART_PLUGS, LOG_PULL_SCREEN_ON_FLAG, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
 
     if CURSES:
         CURSES.add_text(1,200,3,text="EXPERIMENT: {}".format(experiment.name))
@@ -458,15 +545,29 @@ def runExperiment(experiment):
     cleanLogs("logs/sys/%s/" % experiment.name)
     ASSETS=os.listdir(experiment.assets)
 
-    #devices = ALL_DEVICES
-    if len(ALL_DEVICES) - len(DEVICE_BLACKLIST) >= experiment.devices:
-        devices_to_test = []
+    log("STOPPING ALL RUNNING INSTANCES IN NETWORK")
+    for dev in ALL_DEVICES:
+        forceScreenOnViaPower(dev)
+        try:
+            adb.stopAll(dev)
+        except:
+            pass
+
+    filtered_devices = []
+    if len(experiment.devices_filter) != 0:
         for dev in ALL_DEVICES:
+            if dev.name in experiment.devices_filter:
+                filtered_devices.append(dev)
+    else:
+        filtered_devices = ALL_DEVICES
+    if len(filtered_devices) - len(DEVICE_BLACKLIST) >= experiment.devices:
+        devices_to_test = []
+        for dev in filtered_devices:
             if dev.name not in DEVICE_BLACKLIST:
                 devices_to_test.append(dev)
         devices = getNeededDevicesAvailable(experiment, devices_to_test)
     else:
-        devices = getNeededDevicesAvailable(experiment, ALL_DEVICES)
+        devices = getNeededDevicesAvailable(experiment, filtered_devices)
     if (len(devices) < experiment.devices):
         os.system("touch logs/experiment/%s/not_enough_devices_CANCELED"  % experiment.name)
         return
@@ -497,6 +598,8 @@ def runExperiment(experiment):
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.repeat_seed):
+            TAP_TO_KEEP_SCREEN_ON_FLAG = True
+            LOG_PULL_SCREEN_ON_FLAG = True
             if CURSES:
                 progressBar_0.updateProgress(int(100*(seed_repeat/experiment.repeat_seed)))
             repeat_tries = 0
@@ -542,47 +645,45 @@ def runExperiment(experiment):
                 finish_barrier = Barrier(experiment.devices + len(experiment.cloudlets) + len(experiment.clouds) + 1)
                 servers_finish_barrier = Barrier(len(experiment.cloudlets) + len(experiment.clouds) + 1)
 
-
-
                 startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
-                producers = experiment.producers
                 workers = experiment.workers
-                i = 0
                 custom_executors_mobile = []
+                i = 0
                 if (experiment.custom_executors is not None and experiment.custom_executors.mobile != None):
                     for custom_executor in experiment.custom_executors.mobile:
                         for i in range(custom_executor[2]):
                             custom_executors_mobile.append((custom_executor[0], custom_executor[1], custom_executor[3]))
-                if (experiment.power_devices):
-                    power_on()
-                    i = 0
-                    while ((not is_power_on()) and i < 5):
-                        sleep(1 + i)
-                        power_on()
-                        i+=1
-                        if (i == 5 and (not is_power_on())):
-                            experiment.setFail()
-                else:
-                    power_off()
-                    i = 0
-                    while (is_power_on() and i < 5):
-                        sleep(1 + i)
-                        power_off()
-                        i+=1
-                        if (i == 5 and is_power_on()):
-                            experiment.setFail()
+                for device in ALL_DEVICES:
+                    forceScreenOnViaPower(device)
+                filtered_producers = []
+                for device in experiment_devices:
+                    if len(filtered_producers) >= experiment.producers:
+                        break
+                    if (device.name in experiment.producers_filter) or (len(experiment.producers_filter) == 0):
+                        filtered_producers.append(device)
+                i = 0
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
                     else:
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (producers > 0), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
-                    producers -= 1 # Os primeiros n devices é que produzem conteudo
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
+                if USE_SMART_PLUGS:
+                    if (experiment.power_devices):
+                        if (not power_on(experiment.smart_plug)):
+                            experiment.setFail()
+                    else:
+                        if (not power_off(experiment.smart_plug)):
+                            experiment.setFail()
+                for device in ALL_DEVICES:
+                    if device not in experiment_devices[:experiment.devices]:
+                        adb.screenOff(device)
+
                 startClouds(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier)
 
                 log("WAIT_ON_BARRIER\tBOOT_BARRIER\tMAIN")
-                if not barrierWithTimeout(boot_barrier, 200*experiment.devices, experiment, True, "MAIN"): # 15m
+                if not barrierWithTimeout(boot_barrier, 500*experiment.devices, experiment, True, "MAIN"): # 15m
                     log("BROKEN_BARRIER\tBOOT_BARRIER\tMAIN")
                 sleep(1)
                 log("WAIT_ON_BARRIER\tSTART_BARRIER\tMAIN")
@@ -591,7 +692,7 @@ def runExperiment(experiment):
 
                 completetion_timeout_start = time()
                 i=0
-                while (PENDING_JOBS > 0 and experiment.isOK()) or (experiment.duration > time()-completetion_timeout_start and experiment.isOK()):
+                while (PENDING_TASKS > 0 and experiment.isOK()) or (experiment.duration > time()-completetion_timeout_start and experiment.isOK()):
                     sleep(2)
                     if (i % 20) == 0:
                         log("CURRENT_EXPERIMENT_DURATION\t{}s".format(time()-completetion_timeout_start))
@@ -601,9 +702,15 @@ def runExperiment(experiment):
                         break
                     i+=1
                 sleep(2)
+                if (IDLE_BENCHMARK):
+                    sleep(IDLE_BENCHMARK_DURATION)
                 log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
-                if not barrierWithTimeout(complete_barrier, 240, experiment, True, "MAIN"):
-                    log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
+                if (experiment.benchmark):
+                    if not barrierWithTimeout(complete_barrier, 240+experiment.benchmark_duration, experiment, True, "MAIN"):
+                        log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
+                else:
+                    if not barrierWithTimeout(complete_barrier, 240, experiment, True, "MAIN"):
+                        log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
                 sleep(1)
                 log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(log_pull_barrier, 60, experiment, True, "MAIN")
@@ -613,7 +720,7 @@ def runExperiment(experiment):
                 log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
                 barrierWithTimeout(servers_finish_barrier, 60, experiment, True, "MAIN", servers_finish_barrier, finish_barrier)
                 log("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(finish_barrier, 240, experiment, True, "MAIN", finish_barrier)
+                barrierWithTimeout(finish_barrier, 3000, experiment, True, "MAIN", finish_barrier)
 
                 if (experiment.isOK()):
                     break
@@ -624,13 +731,12 @@ def runExperiment(experiment):
         if (repetition != experiment.repetitions - 1):
             log("Waiting 5s for next repetition")
             sleep(5)
-    if (not is_power_on()):
-        power_on()
-        i = 0
-        while ((not is_power_on()) and i < 5):
-            sleep(1 + i)
-            power_on()
-            i+=1
+    log("FINISHING_EXPERIMENT\t%s" % experiment.name)
+    if USE_SMART_PLUGS:
+        power_on(experiment.smart_plug)
+        sleep(2)
+        for device in ALL_DEVICES:
+            adb.screenOff(device)
 
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
@@ -928,14 +1034,19 @@ class Experiment:
     calibration = False
     asset_quality = "SD"
     mcast_interface = None
-    min_battery = 20
+    min_battery = 10
     _failed_devices = {}
     _running_status = True
     task_executor = "Tensorflow"
     task_executor_settings = None
     custom_executors = None
     power_devices = True
+    smart_plug = "SHP7"
     settings = {}
+    devices_filter = []
+    producers_filter = []
+    benchmark = False
+    benchmark_duration = 0
 
     def __init__(self, name):
         self.name = name
@@ -980,9 +1091,10 @@ def processSettingsMap(raw_settings):
     map = {}
     for setting in raw_settings.split(";"):
         key_val = setting.strip().split(":")
-        if (len(key_val) != 2):
-            continue
-        map[key_val[0].strip()] = key_val[1].strip()
+        if (len(key_val) >= 2):
+            map[key_val[0].strip()] = key_val[1].strip()
+        if (len(key_val) == 1):
+            map[key_val[0].strip()] = ""
     return map
 
 def readConfig(confName):
@@ -993,7 +1105,8 @@ def readConfig(confName):
         startTime = None
         endTime = None
         experiment = Experiment(section)
-        log("{}".format(experiment.settings))
+        experiment.devices_filter = []
+        experiment.producers_filter = []
         for option in config.options(section):
             if option == "strategy":
                 experiment.scheduler = config[section][option]
@@ -1053,13 +1166,11 @@ def readConfig(confName):
                     setting = ""
                     setting = entry.split(':')
                     experiment.setSetting(setting[0].strip(), setting[1].strip())
-                    log("READING_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
             elif option == "taskexecutorsettings":
                 for entry in config[section][option].split(';'):
                     setting = ""
                     setting = entry.split(':')
                     experiment.setTaskExecutorSetting(setting[0].strip(), setting[1].strip())
-                    log("READING_TASK_EXECUTOR_SETTING: {} -> {}".format(setting[0].strip(), setting[1].strip()))
             elif option == "multicastinterface":
                 experiment.mcast_interface = config[section][option]
             elif option == "minbattery":
@@ -1078,7 +1189,7 @@ def readConfig(confName):
                 experiment.task_executor = config[section][option]
             elif option == "customexecutors":
                 custom_executors = CustomExecutors()
-                for entry in config[section][option].split(','):
+                for entry in config[section][option].split(';'):
                     executor_model_device_number = entry.split("/")
                     if len(executor_model_device_number) != 5:
                         log("INVALID CUSTOM_EXECUTOR {}".format(entry))
@@ -1094,6 +1205,19 @@ def readConfig(confName):
             elif option == "powerdevices":
                 if config[section][option].lower() == "false":
                     experiment.power_devices = False
+            elif option == "smartplug":
+                experiment.smart_plug = config[section][option]
+            elif option == "filterdevices":
+                for dev in config[section][option].split(","):
+                    experiment.devices_filter.append(dev.strip())
+            elif option == "filterproducers":
+                for dev in config[section][option].split(","):
+                    experiment.producers_filter.append(dev.strip())
+            elif option == "benchmark":
+                if config[section][option].lower() == "true":
+                    experiment.benchmark = True
+            elif option == "benchmarkduration":
+                experiment.benchmark_duration = int(config[section][option])
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1133,19 +1257,24 @@ def help():
                     Calibration             = Run Jay calibration before begin [BOOL] (Default False)
                     Settings                = Set Jay settings (setting: value;...) [LIST]
                     AssetQuality            = Inform about asset quality (SD/HD/UHD) [STR] (Default SD)
-                    MultiCastInterface      = MCAST_INTERFACE: interface to use in cloudlet [STR]
+                    MultiCastInterface      = MULTICAST_INTERFACE: interface to use in cloudlet [STR]
                     MinBattery              = Minimum battery to run experiment [INT] (Default 20)
                     RunBetween              = Define the experiment run interval (hour - hour)
                     TaskExecutor            = Task executor to use
                     TaskExecutorSettings    = Set Task Executor settings (setting: value;...) [LIST]
                     CustomExecutors         = TaskExecutor/Model/Mobile|Cloud|Cloudlet/Number_of_devices/setting:value;setting:value, ... [LIST]
                     powerDevices            = Power devices though experiment or not [BOOL] (Default True)
+                    SmartPlug               = Name of smart plug SHP7/Meross [STR] (Default SHP7)
+                    FilterDevices           = Filter Devices to be used in experiment (dev_1, dev_2, ..., dev_n) [LIST]
+                    FilterProducers         = Filter Producers to be used in experiment (dev_1, dev_2, ..., dev_n) [LIST]
+                    Benchmark               = Wether this experiment is a benchmark [BOOL] (Default False)
+                    BenchmarkDuration       = Set benchmark Duration [INT]
 
         Models:
             Tensorflow:
                 All:
                     ssd_mobilenet_v1_fpn_coco
-                    ssd_mobilenet_v1_coco
+                    ssd_mobilenet_v1_coco  [FUNCIONA]
                     ssd_mobilenet_v2_coco
                     ssdlite_mobilenet_v2_coco
                     ssd_resnet50_v1_fpn_coco
@@ -1163,9 +1292,9 @@ def help():
             TensorflowLite:
                 Lite:
                     ssd_mobilenet_v3_large_coco  (BROKEN RESULTS)
-                    ssd_mobilenet_v3_small_coco
-                    ssd_mobilenet_v1_fpn_coco
-                    ssd_resnet50_v1_fpn_coco
+                    ssd_mobilenet_v3_small_coco    [WORKING]
+                    ssd_mobilenet_v1_fpn_coco    [WORKING]
+                    ssd_resnet50_v1_fpn_coco  [BROKEN URL]
                     ssd_mobilenet_v3_quantized_large_coco
 
         TaskExecutors:
@@ -1202,6 +1331,15 @@ def help():
 
                     ComputationEstimateScheduler            (Same as estimate but witout Bandwidth Estimate)
 
+                    EAScheduler [LOCAL]
+                    EAScheduler [REMOTE]
+                    EAScheduler [CLOUD]
+                    EAScheduler [LOCAL, CLOUD]
+                    EAScheduler [LOCAL, REMOTE]
+                    EAScheduler [REMOTE, CLOUD]
+                    EAScheduler [LOCAL, REMOTE, CLOUD]
+
+
             Settings:
                     CLOUD_IP
                     GRPC_MAX_MESSAGE_SIZE
@@ -1217,7 +1355,7 @@ def help():
                     RTTDelayMillisFailAttempts
                     DEVICE_ID
                     [*] BANDWIDTH_ESTIMATE_TYPE: [ACTIVE/PASSIVE/ALL]
-                    MCAST_INTERFACE
+                    MULTICAST_INTERFACE
                     [*] BANDWIDTH_ESTIMATE_CALC_METHOD      [mean/median]  default: mean
                     [*] BANDWIDTH_SCALING_FACTOR             [Float] default: 1.0
                     [*] ADVERTISE_WORKER_STATUS: [true/false] default: true ENABLES DEVICE ADVERTISMENT Use when want LOCAL + CLOUDLET
@@ -1239,13 +1377,30 @@ def help():
                     PING_PAYLOAD_SIZE: Int = 32000 // 32Kb
                     AVERAGE_COMPUTATION_TIME_TO_SCORE: Int = 10
                     WORKING_THREADS: Int = 1
-                    WORKER_STATUS_UPDATE_INTERVAL: Long = 5000 // 5s
-                    AUTO_STATUS_UPDATE_INTERVAL_MS: Long = 5000 // 5s
-                    RTTDelayMillisFailRetry: Long = 500 // 0.5s
-                    RTTDelayMillisFailAttempts: Long = 5
-                    MCAST_INTERFACE: String? = null
+                    WORKER_STATUS_UPDATE_INTERVAL: Long = 1000 // 1s
+                    RTT_DELAY_MILLIS_FAIL_RETRY: Long = 500 // 0.5s
+                    RTT_DELAY_MILLIS_FAIL_ATTEMPTS: Long = 5
+                    MULTICAST_INTERFACE: String? = null
+                    MULTICAST_PKT_INTERVAL: Long = 500 // 0.5s
+                    READ_SERVICE_DATA_INTERVAL: Long = 500 // 0.5s
                     DEVICE_ID: String = ""
                     BANDWIDTH_ESTIMATE_TYPE = "ALL" // ACTIVE/PASSIVE/ALL
+
+                    ---> BENCHMARKS
+                    COMPUTATION_BASELINE_DURATION_FLAG = false
+                    COMPUTATION_BASELINE_DURATION = 600 // 10 minutess
+                    TRANSFER_BASELINE_FLAG = false
+
+            OS Specific Problems/Fixes:
+                MacOS:
+                    Too Many Open Files:
+                        ulimit -n 10240
+
+                        sysctl kern.maxfiles
+                        sysctl kern.maxfilesperproc
+
+                        sysctl -w kern.maxfiles=40480
+                        sysctl -w kern.maxfilesperproc=30000
         ================================================ HELP ================================================''')
 
 def logExperiment(conf, experiment):
@@ -1312,8 +1467,58 @@ def checkInterfaces():
             log("\t[*] {}".format(iface))
     log("==========================================================================================")
 
+def installPackage(device):
+    forceScreenOnViaPower(device)
+    log('CLEANING_SYSTEM\t%s' % device.name)
+    adb.uninstallPackage(device=device)
+    log('PACKAGE_UNINSTALLED\t%s' % device.name)
+    adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
+    log('PACKAGE_PUSHED\t%s' % device.name)
+    adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
+    if not adb.checkPackageInstalled(device=device):
+        adb.installPackage('apps','Jay-Android Launcher-release.apk', device=device)
+    log('PACKAGE_INSTALLED\t%s' % device.name)
+    permissions = ["android.permission.INTERNET", "android.permission.READ_PHONE_STATE",
+    "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.FOREGROUND_SERVICE", "android.permission.PACKAGE_USAGE_STATS",
+    "android.permission.ACCESS_NETWORK_STATE", "android.permission.BLUETOOTH",
+    "android.permission.ACCESS_FINE_LOCATION"]
+    for permission in permissions:
+        if permission not in adb.grantedPermissions(device=device):
+            adb.grantPermission(permission, device=device)
+            if permission in adb.grantedPermissions(device=device):
+                log('GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
+            else:
+                log('GRANT_PERMISSION_FAIL: ' + permission + '\t%s' % device.name)
+        else:
+            log('ALREADY_GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
+    adb.screenOff(device)
+
+def forceScreenOnViaPower(device=None):
+    if USE_SMART_PLUGS  and not adb.hasScreenOn(device) and not device.connected_usb and device.connected_wifi:
+        power_off()
+        sleep(2)
+        power_on()
+        sleep(1)
+    adb.screenOn(device)
+
+def fixULimit():
+    if adb.getOs() == "mac":
+        result = subprocess.run(["ulimit", "-n"], stdout=subprocess.PIPE, stderr=FNULL)
+        log("CURRENT_ULIMIT:\t%s" % result.stdout.decode('UTF-8').strip("\n"))
+        if int(result.stdout.decode('UTF-8')) < 10240:
+            log("SETTING_ULIMIT:\t10240")
+            subprocess.run(["ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
+            subprocess.run(["sudo", "ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
+
+def shutdownDevice(device=None, barrier=None):
+    log("SHUTING_DOWN:\t%s (%s)" % (device.name, device.ip))
+    adb.shutdown(device)
+    log("SHUT_DOWN_COMPLETE:\t%s (%s)" % (device.name, device.ip))
+    barrier.wait()
+
 def main():
-    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS
+    global ALL_DEVICES, LOG_FILE, EXPERIMENTS, SCHEDULED_EXPERIMENTS, CURSES, DEBUG, ADB_DEBUG_FILE, ADB_LOGS_LOCK, GRPC_DEBUG_FILE, GRPC_LOGS_LOCK, CURSES_LOGS, USE_SMART_PLUGS, FORCE_USB, SCREEN_BRIGHTNESS, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
@@ -1328,8 +1533,22 @@ def main():
     argparser.add_argument('-ip', '--ip-mask', action='store', required=False)
     argparser.add_argument('-r', '--reboot-devices', default=False, action='store_true', required=False)
     argparser.add_argument('-d', '--daemon', default=False, action='store_true', required=False)
+    argparser.add_argument('-sp', '--smart-plug', default=False, action='store_true', required=False)
+    argparser.add_argument('-u', '--force-usb', default=False, action='store_true', required=False)
+    argparser.add_argument('-b', '--brightness', action='store', required=False)
+    argparser.add_argument('-on', '--screen-on', default=False, action='store_true', required=False)
+    argparser.add_argument('-off', '--screen-off', default=False, action='store_true', required=False)
+    argparser.add_argument('-sd', '--shutdown', default=False, action='store_true', required=False)
+    argparser.add_argument('-po', '--power-on', default=False, action='store_true', required=False)
+    argparser.add_argument('-poff', '--power-off', default=False, action='store_true', required=False)
+    argparser.add_argument('-idle', '--idle-benchmark', default=False, action='store_true', required=False)
+    argparser.add_argument('-idled', '--idle-benchmark-duration', default=IDLE_BENCHMARK_DURATION, action='store', required=False)
 
     args = argparser.parse_args()
+
+    if args.show_help:
+        help()
+        return
 
     now = datetime.now()
     experiment_name = "exp_{}{:02d}{:02d}_{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
@@ -1347,13 +1566,42 @@ def main():
         None
     log("Starting... Please wait")
 
+    if args.smart_plug:
+        USE_SMART_PLUGS = True
+
+    if args.brightness != None:
+        try:
+            SCREEN_BRIGHTNESS = int(args.brightness)
+        except:
+            SCREEN_BRIGHTNESS = 0
+
     if not args.use_stdout:
         LOG_FILE = open("logs/workbench/{}/output.log".format(experiment_name), "w")
 
+    if args.power_on:
+        power_on()
+        return
+    if args.power_off:
+        power_off()
+        return
+
+
+    log("KILLING_ADB...", end="\t")
+    try:
+        adb.close()
+    except:
+        pass
+    adb.killAll()
+    log("KILLED", "\n", False)
+    log("RESTART_ADB", end="\t")
+    adb.init()
+    sleep(5)
+    log("STARTED", "\n", False)
+
     if args.wifi:
-        log("Searching for devices [USB/WIFI]...")
+        log("SEARCHING_DEVICES [USB/WIFI]")
     else:
-        log("Searching for devices [USB]...")
+        log("SEARCHING_DEVICES [USB]")
     if args.debug_adb:
         adb.DEBUG = True
         adb.ADB_DEBUG_FILE = LOG_FILE
@@ -1364,46 +1612,76 @@ def main():
             if args.adb_log_level is not None:
                 print("# WARNING: Invalid log level ({}). Logging ALL".format(args.adb_log_level))
                 adb.LOG_LEVEL = "ALL"
+    if args.force_usb:
+        adb.FORCE_USB = True
+
+    if args.idle_benchmark:
+        IDLE_BENCHMARK = True
+        if args.idle_benchmark_duration:
+            IDLE_BENCHMARK_DURATION = int(args.idle_benchmark_duration)
+
+    if args.wifi or args.ip_mask:
+        power_off()
+        sleep(2)
+        power_on()
+        sleep(2)
     if args.ip_mask:
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=True, ip_mask=args.ip_mask)
     else:
         ALL_DEVICES = adb.listDevices(minBattery = 0, discover_wifi=args.wifi)
-    if args.show_help:
-        help()
+    log("============\t%d DEVICES\t============" % len(ALL_DEVICES))
+    for device in ALL_DEVICES:
+        log("{} ({})".format(device.name, device.ip))
+    if args.shutdown:
+        for device in ALL_DEVICES:
+            forceScreenOnViaPower(device)
+            sleep(1)
+        power_off()
+        shutdownBarrier = Barrier(len(ALL_DEVICES)+1)
+        for device in ALL_DEVICES:
+            Thread(target = shutdownDevice, args=(device,shutdownBarrier)).start()
+            sleep(5)
+        shutdownBarrier.wait()
         return
+    if args.reboot_devices:
+        for device in ALL_DEVICES:
+            forceScreenOnViaPower(device)
+            sleep(1)
+            adb.rebootAndWait(device)
+    if args.screen_off:
+        for device in ALL_DEVICES:
+            adb.screenOff(device)
+    if args.screen_on:
+        for device in ALL_DEVICES:
+            forceScreenOnViaPower(device)
+    devices_with_screen_off = []
+    for device in ALL_DEVICES:
+        if not adb.hasScreenOn(device):
+            devices_with_screen_off.append(device)
     if args.install:
         log('INSTALLING_APKS')
         for device in ALL_DEVICES:
-            adb.uninstallPackage(device=device)
-            log('PACKAGE_UNINSTALLED\t%s' % device.name)
-            adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
-            log('PACKAGE_PUSHED\t%s' % device.name)
-            adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
-            log('PACKAGE_INSTALLED\t%s' % device.name)
+            installPackage(device)
     if args.debug_grpc:
         grpcControls.grpcLogs.debug = True
         grpcControls.grpcLogs.log_file = LOG_FILE
         grpcControls.grpcLogs.lock = LOGS_LOCK
-    log("============\tDEVICES\t============")
-    for device in ALL_DEVICES:
-        log("{} ({})".format(device.name, device.ip))
-    log("===================================")
-    for device in ALL_DEVICES:
-        adb.screenOff(device)
-        if not adb.checkPackageInstalled(device=device):
-            log('PACKAGE_MISSING\t%s' % device.name)
-            log('CLEANING_SYSTEM\t%s' % device.name)
-            adb.uninstallPackage(device=device)
-            log('PUSHING_PACKAGE\t%s' % device.name)
-            adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
-            log('INSTALLING_PACKAGE\t%s' % device.name)
-            adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
-            log('PACKAGE_INSTALLED\t%s' % device.name)
-        if args.reboot_devices:
-            adb.rebootAndWait(device)
     for cfg in args.configs:
         readConfig(cfg)
         shutil.copy(cfg, "{}/{}.loaded".format(loaded_experiments,cfg.split("/")[-1]))
+    if len(EXPERIMENTS) > 0 or len(SCHEDULED_EXPERIMENTS) > 0:
+        fixULimit()
+        log("===================================")
+        for device in ALL_DEVICES:
+            log("CHECKING_PACKAGE\t%s\t" % device.name, end="")
+            forceScreenOnViaPower(device)
+            if not adb.checkPackageInstalled(device=device):
+                log('MISSING', "\n", False)
+                installPackage(device)
+            else:
+                log('FOUND', "\n", False)
+    for device in devices_with_screen_off:
+        adb.screenOff(device)
     #EXPERIMENTS.sort(key=lambda e: e.devices+e.producers-e.request_time+len(e.cloudlets), reverse=False)
 
     if args.use_curses and not args.use_stdout:
@@ -1461,7 +1739,6 @@ def main():
     if args.use_curses:
         progressBar_0.updateProgress(100)
         complete_progress.updateText("")
-
 
 if __name__ == '__main__':
     main()

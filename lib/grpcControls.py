@@ -4,6 +4,7 @@ import lib.protobuf.Cloud_pb2 as Cloud_pb2
 import lib.protobuf.Cloud_pb2_grpc as Cloud_pb2_grpc
 import lib.protobuf.JayProto_pb2 as JayProto_pb2
 import lib.protobuf.JayProto_pb2_grpc as JayProto_pb2_grpc
+import lib.protobuf.JayTensorFlowProto_pb2 as JayTensorFlowProto_pb2
 
 import lib.protobuf.cloudlet.CloudletControl_pb2 as CloudletControl_pb2
 import lib.protobuf.cloudlet.CloudletControl_pb2_grpc as CloudletControl_pb2_grpc
@@ -310,13 +311,13 @@ class jayClient:
         self.brokerStubStatus = status
 
     @func_set_timeout(15)
-    def connectBrokerService(self, retries=5):
+    def connectBrokerService(self, port="45923", retries=5):
         try:
-            self.brokerChannel = grpc.insecure_channel('%s:50051' % self.ip)
+            self.brokerChannel = grpc.insecure_channel('%s:%s' % (self.ip, port))
             self.brokerStub = JayProto_pb2_grpc.BrokerServiceStub(self.brokerChannel)
             sleep(1)
             self.brokerStubReady()
-            log("%s (%s) connectBrokerService" % (self.name, self.ip))
+            log("%s (%s) connectBrokerService(port=%s)" % (self.name, self.ip, port))
         except:
             sleep(5)
             if (retries-1 > 0):
@@ -437,7 +438,7 @@ class jayClient:
         models = self.callExecutorAction("listModels")
         if models == None:
             return None
-        ret_models =  JayProto_pb2.Models()
+        ret_models =  JayTensorFlowProto_pb2.Models()
         ret_models.ParseFromString(models.bytes)
         return ret_models
 
@@ -460,17 +461,21 @@ class jayClient:
         sleep(5)
         return self.setScheduler(scheduler, retries-1)
 
-    def scheduleJob(self, job):
+    def scheduleTask(self, task):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.scheduleJob(job.getProto())
+                return self.brokerStub.scheduleTask(task.getProto())
             except:
                 return False
 
-    def createJob(self, asset_id):
+    def createTask(self, asset_id, deadline=None):
         if (self.brokerStubReady()):
             try:
-                return self.brokerStub.createJob(getProtoString(asset_id))
+                taskInfo = JayProto_pb2.TaskInfo()
+                taskInfo.path = asset_id
+                if (deadline):
+                    taskInfo.deadline = deadline
+                return self.brokerStub.createTask(taskInfo)
             except:
                 return False
 
@@ -518,7 +523,7 @@ class grpcLogs:
     debug = False
     lock = None
 
-class Job:
+class Task:
     id = ""
     data = None
 
@@ -532,10 +537,10 @@ class Job:
         self.data = bytes
 
     def getProto(self):
-        job = JayProto_pb2.Job()
-        job.id = self.id
-        job.data = self.data
-        return job
+        task = JayProto_pb2.Task()
+        task.id = self.id
+        task.data = self.data
+        return task
 
 class Cloud:
     instance = ""

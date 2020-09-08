@@ -12,5 +12,7 @@ __pycache__
 *.bk.3
 *.new
 *.old
-meross.json
+.DS_Store
+ifttt.key
+device.ignore
 apps/
