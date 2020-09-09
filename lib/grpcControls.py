@@ -100,6 +100,7 @@ class x86RemoteControl:
             sleep(5)
             self.start(retries-1)
 
+    @func_set_timeout(15)
     def stop(self, retries=3):
         if retries <= 0:
             log("%s stop FAIL" % (self.ip))
@@ -173,6 +174,7 @@ class x86Launcher:
             sleep(5)
             self.setLogName(log_name, retries-1)
 
+    @func_set_timeout(15)
     def stop(self, retries=3):
         if retries <= 0:
             log("%s (%s) stop FAIL" % (self.name, self.ip))
@@ -360,6 +362,7 @@ class jayClient:
         if (self.brokerStubReady()):
             try:
                 self.task_executors = self.brokerStub.listTaskExecutors(google_empty.Empty())
+                print(self.task_executors)
             except:
                 self.task_executors = None
         if (self.task_executors is not None):

@@ -876,8 +876,14 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     if (experiment.calibration):
         calibrateWorkerThread(jay_instance, cloudlet_seed, asset_id="%s.jpg" % experiment.asset_quality)
     barrierWithTimeout(servers_finish_barrier) #wait experiment completion to init shutdown
-    x86_launcher.stop()
-    x86_remote_control.stop()
+    try:
+        x86_launcher.stop()
+    except:
+        None
+    try:
+        x86_remote_control.stop()
+    except:
+        None
     barrierWithTimeout(finish_barrier)
 
 def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
