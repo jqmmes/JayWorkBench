@@ -498,8 +498,11 @@ def checkPackageInstalled(package=LAUNCHER_APP, device=None):
 def installPackage(path, package, device=None):
     adb(['install', "%s/%s" % (path, package)], device)
 
-def pmInstallPackage(packagePath, package, device=None):
-    adb(['shell', 'pm', 'install', '/sdcard/%s' % package.replace(" ", "\ ")], device)
+def pmInstallPackage(package, device=None):
+    if isRooted(device) and isPermissive(device):
+        adb(['shell', 'su', '-c', "\'pm install -g /data/local/tmp/%s\'" % package.replace(" ", "\ ")], device)
+    else:
+        adb(['shell', 'pm', 'install', '-g', '/data/local/tmp/%s' % package.replace(" ", "\ ")], device)
 
 def uninstallPackage(package=LAUNCHER_APP, device=None):
     adb(['shell', 'pm', 'uninstall', package], device)
@@ -515,6 +518,18 @@ def grantPermission(permission, package=LAUNCHER_APP, device=None):
 def grantedPermissions(package=LAUNCHER_APP, device=None):
     result = adb(['shell', 'dumpsys', 'package', package], device)
     return findall("\s+(\w+\.\w+\.\w+): granted=true", result)
+
+def isPermissive(device=None):
+    result = adb(['shell', 'getenforce'])
+    if result == "Enforcing":
+        return False
+    return True
+
+def isRooted(device=None):
+    result = adb(['shell', 'which', 'su'], device)
+    if result == "":
+        return False
+    return True
 
 def cloudInstanceRunning(instanceName = 'hyrax'):
     instances = gcloud(['compute', 'instances', 'list']).split('\n')

@@ -892,12 +892,12 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
         if (cloud.zone == 'localhost'):
             os.system("cp %s/Jay-x86/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloud.address))
         else:
-            os.system("scp joaquim@%s:~/Jay-x86/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
+            os.system("scp -i ~/.ssh/cloudlet joaquim@%s:~/Jay-x86/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
             os.system("cp %s/Jay-x86/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloudlet))
         else:
-            os.system("scp joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("scp -i ~/.ssh/cloudlet joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
@@ -1345,6 +1345,17 @@ def help():
                     EAScheduler [REMOTE, CLOUD]
                     EAScheduler [LOCAL, REMOTE, CLOUD]
 
+                    GreenTaskScheduler [LOCAL]
+                    GreenTaskScheduler [REMOTE]
+                    GreenTaskScheduler [CLOUD]
+                    GreenTaskScheduler [LOCAL, CLOUD]
+                    GreenTaskScheduler [LOCAL, REMOTE]
+                    GreenTaskScheduler [REMOTE, CLOUD]
+                    GreenTaskScheduler [LOCAL, REMOTE, CLOUD]
+                         Settings:
+                            TASK_DEADLINE_BROKEN_SELECTION: EXECUTE_LOCALLY, FASTER_COMPLETION, [LOWEST_ENERGY]
+                            USE_FIXED_POWER_ESTIMATIONS: true / false
+
 
             Settings:
                     CLOUD_IP
@@ -1478,11 +1489,13 @@ def installPackage(device):
     log('CLEANING_SYSTEM\t%s' % device.name)
     adb.uninstallPackage(device=device)
     log('PACKAGE_UNINSTALLED\t%s' % device.name)
-    adb.pushFile('apps', 'Jay-Android Launcher-release.apk', path='', device=device)
+    log('PUSHING_PACKAGE\t%s' % device.name)
+    adb.pushFile('apps/release/', 'Jay-Android Launcher-release.apk', path='', basepath='/data/local/tmp/', device=device)
     log('PACKAGE_PUSHED\t%s' % device.name)
-    adb.pmInstallPackage('apps', 'Jay-Android Launcher-release.apk', device)
+    log('PM_INSTALL_PACKAGE\t%s' % device.name)
+    adb.pmInstallPackage('Jay-Android Launcher-release.apk', device)
     if not adb.checkPackageInstalled(device=device):
-        adb.installPackage('apps','Jay-Android Launcher-release.apk', device=device)
+        adb.installPackage('apps/release/','Jay-Android Launcher-release.apk', device=device)
     log('PACKAGE_INSTALLED\t%s' % device.name)
     permissions = ["android.permission.INTERNET", "android.permission.READ_PHONE_STATE",
     "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE",
