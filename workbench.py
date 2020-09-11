@@ -24,6 +24,8 @@ import json
 EXPERIMENTS = []
 SCHEDULED_EXPERIMENTS = {}
 PENDING_TASKS = 0
+PENDING_TASKS_LOCK = Lock()
+PENDING_TASKS_WORKER = {}
 PENDING_WORKERS = 0
 LAST_REBOOT_TIME = 0
 ALL_DEVICES = []
@@ -126,18 +128,26 @@ def pingWait(hostname):
     while(not ping(hostname)):
         sleep(2)
 
-def createTask(worker, asset_id):
-    global PENDING_TASKS
+def createTask(worker, asset_id, deadline=None):
+    global PENDING_TASKS, PENDING_TASKS_LOCK, PENDING_TASKS_WORKER
+    PENDING_TASKS_LOCK.acquire()
     PENDING_TASKS += 1
-    log("{}\t{}\tTASK_SUBMIT\t{}".format(time(), asset_id, worker.name))
+    if worker.name not in PENDING_TASKS_WORKER.keys():
+        PENDING_TASKS_WORKER[worker.name] = 0
+    PENDING_TASKS_WORKER[worker.name] += 1
+    PENDING_TASKS_LOCK.release()
+    log("{}\t{}\tTASK_SUBMIT\t{}\t{}".format(time(), asset_id, worker.name, PENDING_TASKS_WORKER[worker.name]))
     try:
-        if not worker.createTask(asset_id):
-            log("{}\t{}\tTASK_FAILED\tFAILED_SCHEDULE\t{}".format(time(), asset_id, worker.name))
+        if not worker.createTask(asset_id, deadline):
+            log("{}\t{}\tTASK_FAILED\tFAILED_SCHEDULE\t{}\t{}".format(time(), asset_id, worker.name, PENDING_TASKS_WORKER[worker.name] - 1))
         else:
-            log("{}\t{}\tTASK_COMPLETE\t{}".format(time(), asset_id, worker.name))
+            log("{}\t{}\tTASK_COMPLETE\t{}\t{}".format(time(), asset_id, worker.name, PENDING_TASKS_WORKER[worker.name] - 1))
     except Exception as task_exception:
-        log("{}\t{}\tTASK_FAILED\t{}TASK_EXCEPTION\t{}".format(time(), asset_id, worker.name))
+        log("{}\t{}\tTASK_FAILED\t{}TASK_EXCEPTION\t{}\t{}".format(time(), asset_id, worker.name, PENDING_TASKS_WORKER[worker.name] - 1))
+    PENDING_TASKS_LOCK.acquire()
     PENDING_TASKS -= 1
+    PENDING_TASKS_WORKER[worker.name] -= 1
+    PENDING_TASKS_LOCK.release()
 
 def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
     log("CALIBRATION\t{}".format(worker.name))
@@ -440,15 +450,14 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     if is_producer:
         if experiment.benchmark and len(asset_list) > 0:
             sleep(2)
-            Thread(target = createTask, args = (jay_instance,asset_list[0])).start()
+            Thread(target = createTask, args = (jay_instance,asset_list[0],experiment.task_deadline)).start()
         else:
             i = 0
-            print(IDLE_BENCHMARK)
             while (i < (len(task_intervals) - 1)  and experiment.isOK() and not IDLE_BENCHMARK):
                 log("NEXT_EVENT_IN\t{}".format(task_intervals[i]))
                 sleep(task_intervals[i])
                 if not experiment.isSequential() or PENDING_TASKS < 1:
-                    Thread(target = createTask, args = (jay_instance,asset_list[i])).start()
+                    Thread(target = createTask, args = (jay_instance,asset_list[i],experiment.task_deadline)).start()
                     i = i+1
     if experiment.benchmark:
         sleep(experiment.benchmark_duration)
@@ -515,8 +524,10 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         experiment.deviceFail(device.name)
     destroyWorker(jay_instance, droid_launcher, device)
     log("WAIT_ON_BARRIER\tFINISH_BARRIER\t%s" % device.name)
-    barrierWithTimeout(finish_barrier)
     adb.screenOff(device)
+    sleep(10)
+    barrierWithTimeout(finish_barrier)
+
 
 def cleanLogs(path):
     if os.path.isdir(path):
@@ -664,9 +675,9 @@ def runExperiment(experiment):
                 i = 0
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(device.name),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier, custom_executors_mobile[i][0], custom_executors_mobile[i][1], custom_executors_mobile[i][2])).start()
                     else:
-                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(i),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
+                        Thread(target = startWorkerThread, args = (experiment, "seed_{}".format(device.name),repetition, seed_repeat, (device in filtered_producers), (experiment.start_worker and (workers > 0)), device, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)).start()
                     workers -= 1 # Os primeiros n devices é que são workers
                     i += 1
                 if USE_SMART_PLUGS:
@@ -694,6 +705,8 @@ def runExperiment(experiment):
                 i=0
                 while (PENDING_TASKS > 0 and experiment.isOK()) or (experiment.duration > time()-completetion_timeout_start and experiment.isOK()):
                     sleep(2)
+                    if (i % 10) == 0:
+                        log("PENDING_TASKS\t{}".format(PENDING_TASKS))
                     if (i % 20) == 0:
                         log("CURRENT_EXPERIMENT_DURATION\t{}s".format(time()-completetion_timeout_start))
                     if (time()-completetion_timeout_start > experiment.duration+experiment.timeout):
@@ -1053,6 +1066,7 @@ class Experiment:
     producers_filter = []
     benchmark = False
     benchmark_duration = 0
+    task_deadline = None
 
     def __init__(self, name):
         self.name = name
@@ -1224,6 +1238,8 @@ def readConfig(confName):
                     experiment.benchmark = True
             elif option == "benchmarkduration":
                 experiment.benchmark_duration = int(config[section][option])
+            elif option == "taskdeadline":
+                experiment.task_deadline = int(config[section][option])
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1275,6 +1291,7 @@ def help():
                     FilterProducers         = Filter Producers to be used in experiment (dev_1, dev_2, ..., dev_n) [LIST]
                     Benchmark               = Wether this experiment is a benchmark [BOOL] (Default False)
                     BenchmarkDuration       = Set benchmark Duration [INT]
+                    TaskDeadline            = Set Task Deadline [INT] (Default: None)
 
         Models:
             Tensorflow:
@@ -1612,10 +1629,14 @@ def main():
         pass
     adb.killAll()
     log("KILLED", "\n", False)
-    log("RESTART_ADB", end="\t")
+    log("RESTART_ADB...", end="\t")
     adb.init()
     sleep(5)
     log("STARTED", "\n", False)
+    #log("DISCONNECTING_OLD_DEVICES...", end="\t")
+    #adb.disconnectAll()
+    #log("DISCONNECTED")
+    #sleep(1)
 
     if args.wifi:
         log("SEARCHING_DEVICES [USB/WIFI]")

@@ -362,7 +362,6 @@ class jayClient:
         if (self.brokerStubReady()):
             try:
                 self.task_executors = self.brokerStub.listTaskExecutors(google_empty.Empty())
-                print(self.task_executors)
             except:
                 self.task_executors = None
         if (self.task_executors is not None):
