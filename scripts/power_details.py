@@ -77,6 +77,7 @@ files_task_completion_duration = {}
 files_battery_level = {}
 files_battery_charge = {}
 files_avg_task_powers = {}
+files_delta_e = {}
 
 def getDeviceType(line):
     finds = findall(",(CLOUD|ANDROID),", line)
@@ -202,6 +203,24 @@ def getBatteryCapacity(data):
                 charges.append((getTimeStamp(line), int(finds[0])))
     return charges
 
+def getDeltaE(device, data_lines):
+    # Time in hours
+    last_power_read = None
+    init_time = (getTimeStamp(data_lines[2]) / 1000.0) / 3600.0
+    end_time = (getTimeStamp(data_lines[-2]) / 1000.0) / 3600.0
+    deltaE = 0
+    for entry in files_powermap[device]:
+        if last_power_read is None:
+            power = entry[1]
+            last_time = init_time
+        else:
+            power = (last_power_read + entry[1]) / 2.0
+        last_power_read = power
+        this_time = ((entry[0] / 1000.0) / 3600.0)
+        deltaE += (power * (this_time - last_time))
+        last_time = this_time
+    deltaE += files_powermap[device][-1][1] * (end_time - ((files_powermap[device][-1][0] / 1000.0) / 3600.0))
+    return deltaE * 1000.0
 
 for file in files:
     name = file.rstrip(".csv")
@@ -212,11 +231,9 @@ for file in files:
     files_deadline_met[name] = getDeadlines(data_lines)
     files_task_duration[name] = getTasksComputeDuration(data_lines)
     files_task_completion_duration[name] = getTasksCompletionDuration(data_lines)
-    #print(files_task_completion_duration[name])
     files_battery_level[name] = getBatteryLevel(data_lines)
     files_battery_charge[name] = getBatteryCapacity(data_lines)
-
-
+    files_delta_e[name] = getDeltaE(name, data_lines)
 
 total_task_energy = 0
 total_task_count = 0
@@ -239,7 +256,10 @@ for file in sorted(files_powermap.keys()):
             total_task_count += 1
         except:
             None
-    files_avg_task_powers[file] = avg_p_file / entries
+    if entries > 0:
+        files_avg_task_powers[file] = avg_p_file / entries
+    else:
+        files_avg_task_powers[file] = 0.0
 
 print("NAME\t\tGENERATED\tEXECUTED\tOFFLOADED\tDEADLINE_MET\tDEADLINE_BROKEN\tAVG_COMPUTE_TIME_TASK\tAVG_TIME_TASK\tAVG_ENERGY_TASK\tdeltaBAT\tdeltaCAP\tdeltaENERGY")
 for file in sorted(files_taskmap.keys()):
@@ -280,7 +300,7 @@ for file in sorted(files_taskmap.keys()):
         device_names[file], files_taskmap[file][0], files_taskmap[file][1],
         files_taskmap[file][2], files_deadline_met[file][0], files_deadline_met[file][1],
         avg_compute_time, avg_task_time, files_avg_task_powers[file], (max_bat - min_bat),
-        (max_cap - min_cap), 1.0)
+        (max_cap - min_cap), files_delta_e[file])
     )
 print("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 print("GLOBAL\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t{:.2f}mWh".format(total_task_energy / total_task_count))

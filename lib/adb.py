@@ -526,7 +526,7 @@ def pmInstallPackage(package, device=None):
         adb(['shell', 'pm', 'install', '-g', '/data/local/tmp/%s' % package.replace(" ", "\ ")], device)
 
 def uninstallPackage(package=LAUNCHER_APP, device=None):
-    adb(['shell', 'pm', 'uninstall', package], device)
+    adb(['shell', 'pm', 'uninstall', '-k', package], device)
 
 def removePackage(package=LAUNCHER_APP, device=None):
     adb(['shell', 'pm', 'clear', package], device)

@@ -339,30 +339,34 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     droid_launcher = None
     jay_instance = None
     error = False
-    try:
-        worker_ip = getDeviceIp(device)
-        if (worker_ip is None and retries < 5):
-            log("FAILED_OBTAIN_IP\t%s" % device.name)
-            skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
-            experiment.deviceFail(device.name)
-            adb.rebootAndWait(device)
-            return
-        log("STARTING_SERVICES\t%s" % device.name)
-        droid_launcher = grpcControls.droidLauncher(worker_ip, device.name)
-        jay_instance = grpcControls.jayClient(worker_ip, device.name)
-        droid_launcher.connectLauncherService()
-        droid_launcher.setLogName(experiment.name)
-        log("CONECTED_TO_LAUNCHER\t%s" % device.name)
-        sleep(10)
-        if is_worker:
-            droid_launcher.startWorker()
-        droid_launcher.startScheduler()
-    except FunctionTimedOut:
-       log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
-       error = True
-    except Exception:
-       log("Error Starting Worker %s" % device.name)
-       error = True
+    for i in range(2):
+        try:
+            worker_ip = getDeviceIp(device)
+            if (worker_ip is None and retries < 5):
+                log("FAILED_OBTAIN_IP\t%s" % device.name)
+                skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
+                experiment.deviceFail(device.name)
+                adb.rebootAndWait(device)
+                return
+            log("STARTING_SERVICES\t%s" % device.name)
+            droid_launcher = grpcControls.droidLauncher(worker_ip, device.name)
+            jay_instance = grpcControls.jayClient(worker_ip, device.name)
+            droid_launcher.connectLauncherService()
+            droid_launcher.setLogName(experiment.name)
+            log("CONECTED_TO_LAUNCHER\t%s" % device.name)
+            sleep(10)
+            if is_worker:
+                droid_launcher.startWorker()
+            droid_launcher.startScheduler()
+            break
+        except FunctionTimedOut:
+            if i == 1:
+                log("Error Starting Worker %s\t[FUNCTION_TIMED_OUT]" % device.name)
+                error = True
+        except Exception:
+            if i == 1:
+                log("Error Starting Worker %s" % device.name)
+                error = True
     '''
     multicast_group = '224.0.0.1'
     server_address = (multicast_group, 50000)
@@ -602,7 +606,7 @@ def runExperiment(experiment):
                 sleep(2)
         barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
 
-    for repetition in range(experiment.repetitions):
+    for repetition in range(0,experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
         os.makedirs("logs/experiment/%s/%d/" % (experiment.name, repetition), exist_ok=True)
         devices.sort(key=lambda e: e.name, reverse=False)
@@ -1543,9 +1547,12 @@ def fixULimit():
         result = subprocess.run(["ulimit", "-n"], stdout=subprocess.PIPE, stderr=FNULL)
         log("CURRENT_ULIMIT:\t%s" % result.stdout.decode('UTF-8').strip("\n"))
         if int(result.stdout.decode('UTF-8')) < 10240:
-            log("SETTING_ULIMIT:\t10240")
-            subprocess.run(["ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
-            subprocess.run(["sudo", "ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
+            log("MUST_SET_ULIMIT_TO: 10240")
+            log("ulimit -n 10240")
+            exit(0)
+            #log("SETTING_ULIMIT:\t10240")
+            #subprocess.run(["ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
+            #subprocess.run(["sudo", "ulimit", "-n", "10240"], stdout=FNULL, stderr=FNULL)
 
 def shutdownDevice(device=None, barrier=None):
     log("SHUTING_DOWN:\t%s (%s)" % (device.name, device.ip))
@@ -1776,6 +1783,8 @@ def main():
                 shutil.move("{}/{}".format(new_experiments,file), "{}/{}.loaded".format(loaded_experiments,file))
         if not run_scheduled and next_experiment is not None:
             i += 1
+    for device in ALL_DEVICES:
+        adb.screenOff(device)
     if args.use_curses:
         progressBar_0.updateProgress(100)
         complete_progress.updateText("")
