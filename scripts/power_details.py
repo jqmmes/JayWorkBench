@@ -121,6 +121,8 @@ def getTasksInfo(data):
         generated -= 1
     if executed > 0:
         executed -= 1
+    if offloaded > 0:
+        offloaded -= 1
     return (generated, executed, offloaded)
 
 def getDeadlines(data):
@@ -133,6 +135,8 @@ def getDeadlines(data):
                 success += 1
             else:
                 fail += 1
+    if success > 0:
+        success -= 1
     return (success, fail)
 
 
@@ -261,7 +265,20 @@ for file in sorted(files_powermap.keys()):
     else:
         files_avg_task_powers[file] = 0.0
 
-print("NAME\t\tGENERATED\tEXECUTED\tOFFLOADED\tDEADLINE_MET\tDEADLINE_BROKEN\tAVG_COMPUTE_TIME_TASK\tAVG_TIME_TASK\tAVG_ENERGY_TASK\tdeltaBAT\tdeltaCAP\tdeltaENERGY")
+total_tasks_generated = 0
+total_tasks_executed = 0
+total_tasks_offloadeded = 0
+total_deadline_met = 0
+total_deadline_broken = 0
+total_delta_energy = 0.0
+
+total_avg_compute_time_cnt = 0
+total_avg_task_time_cnt = 0
+total_avg_compute_time = 0.0
+total_avg_task_time = 0.0
+
+
+print("\n\n\n\nNAME\t\tGENERATED\tEXECUTED\tLOCAL\t\tOFFLOADED\tDEADLINE_MET\tDEADLINE_BROKEN\tAVG_COMPUTE_TIME_TASK\tAVG_TIME_TASK\tAVG_ENERGY_TASK\tdeltaBAT\tdeltaCAP\tdeltaENERGY")
 for file in sorted(files_taskmap.keys()):
     avg_compute_time = 0
     avg_task_time = 0
@@ -269,14 +286,18 @@ for file in sorted(files_taskmap.keys()):
         avg_compute_time += task[1] - task[0]
     try:
         avg_compute_time = (avg_compute_time / len(files_task_duration[file])) / 1000.0
+        total_avg_compute_time_cnt += files_taskmap[file][0]
     except:
         None
+    total_avg_compute_time += avg_compute_time*files_taskmap[file][0]
     for task in files_task_completion_duration[file]:
         avg_task_time += task
     try:
         avg_task_time = (avg_task_time / len(files_task_completion_duration[file])) / 1000.0
+        total_avg_task_time_cnt += files_taskmap[file][0]
     except:
         None
+    total_avg_task_time += avg_task_time*files_taskmap[file][0]
     max_bat = 0
     min_bat = 100
     for bat in files_battery_level[file]:
@@ -296,11 +317,50 @@ for file in sorted(files_taskmap.keys()):
     if min_cap == maxsize and max_cap == -maxsize - 1:
         min_cap = 0
         max_cap = 0
-    print("{}\t{}\t\t{}\t\t{}\t\t{}\t\t{}\t\t{:.2f}s\t\t\t{:.2f}s\t\t{:.2f}mWh \t{}%\t\t{}mAh\t\t{:.2f}mWh".format(
-        device_names[file], files_taskmap[file][0], files_taskmap[file][1],
-        files_taskmap[file][2], files_deadline_met[file][0], files_deadline_met[file][1],
-        avg_compute_time, avg_task_time, files_avg_task_powers[file], (max_bat - min_bat),
-        (max_cap - min_cap), files_delta_e[file])
-    )
-print("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
-print("GLOBAL\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t{:.2f}mWh".format(total_task_energy / total_task_count))
+
+    deadline_success_pcnt = None
+    deadline_broken_pcnt = None
+
+    try:
+        deadline_success_pcnt = ((files_deadline_met[file][0]*100.0)/files_taskmap[file][0])
+        deadline_broken_pcnt = ((files_deadline_met[file][1]*100.0)/files_taskmap[file][0])
+    except:
+        None
+    if deadline_success_pcnt is not None and deadline_broken_pcnt is not None:
+        print("{}\t{}\t\t{}\t\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{:.2f}s\t\t\t{:.2f}s\t\t{:.2f}mWh \t{}%\t\t{}mAh\t\t{:.2f}mWh".format(
+            device_names[file], files_taskmap[file][0], files_taskmap[file][1],
+            (files_taskmap[file][0]-files_taskmap[file][2]),
+            (((files_taskmap[file][0]-files_taskmap[file][2])*100.0)/files_taskmap[file][0]),
+            files_taskmap[file][2], ((files_taskmap[file][2]*100.0)/files_taskmap[file][0]),
+            files_deadline_met[file][0], deadline_success_pcnt,
+            files_deadline_met[file][1], deadline_broken_pcnt,
+            avg_compute_time, avg_task_time, files_avg_task_powers[file], (max_bat - min_bat),
+            (max_cap - min_cap), files_delta_e[file])
+        )
+    else:
+        print("{}\t{}\t\t{}\t\t{}\t\t{}\t\t{}\t\t{}\t\t{:.2f}s\t\t\t{:.2f}s\t\t{:.2f}mWh \t{}%\t\t{}mAh\t\t{:.2f}mWh".format(
+            device_names[file], files_taskmap[file][0], files_taskmap[file][1],
+            (files_taskmap[file][0]-files_taskmap[file][2]), files_taskmap[file][2],
+            files_deadline_met[file][0], files_deadline_met[file][1],
+            avg_compute_time, avg_task_time, files_avg_task_powers[file], (max_bat - min_bat),
+            (max_cap - min_cap), files_delta_e[file])
+        )
+    total_tasks_generated += files_taskmap[file][0]
+    total_tasks_executed += files_taskmap[file][1]
+    total_tasks_offloadeded += files_taskmap[file][2]
+    total_deadline_met += files_deadline_met[file][0]
+    total_deadline_broken += files_deadline_met[file][1]
+    total_delta_energy += files_delta_e[file]
+
+print("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
+print("GLOBAL\t\t{}\t\t{}\t\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{:.2f}s\t\t\t{:.2f}s\t\t{:.2f}mWh\t\t\t\t\t\t{:.2f}mWh".format(
+    total_tasks_generated,total_tasks_executed-5,(total_tasks_generated-total_tasks_offloadeded),
+    (((total_tasks_generated-total_tasks_offloadeded)*100.0)/total_tasks_generated),
+    total_tasks_offloadeded, ((total_tasks_offloadeded*100.0)/total_tasks_offloadeded),
+    total_deadline_met,((total_deadline_met*100.0)/total_tasks_generated),
+    total_deadline_broken,((total_deadline_broken*100.0)/total_tasks_generated),
+    (total_avg_compute_time/total_avg_compute_time_cnt),
+    (total_avg_task_time/total_avg_task_time_cnt),
+    (total_task_energy / total_task_count), total_delta_energy)
+)
+print("\n\n\n\n")

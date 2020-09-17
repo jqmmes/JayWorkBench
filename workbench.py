@@ -606,7 +606,7 @@ def runExperiment(experiment):
                 sleep(2)
         barrierWithTimeout(reboot_barrier, timeout=360, show_error=True, device="MAIN")
 
-    for repetition in range(0,experiment.repetitions):
+    for repetition in range(experiment.task_iteration_start, experiment.repetitions):
         log("=========================\tREPETITION {}\t========================".format(repetition))
         os.makedirs("logs/experiment/%s/%d/" % (experiment.name, repetition), exist_ok=True)
         devices.sort(key=lambda e: e.name, reverse=False)
@@ -772,6 +772,9 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
         good_to_use.sort(key=lambda d: d.battery_level, reverse=True) #Return sorted by most battery
         return good_to_use
     else:
+        forceScreenOnViaPower()
+        sleep(10)
+        power_on()
         discoverable_devices = adb.listDevices(0)
         good_to_charge = []
         for device in to_charge:
@@ -786,6 +789,7 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
         for device in good_to_charge:
             Thread(target = chargeDevice, args = (experiment.min_battery, device, battery_barrier)).start()
         barrierWithTimeout(battery_barrier, 3600, show_error=False)
+        sleep(60)
         return getNeededDevicesAvailable(experiment, devices, retries-1)
 
 def rebootDevice(device, retries=2, reboot_barrier=None, screenOff=False):
@@ -827,12 +831,17 @@ def getBatteryLevel(device, retries=2):
 def chargeDevice(min_battery, device, battery_barrier):
     counter = 0
     battery_level = getBatteryLevel(device)
+    sleep(10)
     while (not battery_barrier.broken and (battery_level < max(0, min(100, min_battery)))):
+        adb.screenOff(device)
         if (counter % 5 == 0):
             log("CHARGING_DEVICE {} ({}%)".format(device.name, battery_level))
         sleep(120)
+        forceScreenOnViaPower()
+        sleep(10)
         battery_level = getBatteryLevel(device)
         counter += 1
+        sleep(10)
     barrierWithTimeout(battery_barrier, 3600, show_error=False)
 
 def startCloudlets(experiment, repetition, seed_repeat, servers_finish_barrier, finish_barrier):
@@ -1071,6 +1080,8 @@ class Experiment:
     benchmark = False
     benchmark_duration = 0
     task_deadline = None
+    task_iteration_start = 0
+
 
     def __init__(self, name):
         self.name = name
@@ -1131,6 +1142,7 @@ def readConfig(confName):
         experiment = Experiment(section)
         experiment.devices_filter = []
         experiment.producers_filter = []
+        experiment.task_iteration_start = 0
         for option in config.options(section):
             if option == "strategy":
                 experiment.scheduler = config[section][option]
@@ -1244,6 +1256,8 @@ def readConfig(confName):
                 experiment.benchmark_duration = int(config[section][option])
             elif option == "taskdeadline":
                 experiment.task_deadline = int(config[section][option])
+            elif option == "taskiterationstart":
+                experiment.task_iteration_start = int(config[section][option])
         if (experiment.producers == 0 or experiment.producers > experiment.devices):
             experiment.producers = experiment.devices
         if (experiment.workers == -1 or experiment.workers > experiment.devices):
@@ -1296,6 +1310,7 @@ def help():
                     Benchmark               = Wether this experiment is a benchmark [BOOL] (Default False)
                     BenchmarkDuration       = Set benchmark Duration [INT]
                     TaskDeadline            = Set Task Deadline [INT] (Default: None)
+                    TaskIterationStart      = The iteration to start task [INT] (Default: 0)
 
         Models:
             Tensorflow:
@@ -1428,6 +1443,14 @@ def help():
                     COMPUTATION_BASELINE_DURATION_FLAG = false
                     COMPUTATION_BASELINE_DURATION = 600 // 10 minutess
                     TRANSFER_BASELINE_FLAG = false
+
+                    --> SCHEDULERS:
+                    TASK_DEADLINE_BROKEN_SELECTION:
+                            EXECUTE_LOCALLY
+                            FASTER_COMPLETION
+                            RANDOM
+                            LOWEST_ENERGY
+                    INCLUDE_IDLE_COSTS = true/false
 
             OS Specific Problems/Fixes:
                 MacOS:
