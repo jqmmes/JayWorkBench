@@ -69,11 +69,18 @@ def power_on(smart_plug="SHP7"):
     subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20on/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
     return True
 
-def power_off(smart_plug="SHP7"):
+def power_off(smart_plug="SHP7", checkPlug=True, retries=5):
+    global ALL_DEVICES
     ifttt_key = readIFTTTKey()
     if (ifttt_key == ""):
         return False
     subprocess.run(['curl', "https://maker.ifttt.com/trigger/Turn%20" + smart_plug + "%20off/with/key/"+ifttt_key], stdout=subprocess.PIPE, stderr=FNULL)
+    if checkPlug:
+        sleep(2)
+        if adb.isCharging(random.choice(ALL_DEVICES)) and retries > 0:
+            log("POWER_OFF_FAILED_RETRYING")
+            sleep(2)
+            return power_off(smart_plug, checkPlug, retries - 1)
     return True
 
 @func_set_timeout(1)
@@ -386,7 +393,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         print (str(sender) + '  ' + repr(data))
     '''
     try:
-        forceScreenOnViaPower(device)
+        forceScreenOnViaPower(device, experiment.power_devices)
         sleep(2)
     except:
         pass
@@ -482,7 +489,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     LOG_PULL_SCREEN_ON_LOCK.acquire()
     try:
         if LOG_PULL_SCREEN_ON_FLAG:
-            forceScreenOnViaPower(device)
+            forceScreenOnViaPower(device, experiment.power_devices)
             sleep(2)
             LOG_PULL_SCREEN_ON_FLAG = False
     finally:
@@ -536,11 +543,11 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
 def cleanLogs(path):
     if os.path.isdir(path):
         for f in os.listdir(path):
-            if os.path.isdir("%s%s" % (path, f)):
-                cleanLogs("%s%s/" % (path, f))
-                os.rmdir("%s%s" % (path, f))
+            if os.path.isdir("%s/%s" % (path, f)):
+                cleanLogs("%s/%s/" % (path, f))
+                os.rmdir("%s/%s" % (path, f))
             else:
-                os.remove("%s%s" % (path, f))
+                os.remove("%s/%s" % (path, f))
     else:
         os.makedirs(path, exist_ok=True)
 
@@ -553,11 +560,12 @@ def runExperiment(experiment):
         progressBar_0 = CURSES.add_progress_bar(1,60,4,10)
         progressBar_0.updateProgress(0)
 
+    if not os.path.isdir("logs/experiment/%s/" % experiment.name):
+        os.makedirs("logs/experiment/%s/" % experiment.name, exist_ok=True)
+
     logExperiment(LOG_FILE, experiment)
     experiment_random = random.Random()
     experiment_random.seed(experiment.seed)
-    cleanLogs("logs/experiment/%s/" % experiment.name)
-    cleanLogs("logs/sys/%s/" % experiment.name)
     ASSETS=os.listdir(experiment.assets)
 
     log("STOPPING ALL RUNNING INSTANCES IN NETWORK")
@@ -652,6 +660,8 @@ def runExperiment(experiment):
                         if dev.name == failed_device:
                             experiment_devices.remove(dev)
 
+                cleanLogs("logs/experiment/%s/%d/%d/" % (experiment.name, repetition, seed_repeat))
+                cleanLogs("logs/sys/%s/%d/%d/" % (experiment.name, repetition, seed_repeat))
                 os.makedirs("logs/experiment/%s/%d/%d/" % (experiment.name, repetition, seed_repeat), exist_ok=True)
                 boot_barrier = Barrier(experiment.devices + 1)
                 start_barrier = Barrier(experiment.devices + 1)
@@ -1557,12 +1567,16 @@ def installPackage(device):
             log('ALREADY_GRANTED_PERMISSION: ' + permission + '\t%s' % device.name)
     adb.screenOff(device)
 
-def forceScreenOnViaPower(device=None):
+def forceScreenOnViaPower(device=None, power_devices=True):
     if USE_SMART_PLUGS  and not adb.hasScreenOn(device) and not device.connected_usb and device.connected_wifi:
         power_off()
         sleep(2)
         power_on()
         sleep(1)
+    sleep(2)
+    if not power_devices:
+        power_off(checkPlug = True)
+        sleep(2)
     adb.screenOn(device)
 
 def fixULimit():
@@ -1648,7 +1662,7 @@ def main():
         power_on()
         return
     if args.power_off:
-        power_off()
+        power_off(checkPlug=False)
         return
 
 
@@ -1691,7 +1705,7 @@ def main():
             IDLE_BENCHMARK_DURATION = int(args.idle_benchmark_duration)
 
     if args.wifi or args.ip_mask:
-        power_off()
+        power_off(checkPlug=False)
         sleep(2)
         power_on()
         sleep(2)
@@ -1706,7 +1720,7 @@ def main():
         for device in ALL_DEVICES:
             forceScreenOnViaPower(device)
             sleep(1)
-        power_off()
+        power_off(checkPlug=False)
         shutdownBarrier = Barrier(len(ALL_DEVICES)+1)
         for device in ALL_DEVICES:
             Thread(target = shutdownDevice, args=(device,shutdownBarrier)).start()

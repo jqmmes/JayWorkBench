@@ -126,6 +126,17 @@ def gcloud(cmd):
   result = subprocess.run(['gcloud'] + cmd, stdout=subprocess.PIPE, stderr=FNULL)
   return result.stdout.decode('UTF-8')
 
+def isCharging(device=None, retries=3):
+    if (retries <= 0):
+        return False
+    battery_details = adb(['shell', 'dumpsys', 'battery'], device)
+    if battery_details.find("AC powered: true") != -1 or battery_details.find("USB powered: true") != -1:
+        return True
+    elif battery_details.find("AC powered: false") != -1 or battery_details.find("USB powered: false") != -1:
+        return False
+    sleep(2)
+    return isCharging(device, retries - 1)
+
 def getBatteryLevel(device=None, retries=3):
     if (retries <= 0):
         return -1
@@ -242,6 +253,8 @@ def getWifiDeviceNameByIp(device_ip, retries=2):
             device_name = "7a3e71d8"
         elif device_ip == "192.168.3.35":
             device_name = "R52N50ZGEYE"
+        elif device_ip == "192.168.3.37":
+            device_name = "HT4BVJT00003"
         elif device_ip == "192.168.3.40":
             device_name = "HT4BVJT00012"
         elif device_ip == "192.168.3.48":

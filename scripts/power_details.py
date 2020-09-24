@@ -63,7 +63,8 @@ device_names = {
 "cloudlet_192.168.3.15": "Cloudlet",
 "unknown_device_192.168.3.48": "Pixel 4 ",
 "9B021FFAZ00510": "Pixel 4 ",
-"HT4BVJT00012": "Nexus 9 "
+"HT4BVJT00012": "Nexus 9 ",
+"HT4BVJT00003": "Nexus 9 "
 }
 
 files = os.listdir(argv[1])
@@ -78,6 +79,7 @@ files_battery_level = {}
 files_battery_charge = {}
 files_avg_task_powers = {}
 files_delta_e = {}
+total_duration = 0.0
 
 def getDeviceType(line):
     finds = findall(",(CLOUD|ANDROID),", line)
@@ -93,7 +95,7 @@ def getTimeStamp(line):
 def getPowerMap(data):
     power_map = []
     for line in data:
-        finds = findall("POWER=-(\d+\.\d+)\"", line)
+        finds = findall("POWER=-(\d+\.\d+)", line)
         if len(finds) > 0:
             power_map.append((getTimeStamp(line), float(finds[0])))
     return power_map
@@ -117,12 +119,8 @@ def getTasksInfo(data):
              executed += 1
         elif len(findall("SCHEDULED", line)) > 0:
             offloaded += checkOffload(line)
-    if generated > 0:
-        generated -= 1
     if executed > 0:
         executed -= 1
-    if offloaded > 0:
-        offloaded -= 1
     return (generated, executed, offloaded)
 
 def getDeadlines(data):
@@ -135,14 +133,10 @@ def getDeadlines(data):
                 success += 1
             else:
                 fail += 1
-    if success > 0:
-        success -= 1
     return (success, fail)
 
 
 def getTasksCompletionDuration(data):
-    #BrokerService_scheduleTask$Jay_Base_150,INIT
-    #EXECUTION_COMPLETE,c29f1e8e-063b-48f2-a314-38f091ccc23e,"DATA_SIZE=1840828;DURATION_MILLIS=2460
     device_type = getDeviceType(data[1])
     if device_type == "CLOUD":
         return []
@@ -155,11 +149,6 @@ def getTasksCompletionDuration(data):
 
 
 def getTasksComputeDuration(data):
-    # init ->  RunnableTaskObjects_run_197,INIT,b2c76807-ee16-47ae-b7b2-b0b41070c4fb
-    # end ->  WorkerGRPCClient$execute$1_run_42,COMPLETE,b2c76807-ee16-47ae-b7b2-b0b41070c4fb
-    #
-    # init_cloudlet ->  ThreadPoolExecutor_runWorker_1128,INIT
-    # end_cloudlet -> ThreadPoolExecutor_runWorker_1128,COMPLETE
     device_type = getDeviceType(data[1])
     durations = []
     job_id = None
@@ -169,7 +158,7 @@ def getTasksComputeDuration(data):
             if device_type == "CLOUD":
                 id = findall("ThreadPoolExecutor_runWorker_1128,INIT,([a-f0-9\-]+)", line)
             else:
-                id = findall("RunnableTaskObjects_run_197,INIT,([a-f0-9\-]+)", line)
+                id = findall("RunnableTaskObjects_run_216,INIT,([a-f0-9\-]+)", line)
             if len(id) > 0:
                 job_id = id[0]
                 timestamp = getTimeStamp(line)
@@ -194,8 +183,6 @@ def getBatteryLevel(data):
     return levels
 
 def getBatteryCapacity(data):
-    #;CHARGE=(\d+) So para Pixel e N9
-    #   NEW_BATTERY_CAPACITY=(\d+)
     charges = []
     for line in data:
         finds = findall(";CHARGE=(\d+)", line)
@@ -223,7 +210,10 @@ def getDeltaE(device, data_lines):
         this_time = ((entry[0] / 1000.0) / 3600.0)
         deltaE += (power * (this_time - last_time))
         last_time = this_time
-    deltaE += files_powermap[device][-1][1] * (end_time - ((files_powermap[device][-1][0] / 1000.0) / 3600.0))
+    try:
+        deltaE += files_powermap[device][-1][1] * (end_time - ((files_powermap[device][-1][0] / 1000.0) / 3600.0))
+    except:
+        print("POSITIVE_CHARGES_NEEDS_REPEAT ON FILE %s" % device)
     return deltaE * 1000.0
 
 for file in files:
@@ -238,6 +228,9 @@ for file in files:
     files_battery_level[name] = getBatteryLevel(data_lines)
     files_battery_charge[name] = getBatteryCapacity(data_lines)
     files_delta_e[name] = getDeltaE(name, data_lines)
+    total_duration = max(total_duration, ((getTimeStamp(data_lines[-2])-getTimeStamp(data_lines[1])) / 1000.0))
+
+
 
 total_task_energy = 0
 total_task_count = 0
@@ -267,7 +260,7 @@ for file in sorted(files_powermap.keys()):
 
 total_tasks_generated = 0
 total_tasks_executed = 0
-total_tasks_offloadeded = 0
+total_tasks_offloaded = 0
 total_deadline_met = 0
 total_deadline_broken = 0
 total_delta_energy = 0.0
@@ -347,20 +340,26 @@ for file in sorted(files_taskmap.keys()):
         )
     total_tasks_generated += files_taskmap[file][0]
     total_tasks_executed += files_taskmap[file][1]
-    total_tasks_offloadeded += files_taskmap[file][2]
+    total_tasks_offloaded += files_taskmap[file][2]
     total_deadline_met += files_deadline_met[file][0]
     total_deadline_broken += files_deadline_met[file][1]
     total_delta_energy += files_delta_e[file]
 
+try:
+    total_tasks_offloaded_pcnt = ((total_tasks_offloaded*100.0)/total_tasks_offloaded)
+except:
+    total_tasks_offloaded_pcnt = 0
+
 print("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 print("GLOBAL\t\t{}\t\t{}\t\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{:.2f}s\t\t\t{:.2f}s\t\t{:.2f}mWh\t\t\t\t\t\t{:.2f}mWh".format(
-    total_tasks_generated,total_tasks_executed-5,(total_tasks_generated-total_tasks_offloadeded),
-    (((total_tasks_generated-total_tasks_offloadeded)*100.0)/total_tasks_generated),
-    total_tasks_offloadeded, ((total_tasks_offloadeded*100.0)/total_tasks_offloadeded),
+    total_tasks_generated,total_tasks_executed,(total_tasks_generated-total_tasks_offloaded),
+    (((total_tasks_generated-total_tasks_offloaded)*100.0)/total_tasks_generated),
+    total_tasks_offloaded, total_tasks_offloaded_pcnt,
     total_deadline_met,((total_deadline_met*100.0)/total_tasks_generated),
     total_deadline_broken,((total_deadline_broken*100.0)/total_tasks_generated),
     (total_avg_compute_time/total_avg_compute_time_cnt),
     (total_avg_task_time/total_avg_task_time_cnt),
     (total_task_energy / total_task_count), total_delta_energy)
 )
+print("\nTOTAL_DURATION: {:.2f}s".format(total_duration))
 print("\n\n\n\n")
