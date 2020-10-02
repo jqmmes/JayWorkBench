@@ -48,6 +48,7 @@ TAP_TO_KEEP_SCREEN_INTERVAL_SECONDS = 120
 PLUGS = []
 IDLE_BENCHMARK = False
 IDLE_BENCHMARK_DURATION = 1200 # 20mins
+LAST_RECEIVED_TASK_COMPLETION = None
 
 
 async def merros_init():
@@ -154,6 +155,7 @@ def createTask(worker, asset_id, deadline=None):
     PENDING_TASKS_LOCK.acquire()
     PENDING_TASKS -= 1
     PENDING_TASKS_WORKER[worker.name] -= 1
+    LAST_RECEIVED_TASK_COMPLETION = time()
     PENDING_TASKS_LOCK.release()
 
 def calibrateWorkerThread(worker, worker_seed, device=None, asset_id=""):
@@ -197,7 +199,9 @@ def barrierWithTimeout(barrier, timeout=None, experiment=None, show_error=True, 
 
 def skipBarriers(experiment, show_error=True, device=None, *skip_barriers):
     if experiment:
-        experiment.setFail()
+        if experiment.isOK():
+            log("SKIP_BARRIERS\tEXPERIMENT_SET_FAIL")
+            experiment.setFail()
     for barrier in skip_barriers:
         try:
             barrier.abort()
@@ -267,6 +271,7 @@ def setTaskExecutorSettings(experiment, jay_instance, custom_settings_map):
 def selectModel(experiment, jay_instance, custom_model):
     models = jay_instance.listModels()
     if (models is None):
+        log("SELECT_MODEL\tEXPERIMENT_SET_FAIL")
         experiment.setFail()
     selected_model = custom_model if (custom_model != None) else experiment.model
     for model in models.models:
@@ -506,6 +511,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
                 LOG_PULL_LOCK.release()
     except:
         log("PULLING_LOG\t%s\tLOG\tERROR" % device.name)
+        log("DEVICE_PULLING_LOG\tEXPERIMENT_SET_FAIL")
         experiment.setFail()
         experiment.deviceFail(device.name)
     try:
@@ -531,6 +537,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
             break
     if not log_available:
         log("CHECKING_LOG\t%s\tFAILED" % device.name)
+        log("DEVICE_CHECKING_LOG\tEXPERIMENT_SET_FAIL")
         experiment.setFail()
         experiment.deviceFail(device.name)
     destroyWorker(jay_instance, droid_launcher, device)
@@ -552,7 +559,7 @@ def cleanLogs(path):
         os.makedirs(path, exist_ok=True)
 
 def runExperiment(experiment):
-    global PENDING_TASKS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES, USE_SMART_PLUGS, LOG_PULL_SCREEN_ON_FLAG, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
+    global PENDING_TASKS, ALL_DEVICES, DEVICE_BLACKLIST, ASSETS, CURSES, USE_SMART_PLUGS, LOG_PULL_SCREEN_ON_FLAG, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION, LAST_RECEIVED_TASK_COMPLETION
 
     if CURSES:
         CURSES.add_text(1,200,3,text="EXPERIMENT: {}".format(experiment.name))
@@ -599,6 +606,12 @@ def runExperiment(experiment):
     logExperiment(conf, experiment)
     conf.close()
 
+
+    if os.path.exists("logs/experiment/%s/lost_devices_mid_experience_CANCELED"):
+        os.remove("logs/experiment/%s/lost_devices_mid_experience_CANCELED")
+    if os.path.exists("logs/experiment/%s/not_enough_devices_CANCELED"):
+        os.remove("logs/experiment/%s/not_enough_devices_CANCELED")
+
     killLocalCloudlet()
     stopClouds(experiment)
 
@@ -620,9 +633,10 @@ def runExperiment(experiment):
         devices.sort(key=lambda e: e.name, reverse=False)
         experiment_random.shuffle(devices)
 
-        for seed_repeat in range(experiment.repeat_seed):
+        for seed_repeat in range(experiment.initial_repeat_seed, experiment.repeat_seed):
             TAP_TO_KEEP_SCREEN_ON_FLAG = True
             LOG_PULL_SCREEN_ON_FLAG = True
+            LAST_RECEIVED_TASK_COMPLETION = None
             if CURSES:
                 progressBar_0.updateProgress(int(100*(seed_repeat/experiment.repeat_seed)))
             repeat_tries = 0
@@ -697,9 +711,11 @@ def runExperiment(experiment):
                 if USE_SMART_PLUGS:
                     if (experiment.power_devices):
                         if (not power_on(experiment.smart_plug)):
+                            log("POWER_ON_FAIL\tEXPERIMENT_SET_FAIL")
                             experiment.setFail()
                     else:
                         if (not power_off(experiment.smart_plug)):
+                            log("POWER_OFF_FAIL\tEXPERIMENT_SET_FAIL")
                             experiment.setFail()
                 for device in ALL_DEVICES:
                     if device not in experiment_devices[:experiment.devices]:
@@ -727,6 +743,13 @@ def runExperiment(experiment):
                         log("COMPLETION_TIMEOUT_EXCEDED")
                         os.system("touch logs/experiment/%s/%d/%d/completion_timeout_exceded"  % (experiment.name, repetition, seed_repeat))
                         break
+                    if not (LAST_RECEIVED_TASK_COMPLETION is None):
+                        if (time()-LAST_RECEIVED_TASK_COMPLETION > 120):
+                            log("TASKS_GOT_STUCK_ON_ERROR")
+                            log("TASKS_STUCK_FAIL\tEXPERIMENT_SET_FAIL")
+                            experiment.setFail()
+                            os.system("touch logs/experiment/%s/%d/%d/tasks_got_stuck"  % (experiment.name, repetition, seed_repeat))
+                            break
                     i+=1
                 sleep(2)
                 if (IDLE_BENCHMARK):
@@ -768,6 +791,7 @@ def runExperiment(experiment):
 def getNeededDevicesAvailable(experiment, devices, retries=5):
     if retries < 0:
         experiment.setFail()
+        log("NOT_ENOUGH_DEVICES\tEXPERIMENT_SET_FAIL")
         os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
         return []
     to_charge = []
@@ -792,6 +816,7 @@ def getNeededDevicesAvailable(experiment, devices, retries=5):
                 if disc_device.name == device.name or disc_device.ip == device.ip:
                     good_to_charge.append(device)
         if len(good_to_use) + len(good_to_charge) < experiment.devices:
+            log("NOT_ENOUGH_DEVICES\tEXPERIMENT_SET_FAIL")
             experiment.setFail()
             os.system("touch logs/experiment/%s/lost_devices_mid_experience_CANCELED"  % experiment.name)
             return []
@@ -906,6 +931,7 @@ def startCloudletThread(cloudlet, experiment, cloudlet_seed, repetition, seed_re
     setTaskExecutorSettings(experiment, jay_instance, custom_settings_map)
     if not selectModel(experiment, jay_instance, custom_model):
         log("Failed to setScheduler on %s" % cloudlet)
+        log("CLOUDLET_SET_SCHEDULER_FAIL\tEXPERIMENT_SET_FAIL")
         experiment.setFail()
 
     barrierWithTimeout(cloudlet_boot_barrier, 600, experiment, True, cloudlet, servers_finish_barrier, finish_barrier) #inform startCloudlets that you have booted
@@ -973,6 +999,7 @@ def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barr
 
     if not selectModel(experiment, jay_instance, custom_model):
         log("Failed to setScheduler on %s" % cloudlet)
+        log("CLOUDLET_SET_SCHEDULER_FAIL\tEXPERIMENT_SET_FAIL")
         experiment.setFail()
 
     log("WAIT_ON_BARRIER\tCLOUD_BOOT_BARRIER\t%s" % cloud.instance)
@@ -1067,6 +1094,7 @@ class Experiment:
     current_repetition = 0
     producers = 0
     repeat_seed = 1
+    initial_repeat_seed = 0
     current_seed_repeat = 0
     timeout = 1500 # 25 Mins
     start_worker = True
@@ -1192,6 +1220,8 @@ def readConfig(confName):
                 experiment.producers = int(config[section][option])
             elif option == "repeatseed":
                 experiment.repeat_seed = int(config[section][option])
+            elif option == "initialrepeatseed":
+                experiment.initial_repeat_seed = int(config[section][option])
             elif option == "timeout":
                 experiment.timeout = int(config[section][option])
             elif option == "startworkers":
@@ -1298,6 +1328,7 @@ def help():
                     Clouds                  = Instance/Zone/IP, Instance/Zone/IP, ... [LIST]
                     Producers               = Number of producer devices [INT]
                     RepeatSeed              = Repeat experiment with same seed N times [INT]
+                    InitialRepeatSeed       = Initial repeat seed [INT]
                     Cloudlets               = IP, ... [LIST]
                     Timeout                 = Max time after experiment duration to cancel execution
                     StartWorkers            = Start Device Worker devices [INT]

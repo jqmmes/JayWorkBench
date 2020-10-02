@@ -345,21 +345,44 @@ for file in sorted(files_taskmap.keys()):
     total_deadline_broken += files_deadline_met[file][1]
     total_delta_energy += files_delta_e[file]
 
+
 try:
-    total_tasks_offloaded_pcnt = ((total_tasks_offloaded*100.0)/total_tasks_offloaded)
+    total_local_pcnt = ((total_tasks_generated-total_tasks_offloaded)*100.0)/total_tasks_generated
+except:
+    total_local_pcnt = 0
+try:
+    total_tasks_offloaded_pcnt = (total_tasks_offloaded*100.0)/total_tasks_offloaded
 except:
     total_tasks_offloaded_pcnt = 0
+try:
+    total_deadline_met_pcnt = (total_deadline_met*100.0)/total_tasks_generated
+except:
+    total_deadline_met_pcnt = 0
+try:
+    total_avg_compute_time_pcnt = total_avg_compute_time/total_avg_compute_time_cnt
+except:
+    total_avg_compute_time_pcnt = 0
+try:
+    total_avg_task_time_pcnt = total_avg_task_time/total_avg_task_time_cnt
+except:
+    total_avg_task_time_pcnt = 0
+try:
+    total_task_energy_pcnt = total_task_energy / total_task_count
+except:
+    total_task_energy_pcnt = 0
+try:
+    total_deadline_broken_pcnt = (total_deadline_broken*100.0)/total_tasks_generated
+except:
+    total_deadline_broken_pcnt = 0
 
 print("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 print("GLOBAL\t\t{}\t\t{}\t\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{} ({:.1f}%)\t{:.2f}s\t\t\t{:.2f}s\t\t{:.2f}mWh\t\t\t\t\t\t{:.2f}mWh".format(
-    total_tasks_generated,total_tasks_executed,(total_tasks_generated-total_tasks_offloaded),
-    (((total_tasks_generated-total_tasks_offloaded)*100.0)/total_tasks_generated),
+    total_tasks_generated,total_tasks_executed,
+    (total_tasks_generated-total_tasks_offloaded), total_local_pcnt,
     total_tasks_offloaded, total_tasks_offloaded_pcnt,
-    total_deadline_met,((total_deadline_met*100.0)/total_tasks_generated),
-    total_deadline_broken,((total_deadline_broken*100.0)/total_tasks_generated),
-    (total_avg_compute_time/total_avg_compute_time_cnt),
-    (total_avg_task_time/total_avg_task_time_cnt),
-    (total_task_energy / total_task_count), total_delta_energy)
+    total_deadline_met,total_deadline_met_pcnt, total_deadline_broken,
+    total_deadline_broken_pcnt, total_avg_compute_time_pcnt, total_avg_task_time_pcnt,
+    total_task_energy_pcnt, total_delta_energy)
 )
 print("\nTOTAL_DURATION: {:.2f}s".format(total_duration))
 print("\n\n\n\n")
