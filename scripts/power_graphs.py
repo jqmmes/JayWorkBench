@@ -2,22 +2,24 @@ from sys import argv, maxsize
 import os
 from re import findall, match
 import shelve
+import dbm
+from time import sleep
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-use_cloudlet = True
-process_files = True
+use_cloudlet = False
+process_files = False
 with_Cloudlet = ""
 file_cloudlet = ""
-shelve_file = "power_processed.shelve"
+shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_power_processed.shelve"
 
 if use_cloudlet:
     with_Cloudlet = "W\ Cloudlet "
     file_cloudlet = "CLOUDLET_"
-    shelve_file = "power_cloudlet_processed.shelve"
+    shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_power_cloudlet_processed.shelve"
 
-storage = shelve.open(shelve_file)
+storage = shelve.Shelf(dbm.ndbm.open(shelve_file, "c"))
 
 device_names = {
 "HT4BTJT00030": "Nexus 9 ",
@@ -47,6 +49,7 @@ files_delta_e = {}
 total_duration = {}
 files_tasks_generated = {}
 files_tasks_executed = {}
+files_timestamps = {}
 
 def getDeviceType(line):
     finds = findall(",(CLOUD|ANDROID),", line)
@@ -190,10 +193,40 @@ def getDeltaE(experiment_key, device, data_lines):
         deltaE += files_powermap[experiment_key][device][-1][1] * (end_time - ((files_powermap[experiment_key][device][-1][0] / 1000.0) / 3600.0))
     except:
         print("POSITIVE_CHARGES_NEEDS_REPEAT ON FILE %s" % device)
+        exit()
+    return deltaE * 1000.0
+
+def getTimeRangeDeltaE(experiment_key, device, init_time, end_time):
+    # Time in hours
+    last_power_read = None
+    n = 0
+    init_time = (init_time / 1000.0) / 3600.0
+    finish_time = (end_time / 1000.0) / 3600.0
+    deltaE = 0
+    i = 0
+    for entry in files_powermap[experiment_key][device]:
+        i += 1
+        if entry[0] > end_time:
+            break
+        if last_power_read is None:
+            power = entry[1]
+            last_time = init_time
+        else:
+            power = (last_power_read + entry[1]) / 2.0
+        last_power_read = power
+        this_time = ((entry[0] / 1000.0) / 3600.0)
+        deltaE += (power * (this_time - last_time))
+        last_time = this_time
+    try:
+        if i > len(files_powermap):
+            i -= 1
+        deltaE += files_powermap[experiment_key][device][i][1] * (finish_time - ((files_powermap[experiment_key][device][i][0] / 1000.0) / 3600.0))
+    except:
+        print("POSITIVE_CHARGES_NEEDS_REPEAT ON FILE %s %s" % (device, experiment_key))
     return deltaE * 1000.0
 
 
-y_labels = ["d={}".format(chr(0x00D8)), "d=12", "d=9", "d=6", "d=3"]
+y_labels = ["d={}".format(chr(0x221E)), "d=12", "d=9", "d=6", "d=3"]
 
 base_name = "SAC21_"
 groups = ["GREEN_DYN", "GREEN_FIXED", "PERFORMANCE", "LOCAL_FIXED"]
@@ -279,7 +312,6 @@ if process_files:
                 if group == "LOCAL_FIXED" and gen not in ["12_12", "9_9", "6_6"]:
                     continue
                 working_dir = "{}/{}{}_{}/0/{}/".format(argv[1], base_name, group, gen, rep)
-                print("Processing {}".format(working_dir))
 
                 files_powermap["{}_{}_{}".format(group, gen, rep)] = {}
                 files_taskmap["{}_{}_{}".format(group, gen, rep)] = {}
@@ -293,6 +325,7 @@ if process_files:
                 files_duration["{}_{}_{}".format(group, gen, rep)] = {}
                 files_delta_e["{}_{}_{}".format(group, gen, rep)] = {}
                 total_duration["{}_{}_{}".format(group,gen,rep)] = 0
+                files_timestamps["{}_{}_{}".format(group, gen, rep)] = {}
                 for file in os.listdir(working_dir):
                     name = file.rstrip(".csv")
                     data_lines = open(working_dir + "/" + file, "r").read().split("\n")
@@ -300,6 +333,7 @@ if process_files:
                     files_duration["{}_{}_{}".format(group, gen, rep)][name] = getTimeStamp(data_lines[-2]) - getTimeStamp(data_lines[1])
                     files_delta_e["{}_{}_{}".format(group, gen, rep)][name] = getDeltaE("{}_{}_{}".format(group, gen, rep), name, data_lines)
                     total_duration["{}_{}_{}".format(group,gen,rep)] = max(total_duration["{}_{}_{}".format(group,gen,rep)], ((getTimeStamp(data_lines[-2])-getTimeStamp(data_lines[1])) / 1000.0))
+                    files_timestamps["{}_{}_{}".format(group,gen,rep)][name] = (getTimeStamp(data_lines[1]), getTimeStamp(data_lines[-2]))
     storage["files_powermap"] = files_powermap
     storage["files_taskmap"] = files_taskmap
     storage["files_deadline_met"] = files_deadline_met
@@ -312,6 +346,7 @@ if process_files:
     storage["files_duration"] = files_duration
     storage["files_delta_e"] = files_delta_e
     storage["total_duration"] = total_duration
+    storage["files_timestamps"] = files_timestamps
 else:
     files_powermap = storage["files_powermap"]
     files_taskmap = storage["files_taskmap"]
@@ -325,6 +360,7 @@ else:
     files_duration = storage["files_duration"]
     files_delta_e = storage["files_delta_e"]
     total_duration = storage["total_duration"]
+    files_timestamps = storage["files_timestamps"]
 
 storage.close()
 
@@ -343,7 +379,19 @@ for group in groups:
             if group == "LOCAL_FIXED" and gen not in ["12_12", "9_9", "6_6"]:
                 continue
             working_dir = "{}/{}{}_{}/0/{}/".format(argv[1], base_name, group, gen, rep)
-            print(working_dir)
+
+            max_duration_starting_timestamp = 0
+            max_duration_complete_timestamp = 0
+
+            for file in sorted(files_powermap["{}_{}_{}".format(group, gen, rep)].keys()):
+                if len(files_taskmap["{}_{}_{}".format(group, gen, rep)][file]) > 0:
+                    task_max = 0
+                    for entry in files_task_duration["{}_{}_{}".format(group, gen, rep)][file]:
+                        task_max = max(task_max, entry[1])
+                    if (task_max - files_timestamps["{}_{}_{}".format(group, gen, rep)][file][0]) > (max_duration_complete_timestamp - max_duration_starting_timestamp):
+                        max_duration_complete_timestamp = task_max
+                        max_duration_starting_timestamp = files_timestamps["{}_{}_{}".format(group, gen, rep)][file][0]
+
             # for file in os.listdir(working_dir):
             #     name = file.rstrip(".csv")
             #     data_lines = open(working_dir + "/" + file, "r").read().split("\n")
@@ -355,6 +403,7 @@ for group in groups:
             total_task_energy = 0
             total_task_count = 0
             files_avg_task_powers["{}_{}_{}".format(group, gen, rep)] = {}
+
             for file in sorted(files_powermap["{}_{}_{}".format(group, gen, rep)].keys()):
                 entries = 0
                 avg_p_file = 0
@@ -444,7 +493,8 @@ for group in groups:
                 total_tasks_offloaded += files_taskmap["{}_{}_{}".format(group, gen, rep)][file][2]
                 total_deadline_met += files_deadline_met["{}_{}_{}".format(group, gen, rep)][file][0]
                 total_deadline_broken += files_deadline_met["{}_{}_{}".format(group, gen, rep)][file][1]
-                total_delta_energy += files_delta_e["{}_{}_{}".format(group, gen, rep)][file]
+                r_delta_e = getTimeRangeDeltaE("{}_{}_{}".format(group, gen, rep), file, files_timestamps["{}_{}_{}".format(group, gen, rep)][file][0], max_duration_complete_timestamp+5000)
+                total_delta_energy += r_delta_e
 
             total_global_local_executions = 0
             total_global_cloudlet_offloads = 0
@@ -477,7 +527,10 @@ for group in groups:
             except:
                 total_tasks_offloaded_pcnt = 0
             try:
-                total_deadline_met_pcnt = (total_deadline_met*100.0)/total_tasks_generated
+                if "NO_DEADLINE" in gen:
+                    total_deadline_met_pcnt = 100
+                else:
+                    total_deadline_met_pcnt = (total_deadline_met*100.0)/total_tasks_generated
             except:
                 total_deadline_met_pcnt = 0
             try:
@@ -500,7 +553,7 @@ for group in groups:
             i += 1
             #graph 1
             absolute_total_delta_energy += total_delta_energy
-            absolute_total_deadline_met_pcnt = total_deadline_met_pcnt
+            absolute_total_deadline_met_pcnt += total_deadline_met_pcnt
 
             #graph 2
             absolute_total_local_executions_pcnt += total_local_executions_pcnt
@@ -508,7 +561,6 @@ for group in groups:
             absolute_total_remote_executions_pcnt += total_remote_executions_pcnt
 
             #graph 3
-            print(total_avg_task_time_pcnt)
             absolute_total_avg_task_time += total_avg_task_time_pcnt
 
             #graph 4
@@ -582,11 +634,6 @@ for group in groups:
                 distribution_remote_9.append(absolute_total_remote_executions_pcnt/i)
                 distribution_cloudlet_9.append(absolute_total_cloudlet_offloads_pcnt/i)
             if gen.strip("CLOUDLET_")[:1] == "6":
-                print(i)
-                print(absolute_total_delta_energy)
-                print(absolute_total_avg_task_time)
-                print(absolute_avg_total_task_energy)
-                print(absolute_total_deadline_met_pcnt)
                 perf_6.append(absolute_total_delta_energy/i)
                 avg_task_execution_perf_6.append(absolute_total_avg_task_time/i)
                 avg_task_energy_perf_6.append(absolute_avg_total_task_energy/i)
@@ -693,7 +740,7 @@ fig_2.show()
 fig_3 = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing = 0.05, subplot_titles=("{}=12".format(chr(0x03BB)),"{}=9".format(chr(0x03BB)), "{}=6".format(chr(0x03BB))))
 
 
-y_labels_1 = [["d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),
+y_labels_1 = [["d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)),
                 "d=12","d=12","d=12","d=9","d=9","d=9", "d=6","d=6","d=6","d=3","d=3","d=3"],
             ['Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance",
             'Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance",
@@ -702,7 +749,7 @@ y_labels_1 = [["d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),"d={}".form
             'Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance"]]
 
 
-y_labels_2 = [["d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),
+y_labels_2 = [["d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)),
                 "d=9","d=9","d=9", "d=6","d=6","d=6", "d=3","d=3","d=3"],
             ['Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance",
             'Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance",
@@ -711,7 +758,7 @@ y_labels_2 = [["d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),"d={}".form
 
 
 
-y_labels_3 = [["d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)), "d=6","d=6","d=6", "d=3","d=3","d=3"],
+y_labels_3 = [["d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)), "d=6","d=6","d=6", "d=3","d=3","d=3"],
             ['Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance",
             'Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance",
             'Green w\ Fix Estimations', "Green w\ Dynamic Estimations", "Performance"]]
@@ -729,7 +776,6 @@ y_labels_3 = [["d={}".format(chr(0x00D8)),"d={}".format(chr(0x00D8)),"d={}".form
 # Performance: [cloudlet_6_no_deadline, cloudlet_6_6, cloudletv_6_3]
 
 
-
 fig_3.add_trace(go.Bar(name='Local', y=y_labels_1, x=distribution_local_12, orientation='h', marker_color="#004D40"), row=1, col=1)
 fig_3.add_trace(go.Bar(name="Remote", y=y_labels_1, x=distribution_remote_12, orientation='h', marker_color="#FFC107"), row=1, col=1)
 fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_1, x=distribution_cloudlet_12, orientation='h', marker_color="#D81B60"), row=1, col=1)
@@ -738,7 +784,6 @@ fig_3.add_trace(go.Bar(name='Local', y=y_labels_2, x=distribution_local_9, orien
 fig_3.add_trace(go.Bar(name="Remote", y=y_labels_2, x=distribution_remote_9, orientation='h', marker_color="#FFC107", showlegend=False), row=2, col=1)
 fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_2, x=distribution_cloudlet_9, orientation='h', marker_color="#D81B60", showlegend=False), row=2, col=1)
 
-print(distribution_local_6)
 fig_3.add_trace(go.Bar(name='Local', y=y_labels_3, x=distribution_local_6, orientation='h', marker_color="#004D40", showlegend=False), row=3, col=1)
 fig_3.add_trace(go.Bar(name="Remote", y=y_labels_3, x=distribution_remote_6, orientation='h', marker_color="#FFC107", showlegend=False), row=3, col=1)
 fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_3, x=distribution_cloudlet_6, orientation='h', marker_color="#D81B60", showlegend=False), row=3, col=1)
