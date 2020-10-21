@@ -8,16 +8,20 @@ from time import sleep
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-use_cloudlet = False
+use_cloudlet = True
 process_files = False
 with_Cloudlet = ""
 file_cloudlet = ""
-shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_power_processed.shelve"
+#shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_power_processed.shelve"
+#shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_same_as_power_processed.shelve"
+shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_simple_power_processed.shelve"
 
 if use_cloudlet:
     with_Cloudlet = "W\ Cloudlet "
     file_cloudlet = "CLOUDLET_"
-    shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_power_cloudlet_processed.shelve"
+    #shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_power_cloudlet_processed.shelve"
+    shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_same_as_power_cloudlet_processed.shelve"
+    #shelve_file = "/Users/joaquim/JayWorkBench/scripts/mac_simple_power_cloudlet_processed.shelve"
 
 storage = shelve.Shelf(dbm.ndbm.open(shelve_file, "c"))
 
@@ -226,19 +230,28 @@ def getTimeRangeDeltaE(experiment_key, device, init_time, end_time):
     return deltaE * 1000.0
 
 
-y_labels = ["d={}".format(chr(0x221E)), "d=12", "d=9", "d=6", "d=3"]
+#y_labels = ["d={}".format(chr(0x221E)), "d=12", "d=9", "d=6", "d=3"]
+y_labels = ["d=6 (50ms)", "d=6 (100ms)", "d=6 (200ms)", "d=6 (500ms)", "d=6 (1000ms)"]
 
-base_name = "SAC21_"
-groups = ["GREEN_DYN", "GREEN_FIXED", "PERFORMANCE", "LOCAL_FIXED"]
+#base_name = "SAC21_"
+base_name = "SAME_AS_SAC21_"
+#base_name = "SIMPLE_SAC21_"
+#groups = ["GREEN_DYN", "GREEN_FIXED", "PERFORMANCE", "LOCAL_FIXED"]
+groups = ["GREEN_DYN"]
+# if use_cloudlet:
+#     groups = ["GREEN_DYN", "GREEN_FIXED", "PERFORMANCE"]
 if use_cloudlet:
-    groups = ["GREEN_DYN", "GREEN_FIXED", "PERFORMANCE"]
+   groups = ["GREEN_DYN"]
 
-generation_deadlines = ["{}12_NO_DEADLINE".format(file_cloudlet),"{}12_12".format(file_cloudlet),
-                        "{}12_9".format(file_cloudlet), "{}12_6".format(file_cloudlet),
-                        "{}12_3".format(file_cloudlet), "{}9_NO_DEADLINE".format(file_cloudlet),
-                        "{}9_9".format(file_cloudlet), "{}9_6".format(file_cloudlet),
-                        "{}9_3".format(file_cloudlet), "{}6_NO_DEADLINE".format(file_cloudlet),
-                        "{}6_6".format(file_cloudlet), "{}6_3".format(file_cloudlet)]
+# generation_deadlines = ["{}12_NO_DEADLINE".format(file_cloudlet),"{}12_12".format(file_cloudlet),
+#                         "{}12_9".format(file_cloudlet), "{}12_6".format(file_cloudlet),
+#                         "{}12_3".format(file_cloudlet), "{}9_NO_DEADLINE".format(file_cloudlet),
+#                         "{}9_9".format(file_cloudlet), "{}9_6".format(file_cloudlet),
+#                         "{}9_3".format(file_cloudlet), "{}6_NO_DEADLINE".format(file_cloudlet),
+#                         "{}6_6".format(file_cloudlet), "{}6_3".format(file_cloudlet)]
+generation_deadlines = ["{}12_6_50".format(file_cloudlet), "{}12_6_100".format(file_cloudlet),
+                        "{}12_6_200".format(file_cloudlet),"{}12_6_500".format(file_cloudlet),
+                        "{}12_6_1000".format(file_cloudlet)]
 
 fix_12 = []
 fix_9 = []
@@ -309,6 +322,7 @@ if process_files:
     for group in groups:
         for gen in generation_deadlines:
             for rep in range(3):
+            #for rep in range(1):
                 if group == "LOCAL_FIXED" and gen not in ["12_12", "9_9", "6_6"]:
                     continue
                 working_dir = "{}/{}{}_{}/0/{}/".format(argv[1], base_name, group, gen, rep)
@@ -376,6 +390,7 @@ for group in groups:
         absolute_avg_total_task_energy = 0
         i = 0
         for rep in range(3):
+        #for rep in range(1):
             if group == "LOCAL_FIXED" and gen not in ["12_12", "9_9", "6_6"]:
                 continue
             working_dir = "{}/{}{}_{}/0/{}/".format(argv[1], base_name, group, gen, rep)
@@ -565,7 +580,7 @@ for group in groups:
 
             #graph 4
             absolute_avg_total_task_energy += total_task_energy_pcnt
-
+        print(group, gen)
         if group == "GREEN_DYN":
             if gen.strip("CLOUDLET_")[:2] == "12":
                 dyn_12.append(absolute_total_delta_energy/i)
@@ -775,18 +790,66 @@ y_labels_3 = [["d={}".format(chr(0x221E)),"d={}".format(chr(0x221E)),"d={}".form
 # Green_Dyn: [remote_6_no_deadline, remote_6_6, remote_6_3]
 # Performance: [cloudlet_6_no_deadline, cloudlet_6_6, cloudletv_6_3]
 
+final_distribution_local_12 = []
+final_distribution_remote_12 = []
+final_distribution_cloudlet_12 = []
 
-fig_3.add_trace(go.Bar(name='Local', y=y_labels_1, x=distribution_local_12, orientation='h', marker_color="#004D40"), row=1, col=1)
-fig_3.add_trace(go.Bar(name="Remote", y=y_labels_1, x=distribution_remote_12, orientation='h', marker_color="#FFC107"), row=1, col=1)
-fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_1, x=distribution_cloudlet_12, orientation='h', marker_color="#D81B60"), row=1, col=1)
+n = int(len(distribution_local_12)/3)
+for i in range(int(len(distribution_local_12)/3)):
+    final_distribution_local_12.append(distribution_local_12[n+i])
+    final_distribution_local_12.append(distribution_local_12[i])
+    final_distribution_local_12.append(distribution_local_12[n*2+i])
+    final_distribution_remote_12.append(distribution_remote_12[n+i])
+    final_distribution_remote_12.append(distribution_remote_12[i])
+    final_distribution_remote_12.append(distribution_remote_12[n*2+i])
+    final_distribution_cloudlet_12.append(distribution_cloudlet_12[n+i])
+    final_distribution_cloudlet_12.append(distribution_cloudlet_12[i])
+    final_distribution_cloudlet_12.append(distribution_cloudlet_12[n*2+i])
 
-fig_3.add_trace(go.Bar(name='Local', y=y_labels_2, x=distribution_local_9, orientation='h', marker_color="#004D40", showlegend=False), row=2, col=1)
-fig_3.add_trace(go.Bar(name="Remote", y=y_labels_2, x=distribution_remote_9, orientation='h', marker_color="#FFC107", showlegend=False), row=2, col=1)
-fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_2, x=distribution_cloudlet_9, orientation='h', marker_color="#D81B60", showlegend=False), row=2, col=1)
+fig_3.add_trace(go.Bar(name='Local', y=y_labels_1, x=final_distribution_local_12, orientation='h', marker_color="#004D40"), row=1, col=1)
+fig_3.add_trace(go.Bar(name="Remote", y=y_labels_1, x=final_distribution_remote_12, orientation='h', marker_color="#FFC107"), row=1, col=1)
+fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_1, x=final_distribution_cloudlet_12, orientation='h', marker_color="#D81B60"), row=1, col=1)
 
-fig_3.add_trace(go.Bar(name='Local', y=y_labels_3, x=distribution_local_6, orientation='h', marker_color="#004D40", showlegend=False), row=3, col=1)
-fig_3.add_trace(go.Bar(name="Remote", y=y_labels_3, x=distribution_remote_6, orientation='h', marker_color="#FFC107", showlegend=False), row=3, col=1)
-fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_3, x=distribution_cloudlet_6, orientation='h', marker_color="#D81B60", showlegend=False), row=3, col=1)
+
+final_distribution_local_9 = []
+final_distribution_remote_9 = []
+final_distribution_cloudlet_9 = []
+
+n = int(len(distribution_local_9)/3)
+for i in range(int(len(distribution_local_9)/3)):
+    final_distribution_local_9.append(distribution_local_9[n+i])
+    final_distribution_local_9.append(distribution_local_9[i])
+    final_distribution_local_9.append(distribution_local_9[n*2+i])
+    final_distribution_remote_9.append(distribution_remote_9[n+i])
+    final_distribution_remote_9.append(distribution_remote_9[i])
+    final_distribution_remote_9.append(distribution_remote_9[n*2+i])
+    final_distribution_cloudlet_9.append(distribution_cloudlet_9[n+i])
+    final_distribution_cloudlet_9.append(distribution_cloudlet_9[i])
+    final_distribution_cloudlet_9.append(distribution_cloudlet_9[n*2+i])
+
+fig_3.add_trace(go.Bar(name='Local', y=y_labels_2, x=final_distribution_local_9, orientation='h', marker_color="#004D40", showlegend=False), row=2, col=1)
+fig_3.add_trace(go.Bar(name="Remote", y=y_labels_2, x=final_distribution_remote_9, orientation='h', marker_color="#FFC107", showlegend=False), row=2, col=1)
+fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_2, x=final_distribution_cloudlet_9, orientation='h', marker_color="#D81B60", showlegend=False), row=2, col=1)
+
+final_distribution_local_6 = []
+final_distribution_remote_6 = []
+final_distribution_cloudlet_6 = []
+
+n = int(len(distribution_local_6)/3)
+for i in range(int(len(distribution_local_6)/3)):
+    final_distribution_local_6.append(distribution_local_6[n+i])
+    final_distribution_local_6.append(distribution_local_6[i])
+    final_distribution_local_6.append(distribution_local_6[n*2+i])
+    final_distribution_remote_6.append(distribution_remote_6[n+i])
+    final_distribution_remote_6.append(distribution_remote_6[i])
+    final_distribution_remote_6.append(distribution_remote_6[n*2+i])
+    final_distribution_cloudlet_6.append(distribution_cloudlet_6[n+i])
+    final_distribution_cloudlet_6.append(distribution_cloudlet_6[i])
+    final_distribution_cloudlet_6.append(distribution_cloudlet_6[n*2+i])
+
+fig_3.add_trace(go.Bar(name='Local', y=y_labels_3, x=final_distribution_local_6, orientation='h', marker_color="#004D40", showlegend=False), row=3, col=1)
+fig_3.add_trace(go.Bar(name="Remote", y=y_labels_3, x=final_distribution_remote_6, orientation='h', marker_color="#FFC107", showlegend=False), row=3, col=1)
+fig_3.add_trace(go.Bar(name="Cloudlet", y=y_labels_3, x=final_distribution_cloudlet_6, orientation='h', marker_color="#D81B60", showlegend=False), row=3, col=1)
 
 fig_3.update_layout(barmode='stack', title="Execution Distribution {}".format(with_Cloudlet))
 fig_3.update_yaxes(type='multicategory', row=1, col=1)

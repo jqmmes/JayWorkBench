@@ -1480,6 +1480,9 @@ def help():
                     DEVICE_ID: String = ""
                     BANDWIDTH_ESTIMATE_TYPE = "ALL" // ACTIVE/PASSIVE/ALL
 
+                    MULTICAST_PKT_INTERVAL: Int = 500 // Multicast Advertise Interval
+                    USE_CPU_ESTIMATIONS: Boolean = false // Use CpuEstimation on Profiller
+
                     ---> BENCHMARKS
                     COMPUTATION_BASELINE_DURATION_FLAG = false
                     COMPUTATION_BASELINE_DURATION = 600 // 10 minutess
