@@ -55,13 +55,18 @@ from re import findall, match
 device_names = {
 "HT4BTJT00030": "Nexus 9 ",
 "unknown_device_192.168.3.34": "Xiaomi Mi 9T",
+"unknown_device_192.168.1.92": "Xiaomi Mi 9T",
 "7a3e71d8": "Xiaomi Mi 9T",
 "unknown_device_192.168.3.10": "Galaxy S7e",
+"unknown_device_192.168.1.91": "Galaxy S7e",
 "ce0616067b654c2805": "Galaxy S7e",
 "R52N50ZGEYE": "Tab S5e  ",
 "unknown_device_192.168.3.35": "Tab S5e  ",
+"unknown_device_192.168.1.93": "Tab S5e  ",
 "cloudlet_192.168.3.15": "Cloudlet",
+"cloudlet_192.168.1.94": "Cloudlet",
 "unknown_device_192.168.3.48": "Pixel 4 ",
+"unknown_device_192.168.1.90": "Pixel 4 ",
 "9B021FFAZ00510": "Pixel 4 ",
 "HT4BVJT00012": "Nexus 9 ",
 "HT4BVJT00003": "Nexus 9 "

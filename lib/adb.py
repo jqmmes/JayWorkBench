@@ -243,21 +243,26 @@ def getWifiDeviceNameByIp(device_ip, retries=2):
         device_name = "unknown_device_{}".format(device_ip)
         if device_ip == "192.168.3.6":
             device_name = "HT4BTJT00078"
-        elif device_ip == "192.168.3.10":
+        elif device_ip == "192.168.1.91":
+            #elif device_ip == "192.168.3.10":
             device_name = "ce0616067b654c2805"
         elif device_ip == "192.168.3.16":
             device_name = "e0946815"
         elif device_ip == "192.168.3.33":
             device_name = "HT4BTJT00030"
-        elif device_ip == "192.168.3.34":
+        elif device_ip == "192.168.1.92":
+            #elif device_ip == "192.168.3.34":
             device_name = "7a3e71d8"
-        elif device_ip == "192.168.3.35":
+        elif device_ip == "192.168.1.93":
+            #elif device_ip == "192.168.3.35":
             device_name = "R52N50ZGEYE"
-        elif device_ip == "192.168.3.37":
+        elif device_ip == "192.168.1.85":
+            #elif device_ip == "192.168.3.37":
             device_name = "HT4BVJT00003"
         elif device_ip == "192.168.3.40":
             device_name = "HT4BVJT00012"
-        elif device_ip == "192.168.3.48":
+        elif device_ip == "192.168.1.90":
+            #elif device_ip == "192.168.3.48":
             device_name = "9B021FFAZ00510"
         return device_name
     result = subprocess.run([ADB_BIN, "-s", "{}:5555".format(device_ip), "shell", "getprop ro.serialno"], stdout=subprocess.PIPE, stderr=FNULL)
@@ -383,7 +388,7 @@ def discoverWifiADBDevices(ip_mask=getLocalIpMask(), range_min=0, range_max=256,
     reps = 1
     while (reps > 0):
         #response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
-        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(2) + "-51", '-T', 'polite'], stdout=subprocess.PIPE, stderr=FNULL)
+        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(80) + "-100", '-T', 'polite'], stdout=subprocess.PIPE, stderr=FNULL)
         for entry in findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8")):
             if entry not in network_devices:
                 network_devices.append(entry)
