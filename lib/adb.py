@@ -250,10 +250,12 @@ def getWifiDeviceNameByIp(device_ip, retries=2):
             device_name = "e0946815"
         elif device_ip == "192.168.3.33":
             device_name = "HT4BTJT00030"
-        elif device_ip == "192.168.1.92":
+        elif device_ip == "192.168.1.151":
+            #elif device_ip == "192.168.1.92":
             #elif device_ip == "192.168.3.34":
             device_name = "7a3e71d8"
-        elif device_ip == "192.168.1.93":
+        elif device_ip == "192.168.1.157":
+            #elif device_ip == "192.168.1.93":
             #elif device_ip == "192.168.3.35":
             device_name = "R52N50ZGEYE"
         elif device_ip == "192.168.1.85":
@@ -261,7 +263,8 @@ def getWifiDeviceNameByIp(device_ip, retries=2):
             device_name = "HT4BVJT00003"
         elif device_ip == "192.168.3.40":
             device_name = "HT4BVJT00012"
-        elif device_ip == "192.168.1.90":
+        elif device_ip == "192.168.1.150":
+            #elif device_ip == "192.168.1.90":
             #elif device_ip == "192.168.3.48":
             device_name = "9B021FFAZ00510"
         return device_name
@@ -388,7 +391,7 @@ def discoverWifiADBDevices(ip_mask=getLocalIpMask(), range_min=0, range_max=256,
     reps = 1
     while (reps > 0):
         #response = subprocess.run(['nmap', '-sP', ip_mask.format(1) + "/24", "--host-timeout", "15"], stdout=subprocess.PIPE, stderr=FNULL)
-        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(80) + "-100", '-T', 'polite'], stdout=subprocess.PIPE, stderr=FNULL)
+        response = subprocess.run(['nmap', '-sN', '-p', "5555", ip_mask.format(2) + "-255"], stdout=subprocess.PIPE, stderr=FNULL) # , '-T', 'polite'
         for entry in findall("(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", response.stdout.decode("UTF-8")):
             if entry not in network_devices:
                 network_devices.append(entry)
@@ -543,13 +546,16 @@ def pmInstallPackage(package, device=None):
     else:
         adb(['shell', 'pm', 'install', '-g', '/data/local/tmp/%s' % package.replace(" ", "\ ")], device)
 
-def uninstallPackage(package=LAUNCHER_APP, device=None):
-    adb(['shell', 'pm', 'uninstall', '-k', package], device)
+def uninstallPackage(package=LAUNCHER_APP, clean_data=True, device=None):
+    if clean_data:
+        adb(['shell', 'pm', 'uninstall', package], device)
+    else:
+        adb(['shell', 'pm', 'uninstall', '-k', package], device)
 
 def removePackage(package=LAUNCHER_APP, device=None):
     adb(['shell', 'pm', 'clear', package], device)
     adb(['shell', 'pm', 'reset-permissions', package], device)
-    uninstallPackage(device)
+    uninstallPackage(package, True, device)
 
 def grantPermission(permission, package=LAUNCHER_APP, device=None):
     adb(['shell', 'pm', 'grant', package, permission], device)

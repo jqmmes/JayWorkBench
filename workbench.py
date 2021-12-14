@@ -191,7 +191,7 @@ def barrierWithTimeout(barrier, timeout=None, experiment=None, show_error=True, 
         if timeout is not None:
             barrier.wait(timeout=timeout)
         else:
-            barrier.wait(timeout=2400) # 40mins max timeout overall
+            barrier.wait(timeout=7200) # 40mins max timeout overall
     except Exception as barrier_exception:
         skipBarriers(experiment, show_error, device, *skip_barriers)
         return False
@@ -294,7 +294,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
     global PENDING_TASKS, PENDING_WORKERS, SCREEN_BRIGHTNESS, TAP_TO_KEEP_SCREEN_ON_FLAG, IDLE_BENCHMARK, IDLE_BENCHMARK_DURATION
     if (adb.freeSpace(device=device) < 1.0):
         log('LOW_SDCARD_SPACE\t%s' % device.name)
-        installPackage(device)
+        installPackage(device, True)
     adb.connectWifiADB(device)
     log("START_DEVICE\t%s" % device.name)
     device_random = random.Random()
@@ -438,7 +438,8 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         destroyWorker(jay_instance, droid_launcher, device)
         return
     for scheduler in schedulers.scheduler:
-        if scheduler.name == experiment.scheduler and experiment.isOK():
+        print(f"${scheduler.name}\t==\t${experiment.scheduler}")
+        if scheduler.name.lower() == experiment.scheduler.lower() and experiment.isOK():
             if (jay_instance.setScheduler(scheduler) is None):
                 log("Failed to setScheduler on %s" % device.name)
                 skipBarriers(experiment, True, device.name, boot_barrier, start_barrier, complete_barrier, log_pull_barrier, finish_barrier)
@@ -486,7 +487,7 @@ def startWorkerThread(experiment, worker_seed, repetition, seed_repeat, is_produ
         return
     TAP_TO_KEEP_SCREEN_ON_FLAG = False
     log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
-    if not barrierWithTimeout(log_pull_barrier, 30, experiment, True, device.name, finish_barrier):
+    if not barrierWithTimeout(log_pull_barrier, 300, experiment, True, device.name, finish_barrier):
         log("BROKEN_BARRIER\tLOG_PULL_BARRIER\t%s" % device.name)
         destroyWorker(jay_instance, droid_launcher, device)
         return
@@ -634,9 +635,6 @@ def runExperiment(experiment):
         experiment_random.shuffle(devices)
 
         for seed_repeat in range(experiment.initial_repeat_seed, experiment.repeat_seed):
-            TAP_TO_KEEP_SCREEN_ON_FLAG = True
-            LOG_PULL_SCREEN_ON_FLAG = True
-            LAST_RECEIVED_TASK_COMPLETION = None
             if CURSES:
                 progressBar_0.updateProgress(int(100*(seed_repeat/experiment.repeat_seed)))
             repeat_tries = 0
@@ -700,6 +698,9 @@ def runExperiment(experiment):
                         break
                     if (device.name in experiment.producers_filter) or (len(experiment.producers_filter) == 0):
                         filtered_producers.append(device)
+                TAP_TO_KEEP_SCREEN_ON_FLAG = True
+                LOG_PULL_SCREEN_ON_FLAG = True
+                LAST_RECEIVED_TASK_COMPLETION = None
                 i = 0
                 for device in experiment_devices[:experiment.devices]:
                     if (i < len(custom_executors_mobile)):
@@ -756,21 +757,21 @@ def runExperiment(experiment):
                     sleep(IDLE_BENCHMARK_DURATION)
                 log("WAIT_ON_BARRIER\tCOMPLETE_BARRIER\tMAIN_LOOP")
                 if (experiment.benchmark):
-                    if not barrierWithTimeout(complete_barrier, 240+experiment.benchmark_duration, experiment, True, "MAIN"):
+                    if not barrierWithTimeout(complete_barrier, experiment.timeout+240+experiment.benchmark_duration, experiment, True, "MAIN"):
                         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
                 else:
-                    if not barrierWithTimeout(complete_barrier, 240, experiment, True, "MAIN"):
+                    if not barrierWithTimeout(complete_barrier, experiment.timeout+240, experiment, True, "MAIN"):
                         log("BROKEN_BARRIER\tCOMPLETE_BARRIER\tMAIN")
                 sleep(1)
                 log("WAIT_ON_BARRIER\tLOG_PULL_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(log_pull_barrier, 60, experiment, True, "MAIN")
+                barrierWithTimeout(log_pull_barrier, experiment.timeout+360, experiment, True, "MAIN")
                 if (experiment.isOK()):
                     pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat)
 
                 log("WAIT_ON_BARRIER\tSERVER_FINISH_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(servers_finish_barrier, 60, experiment, True, "MAIN", servers_finish_barrier, finish_barrier)
+                barrierWithTimeout(servers_finish_barrier, 360, experiment, True, "MAIN", servers_finish_barrier, finish_barrier)
                 log("WAIT_ON_BARRIER\tFINISH_BARRIER\tMAIN_LOOP")
-                barrierWithTimeout(finish_barrier, 3000, experiment, True, "MAIN", finish_barrier)
+                barrierWithTimeout(finish_barrier, experiment.timeout, experiment, True, "MAIN", finish_barrier)
 
                 if (experiment.isOK()):
                     break
@@ -954,12 +955,12 @@ def pullLogsCloudsAndCloudlets(experiment, repetition, seed_repeat):
         if (cloud.zone == 'localhost'):
             os.system("cp %s/Jay-x86/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloud.address))
         else:
-            os.system("scp -i ~/.ssh/cloudlet joaquim@%s:~/Jay-x86/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
+            os.system("scp -i cloudlet joaquim@%s:~/Jay-x86/logs/%s logs/experiment/%s/%s/%s/%s_%s.csv" % (cloud.address, log_name, experiment.name, repetition, seed_repeat, cloud.instance, cloud.zone))
     for cloudlet in experiment.cloudlets:
         if (cloudlet == '127.0.0.1'):
             os.system("cp %s/Jay-x86/logs/%s logs/experiment/%s/%s/%s/cloudlet_%s.csv" % (os.environ['HOME'], log_name, experiment.name, repetition, seed_repeat, cloudlet))
         else:
-            os.system("scp -i ~/.ssh/cloudlet joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
+            os.system("scp -i cloudlet joaquim@%s:~/Jay-x86/logs/%s logs/experiment//%s/%s/%s/cloudlet_%s.csv" % (cloudlet, log_name, experiment.name, repetition, seed_repeat, cloudlet))
 
 def startCloudThread(cloud, experiment, repetition, seed_repeat, cloud_boot_barrier, servers_finish_barrier, finish_barrier, custom_task_executor=None, custom_model=None, custom_settings_map=None):
     log("START_CLOUD_INSTANCE\t{}\t({})".format(cloud.instance, cloud.address))
@@ -1433,6 +1434,10 @@ def help():
                             TASK_DEADLINE_BROKEN_SELECTION: EXECUTE_LOCALLY, FASTER_COMPLETION, [LOWEST_ENERGY]
                             USE_FIXED_POWER_ESTIMATIONS: true / false
 
+                    LocalFirst [hybrid] [LOCAL, REMOTE]
+                    LocalFirst [tmin] [LOCAL, REMOTE]
+                    LocalFirst [random] [LOCAL, REMOTE]
+
 
             Settings:
                     CLOUD_IP
@@ -1495,6 +1500,8 @@ def help():
                             RANDOM
                             LOWEST_ENERGY
                     INCLUDE_IDLE_COSTS = true/false
+
+                    DEADLINE_CHECK_TOLERANCE: Int = 200 // Force deadlines to take -{DEADLINE_CHECK_TOLERANCE}ms than expected
 
             OS Specific Problems/Fixes:
                 MacOS:
@@ -1572,10 +1579,10 @@ def checkInterfaces():
             log("\t[*] {}".format(iface))
     log("==========================================================================================")
 
-def installPackage(device):
+def installPackage(device, clean_data=False):
     forceScreenOnViaPower(device)
     log('CLEANING_SYSTEM\t%s' % device.name)
-    adb.uninstallPackage(device=device)
+    adb.uninstallPackage(clean_data=clean_data, device=device)
     log('PACKAGE_UNINSTALLED\t%s' % device.name)
     log('PUSHING_PACKAGE\t%s' % device.name)
     adb.pushFile('apps/release/', 'Jay-Android Launcher-release.apk', path='', basepath='/data/local/tmp/', device=device)
@@ -1637,6 +1644,7 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--configs', default=[], nargs='+', required=False)
     argparser.add_argument('--show-help', default=False, action='store_true', required=False)
+    argparser.add_argument('-cc', '--clean-data', default=False, action='store_true', required=False)
     argparser.add_argument('-i', '--install', default=False, action='store_true', required=False)
     argparser.add_argument('-da', '--debug-adb', default=False, action='store_true', required=False)
     argparser.add_argument('-al', '--adb-log-level', action='store', required=False, help="ALL / ACTION / COMMAND")
@@ -1778,8 +1786,11 @@ def main():
             devices_with_screen_off.append(device)
     if args.install:
         log('INSTALLING_APKS')
+        clean_data=False
+        if args.clean_data:
+            clean_data = True
         for device in ALL_DEVICES:
-            installPackage(device)
+            installPackage(device, clean_data)
     if args.debug_grpc:
         grpcControls.grpcLogs.debug = True
         grpcControls.grpcLogs.log_file = LOG_FILE
